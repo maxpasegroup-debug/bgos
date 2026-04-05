@@ -1,13 +1,10 @@
-/** Consistent vertical rhythm — minimal, breathable sections */
-export const sectionY =
-  "py-24 sm:py-32 lg:py-40";
+/** Consistent vertical rhythm — py-20 across marketing sections */
+export const sectionY = "py-20";
 
-export const sectionDivider = "border-t border-white/[0.06]";
+export const sectionDivider = "border-t border-gray-200";
 
-/** Hero: slightly more air above the fold */
-export const heroY =
-  "pt-28 pb-28 sm:pt-32 sm:pb-36 lg:pt-40 lg:pb-44";
+/** Hero uses same vertical rhythm as other sections */
+export const heroY = "py-20";
 
 /** Space from section title block to main content */
-export const blockGap =
-  "mt-12 sm:mt-16 lg:mt-20";
+export const blockGap = "mt-10 sm:mt-12";

@@ -24,12 +24,12 @@ export function CursorGlow() {
       aria-hidden
     >
       <motion.div
-        className="absolute h-[240px] w-[240px] -translate-x-1/2 -translate-y-1/2 rounded-full mix-blend-screen"
+        className="absolute h-[220px] w-[220px] -translate-x-1/2 -translate-y-1/2 rounded-full mix-blend-multiply"
         style={{
           left: sx,
           top: sy,
           background:
-            "radial-gradient(circle, rgba(239,68,68,0.06) 0%, rgba(250,204,21,0.035) 38%, transparent 68%)",
+            "radial-gradient(circle, rgba(239,68,68,0.07) 0%, rgba(250,204,21,0.05) 40%, transparent 70%)",
         }}
       />
     </motion.div>

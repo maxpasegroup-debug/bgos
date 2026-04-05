@@ -1,11 +1,11 @@
 "use client";
 
-import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+import { motion } from "framer-motion";
 import { SectionReveal } from "./SectionReveal";
 import { Container } from "./Container";
 import { staggerContainer, staggerItem } from "./motionPresets";
 import { blockGap, sectionDivider, sectionY } from "./spacing";
-import { useId, useRef, type ComponentType } from "react";
+import { useId, type ComponentType } from "react";
 
 const features = [
   {
@@ -59,7 +59,7 @@ function LeadIcon({ className }: { className?: string }) {
       </motion.g>
       <motion.path
         d="M 20 22 L 26 28"
-        className="stroke-yellow-400"
+        className="stroke-amber-400"
         strokeWidth="2"
         strokeLinecap="round"
         initial={{ pathLength: 0 }}
@@ -80,10 +80,10 @@ function AiIcon({ className }: { className?: string }) {
     <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden>
       <motion.path
         d="M8 16h16M16 8v16"
-        className="stroke-yellow-400"
+        className="stroke-amber-500"
         strokeWidth="2"
         strokeLinecap="round"
-        animate={{ opacity: [0.45, 0.95, 0.45] }}
+        animate={{ opacity: [0.5, 1, 0.5] }}
         transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
       />
       <motion.g
@@ -95,7 +95,7 @@ function AiIcon({ className }: { className?: string }) {
           cx="16"
           cy="16"
           r="10"
-          className="stroke-red-500/70"
+          className="stroke-red-500/60"
           strokeWidth="1.5"
           strokeDasharray="4 4"
           fill="none"
@@ -116,9 +116,9 @@ function PipelineIcon({ className }: { className?: string }) {
           width="6"
           height="12"
           rx="2"
-          className="fill-white/15 stroke-yellow-400/45"
+          className="fill-slate-200 stroke-amber-400/50"
           strokeWidth="1"
-          animate={{ opacity: [0.4, 0.85, 0.4], y: [1, 0, 1] }}
+          animate={{ opacity: [0.55, 1, 0.55], y: [1, 0, 1] }}
           transition={{
             duration: 3.5,
             delay: i * 0.35,
@@ -149,7 +149,7 @@ function CampaignIcon({ className }: { className?: string }) {
           repeatDelay: 3,
         }}
       />
-      <circle cx="26" cy="8" r="2.5" className="fill-yellow-400/85" />
+      <circle cx="26" cy="8" r="2.5" className="fill-amber-400" />
     </svg>
   );
 }
@@ -164,7 +164,7 @@ function ReportIcon({ className }: { className?: string }) {
         width="20"
         height="20"
         rx="3"
-        className="stroke-white/25"
+        className="stroke-slate-300"
         strokeWidth="1.5"
         fill="none"
       />
@@ -204,18 +204,18 @@ function EngineIcon({ className }: { className?: string }) {
           cx="16"
           cy="16"
           r="9"
-          className="stroke-red-500/55"
+          className="stroke-red-500/50"
           strokeWidth="1.5"
           strokeDasharray="3 5"
           fill="none"
         />
       </motion.g>
-      <circle cx="16" cy="16" r="3" className="fill-yellow-400/80" />
+      <circle cx="16" cy="16" r="3" className="fill-amber-400" />
     </svg>
   );
 }
 
-function TiltFeatureCard({
+function FeatureCard({
   title,
   desc,
   icon: Icon,
@@ -224,48 +224,20 @@ function TiltFeatureCard({
   desc: string;
   icon: ComponentType<{ className?: string }>;
 }) {
-  const ref = useRef<HTMLElement>(null);
-  const mx = useMotionValue(0);
-  const my = useMotionValue(0);
-  const springMx = useSpring(mx, { stiffness: 220, damping: 28 });
-  const springMy = useSpring(my, { stiffness: 220, damping: 28 });
-  const rotateX = useTransform(springMy, [-0.5, 0.5], [4, -4]);
-  const rotateY = useTransform(springMx, [-0.5, 0.5], [-4, 4]);
-
-  const onMove = (e: React.MouseEvent<HTMLElement>) => {
-    const el = ref.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    mx.set((e.clientX - r.left) / r.width - 0.5);
-    my.set((e.clientY - r.top) / r.height - 0.5);
-  };
-  const onLeave = () => {
-    mx.set(0);
-    my.set(0);
-  };
-
   return (
     <motion.article
-      ref={ref}
       variants={staggerItem}
-      onMouseMove={onMove}
-      onMouseLeave={onLeave}
       whileHover={{
-        y: -4,
-        transition: { duration: 0.5, ease: [0.4, 0, 0.2, 1] },
+        y: -6,
+        transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
       }}
-      style={{
-        rotateX,
-        rotateY,
-        transformStyle: "preserve-3d",
-      }}
-      className="group relative rounded-xl border border-white/[0.08] bg-white/[0.045] p-8 shadow-lg backdrop-blur-lg transition-[box-shadow,border-color] duration-500 ease-out hover:border-yellow-400/25 hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.45),0_0_0_1px_rgba(250,204,21,0.08)]"
+      className="group rounded-xl border border-gray-200 bg-white p-8 shadow-sm transition-shadow duration-300 hover:border-gray-300 hover:shadow-lg hover:shadow-red-500/[0.06]"
     >
-      <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-lg border border-white/[0.08] bg-black/20">
+      <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-gray-200 bg-slate-50 shadow-sm transition-shadow duration-300 group-hover:shadow-md">
         <Icon className="h-6 w-6" />
       </div>
-      <h3 className="text-lg font-bold tracking-tight text-white">{title}</h3>
-      <p className="mt-4 text-sm font-normal leading-relaxed tracking-wide text-gray-400">
+      <h3 className="text-lg font-bold tracking-tight text-slate-900">{title}</h3>
+      <p className="mt-3 text-sm font-normal leading-relaxed tracking-wide text-slate-600">
         {desc}
       </p>
     </motion.article>
@@ -284,17 +256,14 @@ export function Features() {
         >
           <motion.h2
             variants={staggerItem}
-            className="text-center text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-[2.5rem]"
+            className="text-center text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl"
           >
             Features
           </motion.h2>
 
-          <div
-            className={`grid gap-8 sm:grid-cols-2 sm:gap-10 lg:grid-cols-3 ${blockGap}`}
-            style={{ perspective: "1200px" }}
-          >
+          <div className={`grid gap-6 sm:grid-cols-2 lg:grid-cols-3 ${blockGap}`}>
             {features.map((f) => (
-              <TiltFeatureCard
+              <FeatureCard
                 key={f.title}
                 title={f.title}
                 desc={f.desc}

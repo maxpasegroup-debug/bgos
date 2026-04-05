@@ -10,7 +10,7 @@ export function WhatIsBgos() {
   return (
     <SectionReveal
       id="what-is-bgos"
-      className={`scroll-mt-28 ${sectionDivider} ${sectionY}`}
+      className={`scroll-mt-24 ${sectionDivider} ${sectionY}`}
     >
       <Container>
         <motion.div
@@ -21,23 +21,23 @@ export function WhatIsBgos() {
         >
           <motion.h2
             variants={staggerItem}
-            className="text-center text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-[2.5rem]"
+            className="text-center text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl"
           >
             Your Business. Fully Automated.
           </motion.h2>
           <motion.p
             variants={staggerItem}
-            className="mx-auto mt-6 max-w-2xl text-center text-base font-normal leading-relaxed tracking-wide text-gray-400 sm:mt-8 sm:text-lg"
+            className="mx-auto mt-5 max-w-2xl text-center text-base font-normal leading-relaxed text-slate-600 sm:mt-6 sm:text-lg"
           >
             BGOS sits between you and your business.{" "}
-            <span className="text-white/90">NEXA AI</span> runs operations — so
-            decisions, follow-ups, and workflows keep moving even when you step
-            away.
+            <span className="font-medium text-slate-800">NEXA AI</span> runs
+            operations — so decisions, follow-ups, and workflows keep moving even
+            when you step away.
           </motion.p>
         </motion.div>
 
         <motion.div
-          className={`flex flex-col items-stretch gap-8 sm:flex-row sm:items-stretch sm:justify-center sm:gap-6 lg:gap-10 ${blockGap}`}
+          className={`flex flex-col items-stretch gap-6 sm:flex-row sm:items-stretch sm:justify-center sm:gap-4 lg:gap-8 ${blockGap}`}
           initial="hidden"
           whileInView="show"
           viewport={{ once: true, margin: "-10%" }}
@@ -66,16 +66,18 @@ function FlowNode({
   return (
     <motion.div
       variants={staggerItem}
-      className={`mx-auto flex w-full max-w-sm flex-col items-center rounded-xl border px-8 py-9 text-center sm:mx-0 sm:max-w-none sm:min-w-0 sm:flex-1 sm:py-10 ${
+      whileHover={{ y: -4 }}
+      transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+      className={`mx-auto flex w-full max-w-sm flex-col items-center rounded-xl border px-7 py-8 text-center shadow-sm transition-shadow duration-300 sm:mx-0 sm:max-w-none sm:min-w-0 sm:flex-1 sm:py-9 ${
         highlight
-          ? "border-red-500/25 bg-gradient-to-b from-red-500/[0.1] to-yellow-400/[0.05] shadow-lg shadow-red-500/5 backdrop-blur-md"
-          : "border-white/[0.08] bg-white/[0.04] backdrop-blur-md"
+          ? "border-red-200/80 bg-gradient-to-b from-red-50/90 to-amber-50/50 shadow-md shadow-red-500/5"
+          : "border-gray-200 bg-white hover:shadow-md"
       }`}
     >
-      <span className="text-lg font-bold tracking-tight text-white">
+      <span className="text-lg font-bold tracking-tight text-slate-900">
         {label}
       </span>
-      <span className="mt-3 text-sm font-normal tracking-wide text-gray-400">
+      <span className="mt-2 text-sm font-normal tracking-wide text-slate-600">
         {sub}
       </span>
     </motion.div>
@@ -86,13 +88,13 @@ function FlowArrows() {
   return (
     <motion.div
       variants={staggerItem}
-      className="flex shrink-0 items-center justify-center py-2 sm:w-10 sm:py-0"
+      className="flex shrink-0 items-center justify-center py-1 sm:w-12 sm:py-0"
     >
       <motion.span
-        className="text-xl leading-none text-yellow-400/90 sm:hidden"
-        animate={{ y: [0, 5, 0] }}
+        className="text-2xl font-light leading-none text-amber-500 sm:hidden"
+        animate={{ y: [0, 6, 0] }}
         transition={{
-          duration: 4,
+          duration: 3.5,
           repeat: Infinity,
           ease: "easeInOut",
         }}
@@ -101,10 +103,10 @@ function FlowArrows() {
         ↓
       </motion.span>
       <motion.span
-        className="hidden text-xl leading-none text-yellow-400/90 sm:inline"
-        animate={{ x: [0, 6, 0] }}
+        className="hidden text-2xl font-light leading-none text-amber-500 sm:inline"
+        animate={{ x: [0, 8, 0] }}
         transition={{
-          duration: 4,
+          duration: 3.5,
           repeat: Infinity,
           ease: "easeInOut",
         }}

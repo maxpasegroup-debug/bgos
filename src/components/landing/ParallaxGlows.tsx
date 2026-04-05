@@ -2,12 +2,12 @@
 
 import { motion, useScroll, useTransform } from "framer-motion";
 
-/** Soft orbs — shallow parallax so motion stays calm */
+/** Soft orbs — shallow parallax for light premium canvas */
 export function ParallaxGlows() {
   const { scrollY } = useScroll();
-  const ySlow = useTransform(scrollY, [0, 1600], [0, 72]);
-  const ySlower = useTransform(scrollY, [0, 1600], [0, 42]);
-  const yBottom = useTransform(scrollY, [0, 1600], [0, 48]);
+  const ySlow = useTransform(scrollY, [0, 1600], [0, 56]);
+  const ySlower = useTransform(scrollY, [0, 1600], [0, 32]);
+  const yBottom = useTransform(scrollY, [0, 1600], [0, 40]);
 
   return (
     <div
@@ -15,15 +15,15 @@ export function ParallaxGlows() {
       aria-hidden
     >
       <motion.div
-        className="absolute -left-[20%] top-[8%] h-[min(42rem,90vw)] w-[min(42rem,90vw)] rounded-full bg-red-500/14 blur-3xl"
+        className="absolute -left-[18%] top-[6%] h-[min(38rem,88vw)] w-[min(38rem,88vw)] rounded-full bg-red-500/[0.06] blur-3xl"
         style={{ y: ySlower }}
       />
       <motion.div
-        className="absolute -right-[15%] top-[28%] h-[min(36rem,80vw)] w-[min(36rem,80vw)] rounded-full bg-yellow-400/12 blur-3xl"
+        className="absolute -right-[12%] top-[26%] h-[min(32rem,78vw)] w-[min(32rem,78vw)] rounded-full bg-amber-400/[0.07] blur-3xl"
         style={{ y: ySlow }}
       />
       <motion.div
-        className="absolute bottom-[5%] left-1/2 h-72 w-[min(90%,48rem)] -translate-x-1/2 rounded-full bg-red-500/10 blur-3xl"
+        className="absolute bottom-[6%] left-1/2 h-64 w-[min(88%,44rem)] -translate-x-1/2 rounded-full bg-slate-300/[0.25] blur-3xl"
         style={{ y: yBottom }}
       />
     </div>

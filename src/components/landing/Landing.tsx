@@ -13,10 +13,10 @@ import { ParallaxGlows } from "./ParallaxGlows";
 
 export function Landing() {
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-gradient-to-b from-black via-[#0B0F19] to-black">
+    <div className="relative min-h-screen overflow-x-hidden bg-[#F8FAFC] bg-gradient-to-b from-white via-[#F8FAFC] to-[#F1F5F9] text-slate-900">
       <ParallaxGlows />
       <div
-        className="pointer-events-none fixed inset-0 z-[25] bg-noise opacity-[0.028] mix-blend-overlay"
+        className="pointer-events-none fixed inset-0 z-[25] bg-noise opacity-[0.04] mix-blend-multiply"
         aria-hidden
       />
       <CursorGlow />
