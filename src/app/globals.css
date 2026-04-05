@@ -1,26 +1,147 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bgos-red: #ff3b3b;
+  --bgos-yellow: #ffc300;
+  --bgos-white: #ffffff;
+  --bgos-bg: #05060a;
+  --bgos-surface: #0a0f1a;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bgos-red: #ff3b3b;
+  --color-bgos-yellow: #ffc300;
+  --color-bgos-navy: #0c1222;
+  --color-bgos-dark: #050508;
+  --color-bgos-muted: #8b95a8;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #000;
+  color: #e8eaef;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Animated gradient text (hero) */
+@keyframes gradient-shift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.animate-gradient-heading {
+  background: linear-gradient(
+    90deg,
+    #ef4444,
+    #facc15,
+    #ef4444,
+    #facc15,
+    #ef4444
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: gradient-shift 16s ease-in-out infinite;
+  will-change: background-position;
+}
+
+/* Primary button shine sweep */
+@keyframes btn-shine {
+  0% {
+    transform: translateX(-130%) skewX(-14deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.45;
+  }
+  40% {
+    opacity: 0.25;
+  }
+  100% {
+    transform: translateX(130%) skewX(-14deg);
+    opacity: 0;
+  }
+}
+
+.animate-btn-shine {
+  animation: btn-shine 6.5s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+/* BGOS dashboard — soft animated mesh + calm CTA shine */
+@keyframes bgos-ambient-mesh {
+  0%,
+  100% {
+    background-position: 0% 40%;
+    opacity: 1;
+  }
+  50% {
+    background-position: 100% 60%;
+    opacity: 0.94;
+  }
+}
+
+.bgos-ambient-mesh {
+  background:
+    radial-gradient(
+      ellipse 130% 90% at 15% 15%,
+      rgba(255, 59, 59, 0.13),
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse 110% 80% at 88% 42%,
+      rgba(255, 195, 0, 0.09),
+      transparent 52%
+    ),
+    radial-gradient(
+      ellipse 100% 70% at 48% 92%,
+      rgba(35, 45, 75, 0.35),
+      transparent 50%
+    );
+  background-size: 200% 200%, 180% 180%, 100% 100%;
+  animation: bgos-ambient-mesh 36s ease-in-out infinite;
+  will-change: background-position;
+}
+
+@keyframes bgos-btn-shine {
+  0% {
+    transform: translateX(-130%) skewX(-12deg);
+    opacity: 0;
+  }
+  18% {
+    opacity: 0.32;
+  }
+  100% {
+    transform: translateX(220%) skewX(-12deg);
+    opacity: 0;
+  }
+}
+
+.animate-bgos-btn-shine {
+  animation: bgos-btn-shine 8s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bgos-ambient-mesh,
+  .animate-bgos-btn-shine {
+    animation: none !important;
+  }
+}
+
+/* Subtle film grain */
+.bg-noise {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
 }

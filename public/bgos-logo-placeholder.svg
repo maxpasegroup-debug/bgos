@@ -1,0 +1,11 @@
+<svg width="120" height="32" viewBox="0 0 120 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="4" width="24" height="24" rx="6" fill="url(#g)"/>
+  <path d="M8 12h8v2H8v-2zm0 4h8v2H8v-2z" fill="#050508"/>
+  <text x="32" y="22" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#FFFFFF">BGOS</text>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF3B3B"/>
+      <stop offset="1" stop-color="#FFC300"/>
+    </linearGradient>
+  </defs>
+</svg>

@@ -1,0 +1,215 @@
+// BGOS + ICECONNECT — production schema
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  TELECALLER
+  ENGINEER
+  INSTALLER
+  ACCOUNTS
+  SERVICE
+  MANAGER
+}
+
+enum CompanyPlan {
+  BASIC
+  PRO
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  VISIT
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum DealStatus {
+  WON
+  LOST
+}
+
+enum TaskStatus {
+  PENDING
+  COMPLETED
+}
+
+enum PaymentStatus {
+  PAID
+  PENDING
+}
+
+enum ServiceTicketStatus {
+  OPEN
+  RESOLVED
+}
+
+model Company {
+  id        String       @id @default(cuid())
+  name      String
+  plan      CompanyPlan  @default(BASIC)
+  createdAt DateTime     @default(now())
+
+  users         User[]
+  leads         Lead[]
+  installations Installation[]
+  payments      Payment[]
+  activityLogs  ActivityLog[]
+  serviceTickets ServiceTicket[]
+
+  @@index([name])
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  mobile    String
+  email     String   @unique
+  password  String
+  role      UserRole
+  companyId String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  company       Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  assignedLeads     Lead[]          @relation("LeadAssignee")
+  tasks             Task[]
+  activityLogs      ActivityLog[]
+  assignedInstallations Installation[] @relation("InstallationAssignee")
+  assignedServiceTickets ServiceTicket[] @relation("TicketAssignee")
+
+  @@index([companyId])
+  @@index([email])
+  @@index([mobile])
+}
+
+model Lead {
+  id         String      @id @default(cuid())
+  name       String
+  phone      String
+  status     LeadStatus  @default(NEW)
+  value      Float?
+  companyId  String
+  assignedTo String?
+  createdAt  DateTime    @default(now())
+
+  company  Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  assignee User?   @relation("LeadAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+  deals    Deal[]
+  tasks    Task[]
+  siteReport String? @db.Text
+
+  @@index([companyId])
+  @@index([status])
+  @@index([assignedTo])
+  @@index([phone])
+}
+
+model Deal {
+  id        String     @id @default(cuid())
+  leadId    String
+  value     Float
+  status    DealStatus
+  createdAt DateTime   @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([status])
+}
+
+model Task {
+  id        String     @id @default(cuid())
+  title     String
+  status    TaskStatus @default(PENDING)
+  userId    String?
+  leadId    String?
+  dueDate   DateTime?
+  createdAt DateTime   @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  lead Lead? @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([leadId])
+  @@index([status])
+}
+
+model Installation {
+  id            String    @id @default(cuid())
+  status        String
+  scheduledDate DateTime?
+  companyId     String
+  assignedTo    String?
+  notes         String?   @db.Text
+  createdAt     DateTime  @default(now())
+  completedAt   DateTime?
+
+  company  Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  assignee User?   @relation("InstallationAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([status])
+  @@index([assignedTo])
+}
+
+model Payment {
+  id        String        @id @default(cuid())
+  amount    Float
+  status    PaymentStatus
+  companyId String
+  createdAt DateTime      @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([status])
+}
+
+model ServiceTicket {
+  id          String              @id @default(cuid())
+  title       String
+  description String?             @db.Text
+  status      ServiceTicketStatus @default(OPEN)
+  companyId   String
+  assignedTo  String?
+  createdAt   DateTime            @default(now())
+  resolvedAt  DateTime?
+
+  company  Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  assignee User?   @relation("TicketAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([status])
+  @@index([assignedTo])
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  type      String
+  message   String
+  metadata  Json?
+  createdAt DateTime @default(now())
+  companyId String?
+  userId    String?
+
+  company Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([type])
+}
