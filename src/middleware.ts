@@ -1,6 +1,7 @@
-import { jwtVerify } from "jose";
+import { jwtVerify, errors } from "jose";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { AUTH_ERROR_CODES, authErrorResponse } from "@/lib/auth-api";
 import {
   AUTH_COOKIE_NAME,
   AUTH_HEADER_COMPANY_ID,
@@ -45,17 +46,26 @@ function tryAttachUserHeaders(
   return true;
 }
 
-async function verifyJwtEdge(token: string): Promise<Record<string, unknown> | null> {
+type EdgeVerifyResult =
+  | { ok: true; payload: Record<string, unknown> }
+  | { ok: false; reason: "expired" | "invalid" };
+
+async function verifyJwtEdge(token: string): Promise<EdgeVerifyResult> {
   const secret = process.env.JWT_SECRET?.trim();
-  if (!secret || secret.length < 32) return null;
+  if (!secret || secret.length < 32) {
+    return { ok: false, reason: "invalid" };
+  }
   try {
     const { payload } = await jwtVerify(token, new TextEncoder().encode(secret), {
       issuer: AUTH_JWT_ISSUER,
       algorithms: ["HS256"],
     });
-    return payload as Record<string, unknown>;
-  } catch {
-    return null;
+    return { ok: true, payload: payload as Record<string, unknown> };
+  } catch (e) {
+    if (e instanceof errors.JWTExpired) {
+      return { ok: false, reason: "expired" };
+    }
+    return { ok: false, reason: "invalid" };
   }
 }
 
@@ -70,23 +80,37 @@ function readToken(request: NextRequest): string | null {
   return null;
 }
 
-function isPublicApiPath(pathname: string): boolean {
-  return pathname === "/api/auth/login" || pathname.startsWith("/api/auth/login/");
+/** Paths that skip auth (marketing, sign-in, session helpers). */
+function isPublicPath(pathname: string): boolean {
+  if (pathname === "/") return true;
+  if (pathname === "/login") return true;
+  if (pathname === "/iceconnect/login") return true;
+  if (pathname === "/api/auth/login") return true;
+  if (pathname === "/api/auth/signup") return true;
+  if (pathname === "/api/auth/logout") return true;
+  if (pathname === "/api/auth/me") return true;
+  if (pathname === "/signup") return true;
+  return false;
 }
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (pathname.startsWith("/api") && isPublicApiPath(pathname)) {
-    return NextResponse.next();
-  }
-
-  const isProtected =
-    pathname.startsWith("/bgos") ||
-    pathname.startsWith("/iceconnect") ||
-    (pathname.startsWith("/api") && !isPublicApiPath(pathname));
-
-  if (!isProtected) {
+  if (isPublicPath(pathname)) {
+    if (pathname === "/iceconnect/login") {
+      const iceToken = readToken(request);
+      if (!iceToken) return NextResponse.next();
+      const iceVerified = await verifyJwtEdge(iceToken);
+      if (
+        iceVerified.ok &&
+        typeof iceVerified.payload.role === "string"
+      ) {
+        return NextResponse.redirect(
+          new URL(getRoleHome(String(iceVerified.payload.role)), request.url),
+        );
+      }
+      return NextResponse.next();
+    }
     return NextResponse.next();
   }
 
@@ -94,32 +118,50 @@ export async function middleware(request: NextRequest) {
   stripInternalAuthHeaders(requestHeaders);
 
   const token = readToken(request);
+
   if (!token) {
     if (pathname.startsWith("/api")) {
-      return NextResponse.json(
-        { ok: false, error: "Unauthorized", code: "UNAUTHORIZED" },
-        { status: 401 },
-      );
+      return authErrorResponse(AUTH_ERROR_CODES.NO_TOKEN);
     }
-    const login = new URL("/login", request.url);
+    const login =
+      pathname.startsWith("/iceconnect") && pathname !== "/iceconnect/login"
+        ? new URL("/iceconnect/login", request.url)
+        : new URL("/login", request.url);
     login.searchParams.set("from", pathname);
     return NextResponse.redirect(login);
   }
 
-  const payload = await verifyJwtEdge(token);
-  if (!payload || !tryAttachUserHeaders(requestHeaders, payload)) {
+  const verified = await verifyJwtEdge(token);
+
+  if (!verified.ok) {
     if (pathname.startsWith("/api")) {
-      return NextResponse.json(
-        { ok: false, error: "Unauthorized", code: "UNAUTHORIZED" },
-        { status: 401 },
+      return authErrorResponse(
+        verified.reason === "expired"
+          ? AUTH_ERROR_CODES.TOKEN_EXPIRED
+          : AUTH_ERROR_CODES.TOKEN_INVALID,
       );
     }
-    const login = new URL("/login", request.url);
+    const login =
+      pathname.startsWith("/iceconnect") && pathname !== "/iceconnect/login"
+        ? new URL("/iceconnect/login", request.url)
+        : new URL("/login", request.url);
     login.searchParams.set("from", pathname);
     return NextResponse.redirect(login);
   }
 
-  const role = String(payload.role);
+  if (!tryAttachUserHeaders(requestHeaders, verified.payload)) {
+    if (pathname.startsWith("/api")) {
+      return authErrorResponse(AUTH_ERROR_CODES.TOKEN_INVALID);
+    }
+    const login =
+      pathname.startsWith("/iceconnect") && pathname !== "/iceconnect/login"
+        ? new URL("/iceconnect/login", request.url)
+        : new URL("/login", request.url);
+    login.searchParams.set("from", pathname);
+    return NextResponse.redirect(login);
+  }
+
+  const role = String(verified.payload.role);
 
   if (pathname === "/iceconnect" || pathname === "/iceconnect/") {
     const home = getRoleHome(role);
@@ -136,6 +178,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(getRoleHome(role), request.url));
   }
 
+  // Company.plan (BASIC | PRO): block Pro-only APIs for Basic JWTs — see `pathnameRequiresProPlan`
+  // in auth-config (automation + sales-booster, except upgrade-request allowlist).
   const companyPlan = requestHeaders.get(AUTH_HEADER_COMPANY_PLAN) ?? "BASIC";
   if (
     pathname.startsWith("/api") &&
@@ -158,5 +202,11 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/bgos/:path*", "/iceconnect", "/iceconnect/:path*", "/api/:path*"],
+  matcher: [
+    /*
+     * All non-static routes: enforce auth except public paths handled in middleware.
+     * Excludes Next assets and common image extensions.
+     */
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+  ],
 };

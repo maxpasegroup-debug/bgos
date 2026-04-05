@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { z } from "zod";
@@ -121,6 +122,12 @@ function LoginForm() {
             {pending ? "Signing in…" : "Sign in"}
           </button>
         </form>
+        <p className="mt-6 text-center text-sm text-white/50">
+          New to BGOS?{" "}
+          <Link href="/signup" className="font-medium text-cyan-400 hover:text-cyan-300">
+            Create an account
+          </Link>
+        </p>
       </div>
     </div>
   );

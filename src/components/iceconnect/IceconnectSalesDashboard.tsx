@@ -3,6 +3,7 @@
 import { LeadStatus, TaskStatus } from "@prisma/client";
 import { useCallback, useEffect, useState } from "react";
 import { forwardLeadStatuses, leadStatusLabel } from "@/lib/lead-pipeline";
+import { IceconnectWorkspaceView } from "./IceconnectWorkspaceView";
 import { IcPanel } from "./IcPanel";
 
 type LeadRow = {
@@ -11,6 +12,7 @@ type LeadRow = {
   status: LeadStatus;
   statusLabel: string;
   phone: string;
+  value: number | null;
 };
 
 type TaskRow = {
@@ -21,9 +23,16 @@ type TaskRow = {
   lead: { id: string; name: string } | null;
 };
 
+type SalesStats = {
+  leadCount: number;
+  pendingTaskCount: number;
+  overdueTaskCount: number;
+};
+
 export function IceconnectSalesDashboard() {
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [tasks, setTasks] = useState<TaskRow[]>([]);
+  const [stats, setStats] = useState<SalesStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -45,9 +54,21 @@ export function IceconnectSalesDashboard() {
         setErr(msg);
         return;
       }
-      const data = (await res.json()) as { leads: LeadRow[]; tasks: TaskRow[] };
+      const data = (await res.json()) as {
+        leads: LeadRow[];
+        tasks: TaskRow[];
+        stats?: SalesStats;
+      };
       setLeads(Array.isArray(data.leads) ? data.leads : []);
       setTasks(Array.isArray(data.tasks) ? data.tasks : []);
+      setStats(
+        data.stats &&
+          typeof data.stats.leadCount === "number" &&
+          typeof data.stats.pendingTaskCount === "number" &&
+          typeof data.stats.overdueTaskCount === "number"
+          ? data.stats
+          : null,
+      );
     } catch {
       setErr("Network error — check your connection.");
     } finally {
@@ -98,42 +119,34 @@ export function IceconnectSalesDashboard() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-8" aria-busy="true" aria-label="Loading sales workspace">
-        <div className="space-y-2">
-          <div className="h-8 w-48 animate-pulse rounded-lg bg-white/10" />
-          <div className="h-4 w-72 max-w-full animate-pulse rounded bg-white/5" />
-        </div>
-        <div className="space-y-3 rounded-xl border border-white/10 bg-black/20 p-4">
-          <div className="h-5 w-24 animate-pulse rounded bg-white/10" />
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-20 animate-pulse rounded-lg bg-white/5" />
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const pendingTasks = tasks.filter((t) => t.status === TaskStatus.PENDING);
 
   return (
-    <div className="space-y-6 sm:space-y-8">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">Sales</h1>
-        <p className="mt-1 text-sm text-white/50">Your leads and tasks only.</p>
-      </div>
-      {err ? (
-        <div
-          className="flex flex-col gap-4 rounded-xl border border-red-500/25 bg-red-500/5 p-4 sm:flex-row sm:items-center sm:justify-between"
-          role="alert"
-        >
-          <p className="text-sm text-red-300">{err}</p>
-          <button
-            type="button"
-            onClick={() => void load()}
-            className="shrink-0 rounded-lg bg-white/10 px-4 py-2 text-sm font-medium text-white hover:bg-white/15"
-          >
-            Retry
-          </button>
+    <IceconnectWorkspaceView
+      title="Sales"
+      subtitle="Your assigned leads and tasks only — other telecallers’ data is hidden."
+      loading={loading}
+      error={err}
+      onRetry={() => void load()}
+    >
+      {stats ? (
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-wider text-white/45">Leads</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums text-white">{stats.leadCount}</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-wider text-white/45">Pending tasks</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums text-white">
+              {stats.pendingTaskCount}
+            </p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-wider text-white/45">Overdue</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums text-amber-200">
+              {stats.overdueTaskCount}
+            </p>
+          </div>
         </div>
       ) : null}
 
@@ -153,6 +166,7 @@ export function IceconnectSalesDashboard() {
                     <p className="font-medium text-white">{l.name}</p>
                     <p className="text-xs text-white/45">
                       {l.phone} · {l.statusLabel}
+                      {l.value != null && l.value > 0 ? ` · ₹${l.value.toLocaleString("en-IN")}` : ""}
                     </p>
                   </div>
                   {options.length > 0 ? (
@@ -180,41 +194,39 @@ export function IceconnectSalesDashboard() {
       </IcPanel>
 
       <IcPanel title="Tasks">
-        {tasks.filter((t) => t.status === TaskStatus.PENDING).length === 0 ? (
+        {pendingTasks.length === 0 ? (
           <p className="text-sm text-white/45">No pending tasks.</p>
         ) : (
           <ul className="space-y-3">
-            {tasks
-              .filter((t) => t.status === TaskStatus.PENDING)
-              .map((t) => (
-                <li
-                  key={t.id}
-                  className="flex flex-col gap-2 rounded-lg border border-white/10 bg-black/20 p-4 sm:flex-row sm:items-center sm:justify-between"
+            {pendingTasks.map((t) => (
+              <li
+                key={t.id}
+                className="flex flex-col gap-2 rounded-lg border border-white/10 bg-black/20 p-4 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <p className="text-sm text-white">{t.title}</p>
+                  {t.lead ? (
+                    <p className="text-xs text-white/45">Lead: {t.lead.name}</p>
+                  ) : null}
+                  {t.overdue ? (
+                    <span className="mt-1 inline-block rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-200">
+                      Overdue
+                    </span>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  disabled={busy === t.id}
+                  onClick={() => void completeTask(t.id)}
+                  className="shrink-0 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/15 disabled:opacity-50"
                 >
-                  <div>
-                    <p className="text-sm text-white">{t.title}</p>
-                    {t.lead ? (
-                      <p className="text-xs text-white/45">Lead: {t.lead.name}</p>
-                    ) : null}
-                    {t.overdue ? (
-                      <span className="mt-1 inline-block rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-200">
-                        Overdue
-                      </span>
-                    ) : null}
-                  </div>
-                  <button
-                    type="button"
-                    disabled={busy === t.id}
-                    onClick={() => void completeTask(t.id)}
-                    className="shrink-0 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/15 disabled:opacity-50"
-                  >
-                    Complete
-                  </button>
-                </li>
-              ))}
+                  Complete
+                </button>
+              </li>
+            ))}
           </ul>
         )}
       </IcPanel>
-    </div>
+    </IceconnectWorkspaceView>
   );
 }

@@ -1,20 +1,46 @@
 import { CompanyPlan } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  internalServerErrorResponse,
-  parseJsonBody,
-  zodValidationErrorResponse,
-} from "@/lib/api-response";
-import { AUTH_COOKIE_NAME } from "@/lib/auth-config";
+import { parseJsonBody, zodValidationErrorResponse } from "@/lib/api-response";
+import { handleApiError } from "@/lib/route-error";
+import { AUTH_ERROR_CODES } from "@/lib/auth-api";
+import { mobileLookupVariants } from "@/lib/mobile-login";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
 import { signAccessToken } from "@/lib/jwt";
+import { setSessionCookie } from "@/lib/session-cookie";
 
-const bodySchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1, "Password is required"),
-});
+const bodySchema = z
+  .object({
+    email: z.string().optional(),
+    mobile: z.string().optional(),
+    password: z.string().min(1, "Password is required"),
+  })
+  .superRefine((data, ctx) => {
+    const email = data.email?.trim();
+    const mobile = data.mobile?.trim();
+    if (email && mobile) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["email"],
+        message: "Use either email or mobile",
+      });
+    }
+    if (!email && !mobile) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["mobile"],
+        message: "Mobile number or email is required",
+      });
+    }
+    if (email && !z.string().email().safeParse(email).success) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["email"],
+        message: "Enter a valid email",
+      });
+    }
+  });
 
 export async function POST(request: Request) {
   const raw = await parseJsonBody(request);
@@ -25,32 +51,60 @@ export async function POST(request: Request) {
     return zodValidationErrorResponse(parsed.error);
   }
 
-  const { email, password } = parsed.data;
+  const { password } = parsed.data;
+  const email = parsed.data.email?.trim();
+  const mobileRaw = parsed.data.mobile?.trim();
 
   let user;
   try {
-    user = await prisma.user.findFirst({
-    where: { email: { equals: email.trim(), mode: "insensitive" } },
-    include: { company: { select: { plan: true } } },
-  });
+    if (email) {
+      user = await prisma.user.findFirst({
+        where: { email: { equals: email, mode: "insensitive" } },
+        include: { company: { select: { plan: true } } },
+      });
+    } else {
+      const variants = mobileLookupVariants(mobileRaw ?? "");
+      if (variants.length === 0) {
+        return NextResponse.json(
+          {
+            ok: false as const,
+            error: "Enter a valid mobile number",
+            code: "VALIDATION_ERROR",
+          },
+          { status: 400 },
+        );
+      }
+      user = await prisma.user.findFirst({
+        where: {
+          OR: variants.map((m) => ({
+            mobile: { equals: m, mode: "insensitive" as const },
+          })),
+        },
+        include: { company: { select: { plan: true } } },
+      });
+    }
   } catch (e) {
-    console.error("[POST /api/auth/login]", e);
-    return internalServerErrorResponse();
+    return handleApiError("POST /api/auth/login", e);
   }
 
+  const authError = NextResponse.json(
+    {
+      ok: false as const,
+      error: email
+        ? "Invalid email or password"
+        : "Invalid mobile number or password",
+      code: AUTH_ERROR_CODES.INVALID_CREDENTIALS,
+    },
+    { status: 401 },
+  );
+
   if (!user || !user.isActive) {
-    return NextResponse.json(
-      { ok: false as const, error: "Invalid email or password", code: "INVALID_CREDENTIALS" },
-      { status: 401 },
-    );
+    return authError;
   }
 
   const valid = await verifyPassword(password, user.password);
   if (!valid) {
-    return NextResponse.json(
-      { ok: false as const, error: "Invalid email or password", code: "INVALID_CREDENTIALS" },
-      { status: 401 },
-    );
+    return authError;
   }
 
   const companyPlan = user.company?.plan ?? CompanyPlan.BASIC;
@@ -83,14 +137,7 @@ export async function POST(request: Request) {
     },
   });
 
-  const isProd = process.env.NODE_ENV === "production";
-  res.cookies.set(AUTH_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 7,
-  });
+  setSessionCookie(res, token);
 
   return res;
 }

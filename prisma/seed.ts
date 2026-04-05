@@ -6,6 +6,7 @@ import {
   TaskStatus,
   UserRole,
 } from "@prisma/client";
+import { applySolarTemplate } from "../src/lib/industry-templates";
 import { hashPassword } from "../src/lib/password";
 import { prisma } from "../src/lib/prisma";
 
@@ -26,6 +27,8 @@ async function main() {
       plan: CompanyPlan.PRO,
     },
   });
+
+  await applySolarTemplate(company.id);
 
   const passwordHash = await hashPassword("demo-password-change-me");
 
@@ -118,7 +121,7 @@ async function main() {
       data: {
         name: "John",
         phone: "7666666666",
-        status: LeadStatus.PROPOSAL,
+        status: LeadStatus.PROPOSAL_SENT,
         value: 300000,
         companyId: company.id,
         assignedTo: telecaller.id,
@@ -128,7 +131,7 @@ async function main() {
       data: {
         name: "Site Visit Lead",
         phone: "7444444444",
-        status: LeadStatus.VISIT,
+        status: LeadStatus.SITE_VISIT_SCHEDULED,
         value: 180000,
         companyId: company.id,
         assignedTo: engineer.id,
@@ -140,8 +143,8 @@ async function main() {
 
   await prisma.deal.createMany({
     data: [
-      { leadId: ravi.id, value: 250000, status: DealStatus.WON },
-      { leadId: arun.id, value: 150000, status: DealStatus.LOST },
+      { leadId: ravi.id, companyId: company.id, value: 250000, status: DealStatus.WON },
+      { leadId: arun.id, companyId: company.id, value: 150000, status: DealStatus.LOST },
     ],
   });
 
@@ -152,12 +155,14 @@ async function main() {
         status: TaskStatus.PENDING,
         userId: telecaller.id,
         leadId: ravi.id,
+        companyId: company.id,
       },
       {
         title: "Send proposal",
         status: TaskStatus.COMPLETED,
         userId: telecaller.id,
         leadId: arun.id,
+        companyId: company.id,
       },
     ],
   });

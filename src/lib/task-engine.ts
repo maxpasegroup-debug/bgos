@@ -4,23 +4,101 @@ import { LeadStatus, TaskStatus } from "@prisma/client";
 import { leadStatusLabel } from "@/lib/lead-pipeline";
 import { prisma } from "@/lib/prisma";
 
-export function defaultTaskDueDate(): Date {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() + 3);
+/** Lead with no movement for this long gets a "Reminder task" when backfilling. */
+export const LEAD_STALE_MS = 72 * 60 * 60 * 1000;
+
+function endOfDayUtc(base: Date, addDays: number): Date {
+  const d = new Date(base);
+  d.setUTCDate(d.getUTCDate() + addDays);
   d.setUTCHours(23, 59, 59, 999);
   return d;
 }
 
-export function taskTitleNewLead(leadName: string): string {
-  return `Follow up: ${leadName} (new lead)`;
+/** New lead — call soon (next business day EOD UTC). */
+export function dueDateCallLead(): Date {
+  return endOfDayUtc(new Date(), 1);
 }
 
-export function taskTitleStatusChange(leadName: string, newStatus: LeadStatus): string {
+/** Proposal / general follow-up — a few days out. */
+export function dueDateFollowUp(): Date {
+  return endOfDayUtc(new Date(), 3);
+}
+
+/** Reminder after delay — short horizon. */
+export function dueDateReminder(): Date {
+  return endOfDayUtc(new Date(), 1);
+}
+
+/** Default pipeline task due (legacy + non-specific stages). */
+export function defaultTaskDueDate(): Date {
+  return endOfDayUtc(new Date(), 3);
+}
+
+export function taskTitleCallLead(leadName: string): string {
+  return `Call lead — ${leadName}`;
+}
+
+/** @deprecated Use taskTitleCallLead */
+export function taskTitleNewLead(leadName: string): string {
+  return taskTitleCallLead(leadName);
+}
+
+export function taskTitleProposalFollowUp(leadName: string): string {
+  return `Follow-up — ${leadName}`;
+}
+
+export function taskTitleReminder(leadName: string): string {
+  return `Reminder task — ${leadName}`;
+}
+
+/**
+ * Title for the next task after a pipeline move. No task for terminal statuses.
+ */
+export function taskTitleAfterStatusChange(
+  leadName: string,
+  newStatus: LeadStatus,
+): string | null {
+  if (newStatus === LeadStatus.WON || newStatus === LeadStatus.LOST) {
+    return null;
+  }
+  if (newStatus === LeadStatus.PROPOSAL_SENT) {
+    return taskTitleProposalFollowUp(leadName);
+  }
   return `Pipeline: ${leadName} → ${leadStatusLabel(newStatus)}`;
 }
 
-export function taskTitleCatchUp(leadName: string, currentStatus: LeadStatus): string {
-  return `Follow up: ${leadName} (${leadStatusLabel(currentStatus)})`;
+export function isLeadStale(lead: { updatedAt: Date }): boolean {
+  return Date.now() - lead.updatedAt.getTime() > LEAD_STALE_MS;
+}
+
+/**
+ * Auto title for an open lead that currently has no pending task.
+ */
+export function autoTaskTitleForOpenLead(lead: {
+  name: string;
+  status: LeadStatus;
+  updatedAt: Date;
+}): string {
+  if (isLeadStale(lead)) {
+    return taskTitleReminder(lead.name);
+  }
+  if (lead.status === LeadStatus.PROPOSAL_SENT) {
+    return taskTitleProposalFollowUp(lead.name);
+  }
+  if (
+    lead.status === LeadStatus.NEW ||
+    lead.status === LeadStatus.CONTACTED
+  ) {
+    return taskTitleCallLead(lead.name);
+  }
+  return `Next: ${lead.name} — ${leadStatusLabel(lead.status)}`;
+}
+
+export function dueDateForAutoTitle(title: string): Date {
+  if (title.startsWith("Reminder task")) return dueDateReminder();
+  if (title.startsWith("Follow-up")) return dueDateFollowUp();
+  if (title.startsWith("Call lead")) return dueDateCallLead();
+  return defaultTaskDueDate();
 }
 
 export async function createLeadTask(
@@ -29,6 +107,7 @@ export async function createLeadTask(
     title: string;
     userId: string;
     leadId: string;
+    companyId: string;
     dueDate: Date;
   },
 ) {
@@ -37,6 +116,7 @@ export async function createLeadTask(
       title: input.title,
       userId: input.userId,
       leadId: input.leadId,
+      companyId: input.companyId,
       dueDate: input.dueDate,
       status: TaskStatus.PENDING,
     },
@@ -46,7 +126,47 @@ export async function createLeadTask(
 const CLOSED: LeadStatus[] = [LeadStatus.WON, LeadStatus.LOST];
 
 /**
- * For every open lead in the company with no pending task, create one (core “no task → auto create”).
+ * Ensure one pending task exists for a single open lead (e.g. after completing a task).
+ */
+export async function ensurePendingTaskForLead(
+  companyId: string,
+  leadId: string,
+  fallbackUserId: string,
+): Promise<boolean> {
+  const lead = await prisma.lead.findFirst({
+    where: { id: leadId, companyId, status: { notIn: CLOSED } },
+    select: {
+      id: true,
+      name: true,
+      status: true,
+      assignedTo: true,
+      updatedAt: true,
+      companyId: true,
+    },
+  });
+  if (!lead) return false;
+
+  const pending = await prisma.task.count({
+    where: { leadId: lead.id, status: TaskStatus.PENDING },
+  });
+  if (pending > 0) return false;
+
+  const title = autoTaskTitleForOpenLead(lead);
+  await prisma.task.create({
+    data: {
+      title,
+      userId: lead.assignedTo ?? fallbackUserId,
+      leadId: lead.id,
+      companyId: lead.companyId,
+      dueDate: dueDateForAutoTitle(title),
+      status: TaskStatus.PENDING,
+    },
+  });
+  return true;
+}
+
+/**
+ * For every open lead with no pending task, create one (keeps pipeline covered).
  */
 export async function ensurePendingTasksForOpenLeads(
   companyId: string,
@@ -57,7 +177,14 @@ export async function ensurePendingTasksForOpenLeads(
       companyId,
       status: { notIn: CLOSED },
     },
-    select: { id: true, name: true, status: true, assignedTo: true },
+    select: {
+      id: true,
+      name: true,
+      status: true,
+      assignedTo: true,
+      updatedAt: true,
+      companyId: true,
+    },
   });
 
   if (openLeads.length === 0) return 0;
@@ -80,17 +207,19 @@ export async function ensurePendingTasksForOpenLeads(
   if (toCreate.length === 0) return 0;
 
   await prisma.$transaction(
-    toCreate.map((lead) =>
-      prisma.task.create({
+    toCreate.map((lead) => {
+      const title = autoTaskTitleForOpenLead(lead);
+      return prisma.task.create({
         data: {
-          title: taskTitleCatchUp(lead.name, lead.status),
+          title,
           userId: lead.assignedTo ?? fallbackUserId,
           leadId: lead.id,
-          dueDate: defaultTaskDueDate(),
+          companyId: lead.companyId,
+          dueDate: dueDateForAutoTitle(title),
           status: TaskStatus.PENDING,
         },
-      }),
-    ),
+      });
+    }),
   );
 
   return toCreate.length;

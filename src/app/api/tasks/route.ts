@@ -2,13 +2,10 @@ import { TaskStatus } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { parseTasksQuery } from "@/lib/api-query";
-import {
-  internalServerErrorResponse,
-  prismaKnownErrorResponse,
-  zodValidationErrorResponse,
-} from "@/lib/api-response";
+import { prismaKnownErrorResponse, zodValidationErrorResponse } from "@/lib/api-response";
+import { handleApiError } from "@/lib/route-error";
 import { requireAuth } from "@/lib/auth";
-import { ensurePendingTasksForOpenLeads } from "@/lib/task-engine";
+import { computeTaskOverdue, ensurePendingTasksForOpenLeads } from "@/lib/task-engine";
 import { serializeTask } from "@/lib/task-serialize";
 import { prisma } from "@/lib/prisma";
 
@@ -44,7 +41,7 @@ export async function GET(request: NextRequest) {
   } catch (e) {
     const p = prismaKnownErrorResponse(e);
     if (p) return p;
-    return internalServerErrorResponse();
+    return handleApiError("GET /api/tasks [ensurePendingTasksForOpenLeads]", e);
   }
 
   const where: {
@@ -69,10 +66,17 @@ export async function GET(request: NextRequest) {
     where.userId = assignedTo;
   }
 
+  const overdueCountWhere = {
+    ...where,
+    status: TaskStatus.PENDING,
+    dueDate: { lt: new Date() },
+  };
+
   let tasks;
   let total: number;
+  let overdueTotal: number;
   try {
-    [tasks, total] = await Promise.all([
+    [tasks, total, overdueTotal] = await Promise.all([
       prisma.task.findMany({
         where,
         orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
@@ -81,12 +85,17 @@ export async function GET(request: NextRequest) {
         include,
       }),
       prisma.task.count({ where }),
+      prisma.task.count({ where: overdueCountWhere }),
     ]);
   } catch (e) {
     const p = prismaKnownErrorResponse(e);
     if (p) return p;
-    return internalServerErrorResponse();
+    return handleApiError("GET /api/tasks", e);
   }
+
+  const overdueInPage = tasks.filter((t) =>
+    computeTaskOverdue({ status: t.status, dueDate: t.dueDate }),
+  ).length;
 
   return NextResponse.json({
     ok: true as const,
@@ -95,5 +104,7 @@ export async function GET(request: NextRequest) {
     limit: take,
     offset: skip,
     autoCreatedTasks,
+    overdueTotal,
+    overdueInPage,
   });
 }

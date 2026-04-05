@@ -4,7 +4,7 @@ import { z } from "zod";
 import { requireAuthWithRoles } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
-import { findUserInCompany, USER_MUTATION_ROLES } from "@/lib/user-company";
+import { findUserInCompany, USER_ADMIN_ROLES } from "@/lib/user-company";
 
 const bodySchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
@@ -16,7 +16,7 @@ type RouteContext = { params: Promise<{ id: string }> };
  * Set a new password for an employee (same company). User remains active and can sign in immediately.
  */
 export async function POST(request: NextRequest, context: RouteContext) {
-  const session = requireAuthWithRoles(request, USER_MUTATION_ROLES);
+  const session = requireAuthWithRoles(request, USER_ADMIN_ROLES);
   if (session instanceof NextResponse) return session;
 
   const { id } = await context.params;

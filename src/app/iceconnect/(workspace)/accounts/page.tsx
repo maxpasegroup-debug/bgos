@@ -5,7 +5,7 @@ import { canAccessIceconnectDashboard, getRoleHome } from "@/lib/role-routing";
 
 export default async function IceconnectAccountsPage() {
   const user = await getAuthUserFromHeaders();
-  if (!user) redirect("/login?from=/iceconnect/accounts");
+  if (!user) redirect("/iceconnect/login?from=/iceconnect/accounts");
   if (!canAccessIceconnectDashboard("accounts", user.role)) {
     redirect(getRoleHome(user.role));
   }

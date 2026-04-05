@@ -14,7 +14,7 @@ import {
   AUTH_HEADER_USER_ROLE,
   companyPlanFromJwtClaim,
 } from "./auth-config";
-import { verifyAccessToken } from "./jwt";
+import { verifyAccessTokenResult } from "./jwt";
 
 export type AuthUser = AccessTokenPayload;
 
@@ -53,12 +53,27 @@ function payloadToUser(decoded: Record<string, unknown>): AuthUser | null {
  * Verify JWT and return the signed-in user (Route Handlers, Server Actions).
  */
 export function getAuthUserFromToken(token: string): AuthUser | null {
-  try {
-    const decoded = verifyAccessToken(token) as Record<string, unknown>;
-    return payloadToUser(decoded);
-  } catch {
-    return null;
+  const r = verifyAccessTokenResult(token);
+  if (!r.ok) return null;
+  return payloadToUser(r.payload as Record<string, unknown>);
+}
+
+/** Session probe for `/api/auth/me` (distinguishes absent vs expired vs invalid). */
+export type MeSession =
+  | { status: "none" }
+  | { status: "valid"; user: AuthUser }
+  | { status: "expired" }
+  | { status: "invalid" };
+
+export function getMeSessionFromToken(token: string | undefined): MeSession {
+  if (!token?.trim()) return { status: "none" };
+  const r = verifyAccessTokenResult(token);
+  if (!r.ok) {
+    return r.code === "TOKEN_EXPIRED" ? { status: "expired" } : { status: "invalid" };
   }
+  const user = payloadToUser(r.payload as Record<string, unknown>);
+  if (!user) return { status: "invalid" };
+  return { status: "valid", user };
 }
 
 export function getAuthUser(request: NextRequest | Request): AuthUser | null {

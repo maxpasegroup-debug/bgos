@@ -1,11 +1,10 @@
-import { DealStatus, PaymentStatus } from "@prisma/client";
+import { CompanyPlan, DealStatus, PaymentStatus } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import {
-  internalServerErrorResponse,
-  prismaKnownErrorResponse,
-} from "@/lib/api-response";
+import { prismaKnownErrorResponse } from "@/lib/api-response";
 import { requireAuth } from "@/lib/auth";
+import { handleApiError } from "@/lib/route-error";
+import { buildBgosDashboardSnapshot } from "@/lib/bgos-dashboard-data";
 import { getPipelineStages } from "@/lib/dashboard-pipeline";
 import { generateInsights } from "@/lib/nexa-insights";
 import { prisma } from "@/lib/prisma";
@@ -21,11 +20,13 @@ export async function GET(request: NextRequest) {
   let revenue: { _sum: { value: number | null } };
   let installations: number;
   let pendingPayments: number;
+  let snapshot: Awaited<ReturnType<typeof buildBgosDashboardSnapshot>>;
   let insights: Awaited<ReturnType<typeof generateInsights>>;
   let pipeline: Awaited<ReturnType<typeof getPipelineStages>>;
   let salesBooster: Awaited<ReturnType<typeof buildSalesBoosterPayload>>;
 
   try {
+    snapshot = await buildBgosDashboardSnapshot(companyId);
     [leads, revenue, installations, pendingPayments, insights, pipeline, salesBooster] =
       await Promise.all([
         prisma.lead.count({ where: { companyId } }),
@@ -42,15 +43,14 @@ export async function GET(request: NextRequest) {
         prisma.payment.count({
           where: { companyId, status: PaymentStatus.PENDING },
         }),
-        generateInsights(companyId),
+        generateInsights(companyId, snapshot.nexa),
         getPipelineStages(companyId),
-        buildSalesBoosterPayload(companyId),
+        buildSalesBoosterPayload(companyId, user.companyPlan ?? CompanyPlan.BASIC),
       ]);
   } catch (e) {
     const p = prismaKnownErrorResponse(e);
     if (p) return p;
-    console.error("[GET /api/dashboard]", e);
-    return internalServerErrorResponse();
+    return handleApiError("GET /api/dashboard", e);
   }
 
   return NextResponse.json({
@@ -61,5 +61,11 @@ export async function GET(request: NextRequest) {
     pipeline,
     insights,
     salesBooster,
+    nexa: snapshot.nexa,
+    operations: snapshot.operations,
+    revenueBreakdown: snapshot.revenue,
+    risks: snapshot.risks,
+    health: snapshot.health,
+    team: snapshot.team,
   });
 }

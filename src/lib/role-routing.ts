@@ -1,5 +1,6 @@
 /**
  * Role → default app home (BGOS vs ICECONNECT). Safe for Edge middleware and client.
+ * ADMIN (and MANAGER) → boss app `/bgos`; field roles → their ICECONNECT dashboard.
  */
 
 export const ROLE_HOME: Readonly<Record<string, string>> = {
@@ -30,7 +31,7 @@ const API_RULES: RouteRule[] = [
   { prefix: "/api/activity", roles: new Set(["ADMIN", "MANAGER"]) },
   { prefix: "/api/automation", roles: new Set(["ADMIN", "MANAGER"]) },
   { prefix: "/api/pipeline", roles: new Set(["ADMIN", "MANAGER"]) },
-  { prefix: "/api/users", roles: new Set(["ADMIN", "MANAGER"]) },
+  { prefix: "/api/users", roles: new Set(["ADMIN"]) },
   { prefix: "/api/leads", roles: new Set(["TELECALLER", "ADMIN", "MANAGER"]) },
   { prefix: "/api/tasks", roles: new Set(["TELECALLER", "ADMIN", "MANAGER"]) },
   {

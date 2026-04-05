@@ -1,34 +1,24 @@
 import "server-only";
 
-import { DealStatus, LeadStatus } from "@prisma/client";
+import { LeadStatus } from "@prisma/client";
+import { getCompanyPipelineStatuses } from "@/lib/company-pipeline";
+import { leadStatusLabel } from "@/lib/lead-pipeline";
 import { prisma } from "@/lib/prisma";
 
 export type PipelineStageRow = { stage: string; count: number };
 
-const STAGES: { label: string; status: LeadStatus | null }[] = [
-  { label: "New", status: LeadStatus.NEW },
-  { label: "Contacted", status: LeadStatus.CONTACTED },
-  { label: "Qualified", status: LeadStatus.QUALIFIED },
-  { label: "Visit", status: LeadStatus.VISIT },
-  { label: "Proposal", status: LeadStatus.PROPOSAL },
-  { label: "Negotiation", status: LeadStatus.NEGOTIATION },
-  { label: "Won / Lost", status: null },
-];
-
 export async function getPipelineStages(companyId: string): Promise<PipelineStageRow[]> {
-  return Promise.all(
-    STAGES.map(async ({ label, status }) => {
-      if (status === null) {
-        const count = await prisma.deal.count({
-          where: {
-            status: { in: [DealStatus.WON, DealStatus.LOST] },
-            lead: { companyId },
-          },
-        });
-        return { stage: label, count };
-      }
-      const count = await prisma.lead.count({ where: { companyId, status } });
-      return { stage: label, count };
-    }),
+  const order = await getCompanyPipelineStatuses(companyId);
+  const grouped = await prisma.lead.groupBy({
+    by: ["status"],
+    where: { companyId },
+    _count: { _all: true },
+  });
+  const counts = new Map<LeadStatus, number>(
+    grouped.map((g) => [g.status, g._count._all]),
   );
+  return order.map((status) => ({
+    stage: leadStatusLabel(status),
+    count: counts.get(status) ?? 0,
+  }));
 }

@@ -2,10 +2,12 @@ import { Prisma, UserRole } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { prismaKnownErrorResponse } from "@/lib/api-response";
 import { requireAuthWithRoles } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
+import { handleApiError } from "@/lib/route-error";
 import { prisma } from "@/lib/prisma";
-import { USER_MUTATION_ROLES } from "@/lib/user-company";
+import { toPublicUser, USER_ADMIN_ROLES } from "@/lib/user-company";
 
 const createBodySchema = z.object({
   name: z.string().trim().min(1).max(200),
@@ -15,30 +17,8 @@ const createBodySchema = z.object({
   role: z.nativeEnum(UserRole),
 });
 
-function publicUser(u: {
-  id: string;
-  name: string;
-  mobile: string;
-  email: string;
-  role: UserRole;
-  companyId: string;
-  isActive: boolean;
-  createdAt: Date;
-}) {
-  return {
-    id: u.id,
-    name: u.name,
-    mobile: u.mobile,
-    email: u.email,
-    role: u.role,
-    companyId: u.companyId,
-    isActive: u.isActive,
-    createdAt: u.createdAt.toISOString(),
-  };
-}
-
 export async function POST(request: NextRequest) {
-  const session = requireAuthWithRoles(request, USER_MUTATION_ROLES);
+  const session = requireAuthWithRoles(request, USER_ADMIN_ROLES);
   if (session instanceof NextResponse) return session;
 
   let json: unknown;
@@ -80,7 +60,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(
-      { ok: true as const, user: publicUser(user) },
+      { ok: true as const, user: toPublicUser(user) },
       { status: 201 },
     );
   } catch (e) {
@@ -90,6 +70,8 @@ export async function POST(request: NextRequest) {
         { status: 409 },
       );
     }
-    throw e;
+    const p = prismaKnownErrorResponse(e);
+    if (p) return p;
+    return handleApiError("POST /api/users/create", e);
   }
 }

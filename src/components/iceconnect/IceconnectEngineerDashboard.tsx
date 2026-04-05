@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { IceconnectWorkspaceView } from "./IceconnectWorkspaceView";
 import { IcPanel } from "./IcPanel";
 
 type Visit = {
@@ -18,16 +19,28 @@ export function IceconnectEngineerDashboard() {
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/iceconnect/engineer/visits", { credentials: "include" });
-    if (!res.ok) {
-      setErr("Could not load visits");
-      setLoading(false);
-      return;
-    }
-    const data = (await res.json()) as { visits: Visit[] };
-    setVisits(data.visits);
     setErr(null);
-    setLoading(false);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/iceconnect/engineer/visits", { credentials: "include" });
+      if (!res.ok) {
+        let msg = "Could not load visits.";
+        try {
+          const j = (await res.json()) as { error?: string };
+          if (typeof j.error === "string" && j.error.trim()) msg = j.error;
+        } catch {
+          /* ignore */
+        }
+        setErr(msg);
+        return;
+      }
+      const data = (await res.json()) as { visits: Visit[] };
+      setVisits(Array.isArray(data.visits) ? data.visits : []);
+    } catch {
+      setErr("Network error — check your connection.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -46,7 +59,7 @@ export function IceconnectEngineerDashboard() {
         body: JSON.stringify({ leadId, report }),
       });
       if (!res.ok) {
-        setErr("Could not save report");
+        setErr("Could not save report.");
         return;
       }
       setDrafts((d) => ({ ...d, [leadId]: "" }));
@@ -56,22 +69,14 @@ export function IceconnectEngineerDashboard() {
     }
   }
 
-  if (loading) {
-    return <p className="text-sm text-white/50">Loading assigned visits…</p>;
-  }
-
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Site visits</h1>
-        <p className="mt-1 text-sm text-white/50">Visits assigned to you (Visit stage).</p>
-      </div>
-      {err ? (
-        <p className="text-sm text-red-400" role="alert">
-          {err}
-        </p>
-      ) : null}
-
+    <IceconnectWorkspaceView
+      title="Site visits"
+      subtitle="Leads in site-visit stage assigned to you — upload field reports here."
+      loading={loading}
+      error={err}
+      onRetry={() => void load()}
+    >
       <IcPanel title="Assigned visits">
         {visits.length === 0 ? (
           <p className="text-sm text-white/45">No site visits assigned.</p>
@@ -107,6 +112,6 @@ export function IceconnectEngineerDashboard() {
           </ul>
         )}
       </IcPanel>
-    </div>
+    </IceconnectWorkspaceView>
   );
 }

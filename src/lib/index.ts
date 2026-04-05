@@ -7,6 +7,7 @@ export { hashPassword, verifyPassword } from "./password";
 export {
   signAccessToken,
   verifyAccessToken,
+  verifyAccessTokenResult,
   requireJwtSecret,
 } from "./jwt";
 export {

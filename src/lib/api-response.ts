@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
-import type { z } from "zod";
+import type { z, ZodTypeAny } from "zod";
 
 export type ApiErrorBody = {
   ok: false;
@@ -42,6 +42,22 @@ export async function parseJsonBody(
   }
 }
 
+/** Empty body → `{}` (for optional JSON payloads). */
+export async function parseJsonBodyOptional(
+  request: Request,
+): Promise<{ ok: true; data: unknown } | { ok: false; response: NextResponse<ApiErrorBody> }> {
+  try {
+    const text = await request.text();
+    if (!text.trim()) {
+      return { ok: true, data: {} };
+    }
+    const data = JSON.parse(text) as unknown;
+    return { ok: true, data };
+  } catch {
+    return { ok: false, response: jsonError(400, "BAD_REQUEST", "Invalid JSON body") };
+  }
+}
+
 export function prismaKnownErrorResponse(err: unknown): NextResponse<ApiErrorBody> | null {
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     switch (err.code) {
@@ -58,4 +74,23 @@ export function prismaKnownErrorResponse(err: unknown): NextResponse<ApiErrorBod
 
 export function internalServerErrorResponse(): NextResponse<ApiErrorBody> {
   return jsonError(503, "SERVICE_UNAVAILABLE", "Could not complete the request");
+}
+
+/**
+ * Parse JSON body then validate with Zod (empty body → 400).
+ */
+export async function parseJsonBodyZod<T extends ZodTypeAny>(
+  request: Request,
+  schema: T,
+): Promise<
+  | { ok: true; data: z.infer<T> }
+  | { ok: false; response: NextResponse<ApiErrorBody> }
+> {
+  const raw = await parseJsonBody(request);
+  if (!raw.ok) return raw;
+  const parsed = schema.safeParse(raw.data);
+  if (!parsed.success) {
+    return { ok: false, response: zodValidationErrorResponse(parsed.error) };
+  }
+  return { ok: true, data: parsed.data };
 }

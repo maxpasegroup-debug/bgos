@@ -1,20 +1,30 @@
 "use client";
 
+import { UserRole } from "@prisma/client";
 import { motion, useReducedMotion } from "framer-motion";
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { DashboardSurface } from "@/components/dashboard/DashboardSurface";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { BgosAddEmployeeForm } from "./BgosAddEmployeeForm";
+import { useBgosDashboardContext } from "./BgosDataProvider";
 import { BgosShineButton } from "./BgosShineButton";
 import { SalesBoosterModule } from "./SalesBoosterModule";
 import { BGOS_GRID_GAP, BGOS_MAIN_PAD } from "./layoutTokens";
 import { easePremium, fadeUp, sectionReveal, staggerRow } from "./motion";
-import type { NexaInsight } from "@/types";
+import type {
+  DashboardHealth,
+  NexaInsight,
+  NexaSnapshot,
+  TeamMemberPerformance,
+} from "@/types";
 import type { DashboardPayload, PipelineRow } from "./useBgosData";
 
 const METRIC_LABELS = [
-  "Leads Today",
-  "Revenue Today",
-  "Installations Done",
-  "Pending Approvals",
+  "Total leads",
+  "Total revenue (won)",
+  "Installations done",
+  "Pending payments",
 ] as const;
 
 function formatInr(n: number) {
@@ -34,7 +44,9 @@ export function BgosDashboardGrid({
   pipeline: PipelineRow[] | null;
   metricsUnavailable: boolean;
 }) {
+  const { sessionRole } = useBgosDashboardContext();
   const reduceMotion = useReducedMotion();
+  const isAdmin = sessionRole === UserRole.ADMIN;
 
   const metrics = useMemo(() => {
     if (!dashboard) return null;
@@ -85,9 +97,14 @@ export function BgosDashboardGrid({
         ))}
       </motion.section>
 
+      <DashboardControlsStrip isAdmin={isAdmin} />
+
       {/* 2 — NEXA priority + health */}
-      <NexaPriorityPanel insights={dashboard?.insights ?? []} />
-      <BusinessHealthPanel />
+      <NexaPriorityPanel
+        nexa={dashboard?.nexa}
+        insights={dashboard?.insights ?? []}
+      />
+      <BusinessHealthPanel health={dashboard?.health} />
 
       {/* 3 — Pipeline */}
       <PipelinePanel pipeline={pipeline} reduceMotion={!!reduceMotion} />
@@ -99,20 +116,73 @@ export function BgosDashboardGrid({
       />
 
       {/* 5 — Operations */}
-      <OperationsPanel />
+      <OperationsPanel operations={dashboard?.operations} />
 
       {/* 6 — Team */}
-      <TeamPanel />
+      <TeamPanel team={dashboard?.team ?? []} isAdmin={isAdmin} />
 
       {/* 7 — Revenue */}
-      <RevenuePanel />
+      <RevenuePanel
+        breakdown={dashboard?.revenueBreakdown}
+        pendingPaymentCount={dashboard?.pendingPayments}
+      />
 
       {/* 8 — Risks */}
-      <RisksPanel />
+      <RisksPanel
+        risks={dashboard?.risks}
+        opportunitiesCount={dashboard?.nexa?.opportunities}
+        pipelineValue={dashboard?.revenueBreakdown?.pipelineValue}
+      />
 
       {/* 9 — NEXA chat */}
-      <NexaChatPanel />
+      <NexaChatPanel nexa={dashboard?.nexa} insights={dashboard?.insights ?? []} />
     </motion.div>
+  );
+}
+
+function DashboardControlsStrip({ isAdmin }: { isAdmin: boolean }) {
+  return (
+    <motion.section
+      variants={fadeUp}
+      className="col-span-full"
+      style={{ scrollMarginTop: "5.5rem" }}
+    >
+      <DashboardSurface tilt={false} className="p-4 sm:p-5">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-white/45">
+          Control panel
+        </h2>
+        <p className="mt-1 text-xs text-white/35">
+          Live metrics refresh automatically while this tab stays open.
+        </p>
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <a
+            href="#team"
+            className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/15 bg-white/[0.06] px-4 text-sm font-medium text-white transition hover:border-[#FFC300]/40"
+          >
+            View team performance
+          </a>
+          {isAdmin ? (
+            <a
+              href="#add-employee"
+              className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[#FFC300]/35 bg-[#FFC300]/10 px-4 text-sm font-semibold text-[#FFC300] transition hover:bg-[#FFC300]/15"
+            >
+              Add employee
+            </a>
+          ) : null}
+          <Link
+            href="/bgos/nexa"
+            className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/15 bg-white/[0.06] px-4 text-sm font-medium text-white/90 transition hover:border-[#FFC300]/40"
+          >
+            Nexa focus view
+          </Link>
+        </div>
+        {!isAdmin ? (
+          <p className="mt-3 text-xs text-white/40">
+            Only a company admin can add employees from this panel.
+          </p>
+        ) : null}
+      </DashboardSurface>
+    </motion.section>
   );
 }
 
@@ -132,6 +202,15 @@ function formatInsightLine(insight: NexaInsight): string {
   if (meta?.pendingTasks != null) {
     return `${message} (${meta.pendingTasks} pending)`;
   }
+  if (meta?.overdueFollowUps != null) {
+    return `${message} (${meta.overdueFollowUps} overdue)`;
+  }
+  if (meta?.delays != null) {
+    return `${message} (${meta.delays} past schedule)`;
+  }
+  if (meta?.opportunities != null) {
+    return `${message} (${meta.opportunities} in qualified → negotiation)`;
+  }
   if (meta?.leads != null) {
     return `${message} (${meta.leads} leads)`;
   }
@@ -141,7 +220,13 @@ function formatInsightLine(insight: NexaInsight): string {
   return message;
 }
 
-function NexaPriorityPanel({ insights }: { insights: NexaInsight[] }) {
+function NexaPriorityPanel({
+  nexa,
+  insights,
+}: {
+  nexa: NexaSnapshot | undefined;
+  insights: NexaInsight[];
+}) {
   const reduceMotion = useReducedMotion();
 
   return (
@@ -175,8 +260,48 @@ function NexaPriorityPanel({ insights }: { insights: NexaInsight[] }) {
           </div>
           <div className="relative">
             <h2 className="text-lg font-semibold text-white sm:text-xl">
-              Boss, here&apos;s what matters today:
+              Nexa insights
             </h2>
+            <p className="mt-1 text-xs text-white/45">
+              Follow-ups, delays, and opportunities — driven by your live CRM data.
+            </p>
+            {nexa ? (
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-lg border border-white/10 bg-black/25 px-3 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-white/45">
+                    Pending follow-ups
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold tabular-nums text-white">
+                    {nexa.pendingFollowUps}
+                  </p>
+                  {nexa.overdueFollowUps > 0 ? (
+                    <p className="mt-0.5 text-xs text-amber-200/90">
+                      {nexa.overdueFollowUps} overdue
+                    </p>
+                  ) : null}
+                </div>
+                <div className="rounded-lg border border-white/10 bg-black/25 px-3 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-white/45">
+                    Delays
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold tabular-nums text-white">
+                    {nexa.delays}
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-white/40">Installs past due date</p>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-black/25 px-3 py-3 sm:col-span-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-white/45">
+                    Opportunities
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold tabular-nums text-[#FFE066]">
+                    {nexa.opportunities}
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-white/40">
+                    Leads in qualified, proposal, or negotiation
+                  </p>
+                </div>
+              </div>
+            ) : null}
             {insights.length > 0 ? (
               <ul className="mt-5 space-y-2.5 text-sm text-white/80 sm:mt-6 sm:text-base">
                 {insights.map((it) => (
@@ -190,12 +315,22 @@ function NexaPriorityPanel({ insights }: { insights: NexaInsight[] }) {
               </ul>
             ) : (
               <p className="mt-5 text-sm text-white/60 sm:mt-6 sm:text-base">
-                All clear — NEXA has no alerts for this company right now.
+                All clear — NEXA has no rule-based alerts for this company right now.
               </p>
             )}
             <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <BgosShineButton variant="red">Fix Now</BgosShineButton>
-              <BgosShineButton variant="yellow">Auto Handle</BgosShineButton>
+              <a
+                href="#operations"
+                className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-red-500/40 bg-red-500/10 px-4 text-sm font-semibold text-red-200 transition hover:bg-red-500/15"
+              >
+                Jump to operations
+              </a>
+              <a
+                href="#sales"
+                className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[#FFC300]/40 bg-[#FFC300]/10 px-4 text-sm font-semibold text-[#FFC300] transition hover:bg-[#FFC300]/15"
+              >
+                Review pipeline
+              </a>
             </div>
           </div>
         </DashboardSurface>
@@ -204,13 +339,25 @@ function NexaPriorityPanel({ insights }: { insights: NexaInsight[] }) {
   );
 }
 
-function BusinessHealthPanel() {
-  const rows = [
-    { label: "Efficiency", value: 82 },
-    { label: "Conversion", value: 34 },
-    { label: "Team productivity", value: 76 },
-  ];
+function BusinessHealthPanel({ health }: { health: DashboardHealth | undefined }) {
   const reduceMotion = useReducedMotion();
+  const rows = [
+    {
+      label: "Follow-up efficiency",
+      sub: "Share of pending tasks that are not overdue",
+      value: health?.efficiency ?? 0,
+    },
+    {
+      label: "Win rate",
+      sub: "Won ÷ (won + lost)",
+      value: health?.conversion ?? 0,
+    },
+    {
+      label: "Task throughput",
+      sub: "Completed ÷ all lead tasks",
+      value: health?.teamProductivity ?? 0,
+    },
+  ];
 
   return (
     <motion.section variants={fadeUp} style={{ scrollMarginTop: "5.5rem" }}>
@@ -218,20 +365,24 @@ function BusinessHealthPanel() {
         <h2 className="text-xs font-semibold uppercase tracking-wider text-white/45">
           Business health
         </h2>
+        <p className="mt-1 text-[10px] text-white/35">Computed from live tasks, leads, and outcomes.</p>
         <div className="mt-5 space-y-5">
           {rows.map((row, i) => (
             <div key={row.label}>
-              <div className="mb-1.5 flex justify-between text-sm">
-                <span className="text-white/70">{row.label}</span>
-                <span className="tabular-nums font-medium text-white">
-                  {row.value}%
+              <div className="mb-1.5 flex justify-between gap-2 text-sm">
+                <span className="text-white/70">
+                  {row.label}
+                  <span className="mt-0.5 block text-[10px] font-normal text-white/35">
+                    {row.sub}
+                  </span>
                 </span>
+                <span className="shrink-0 tabular-nums font-medium text-white">{row.value}%</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-white/[0.08]">
                 <motion.div
                   className="h-full rounded-full bg-gradient-to-r from-[#FF3B3B] to-[#FFC300]"
                   initial={{ width: 0 }}
-                  animate={{ width: `${row.value}%` }}
+                  animate={{ width: `${Math.min(100, row.value)}%` }}
                   transition={{
                     duration: reduceMotion ? 0 : 1,
                     delay: reduceMotion ? 0 : 0.2 + i * 0.1,
@@ -255,6 +406,10 @@ function PipelinePanel({
   reduceMotion: boolean;
 }) {
   const stages = pipeline ?? [];
+  const pipelineTotal = useMemo(
+    () => stages.reduce((acc, s) => acc + s.count, 0),
+    [stages],
+  );
 
   return (
     <motion.section
@@ -267,6 +422,14 @@ function PipelinePanel({
         <h2 className="text-sm font-semibold text-white sm:text-base">
           Sales pipeline
         </h2>
+        {pipelineTotal === 0 && stages.length > 0 ? (
+          <div className="mt-4">
+            <EmptyState
+              title="No leads in the pipeline yet"
+              description="Add leads from your CRM or ICECONNECT so stages populate here."
+            />
+          </div>
+        ) : null}
         <div className="relative mb-3 mt-4 hidden h-1 w-full overflow-hidden rounded-full bg-white/[0.07] md:block">
           <motion.div
             className="absolute inset-y-0 w-[28%] rounded-full bg-gradient-to-r from-transparent via-[#FFC300]/60 to-transparent"
@@ -316,98 +479,148 @@ function PipelinePanel({
   );
 }
 
-function OperationsPanel() {
+function OperationsPanel({
+  operations,
+}: {
+  operations: DashboardPayload["operations"] | undefined;
+}) {
+  const q = operations?.installationQueue ?? 0;
+  const svc = operations?.openServiceTickets ?? 0;
+  const pend = operations?.pendingPayments ?? 0;
+
   const modules = [
-    { label: "Loan Status", value: 9 },
-    { label: "Installation Queue", value: 6 },
-    { label: "Approval Status", value: 4 },
-    { label: "Service Requests", value: 11 },
+    { label: "Installation queue", value: q },
+    { label: "Open service tickets", value: svc },
+    { label: "Pending payment records", value: pend },
   ];
 
   return (
     <motion.section
       id="operations"
       variants={staggerRow}
-      className={`col-span-full grid grid-cols-2 lg:grid-cols-4 ${BGOS_GRID_GAP}`}
+      className={`col-span-full grid grid-cols-1 sm:grid-cols-3 ${BGOS_GRID_GAP}`}
       style={{ scrollMarginTop: "5.5rem" }}
     >
       {modules.map((m) => (
         <motion.div key={m.label} variants={fadeUp}>
           <DashboardSurface className="p-4 sm:p-5">
-            <p className="text-2xl font-semibold tabular-nums text-white">
-              {m.value}
-            </p>
+            <p className="text-2xl font-semibold tabular-nums text-white">{m.value}</p>
             <p className="mt-1 text-[10px] font-medium uppercase tracking-wider text-white/45">
               {m.label}
             </p>
           </DashboardSurface>
         </motion.div>
       ))}
-      <motion.div variants={fadeUp} className="col-span-full">
-        <DashboardSurface tilt={false} className="overflow-hidden p-0">
-          <div
-            className="h-0.5 w-full bg-gradient-to-r from-[#FF3B3B] to-[#FFC300]"
-            aria-hidden
-          />
-          <p className="px-4 py-3.5 text-sm font-medium text-white/90 sm:px-5">
-            2 installations delayed
-          </p>
-        </DashboardSurface>
-      </motion.div>
     </motion.section>
   );
 }
 
-function TeamPanel() {
-  const depts = [
-    { name: "Marketing", pct: 91, bar: "from-emerald-400 to-green-500" },
-    { name: "Installation", pct: 74, bar: "from-amber-400 to-[#FFC300]" },
-    { name: "Service", pct: 61, bar: "from-[#FF3B3B] to-red-600" },
-  ];
-  const reduceMotion = useReducedMotion();
-
+function TeamPanel({
+  team,
+  isAdmin,
+}: {
+  team: TeamMemberPerformance[];
+  isAdmin: boolean;
+}) {
   return (
     <motion.section
       id="team"
       variants={staggerRow}
-      className={`col-span-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 ${BGOS_GRID_GAP}`}
+      className={`col-span-full space-y-6 ${BGOS_GRID_GAP}`}
       style={{ scrollMarginTop: "5.5rem" }}
     >
-      {depts.map((d, i) => (
-        <motion.div key={d.name} variants={fadeUp}>
-          <DashboardSurface className="p-6">
-            <h3 className="text-sm font-medium text-white">{d.name}</h3>
-            <p className="mt-3 text-3xl font-semibold tabular-nums text-white">
-              {d.pct}
-              <span className="text-lg text-white/45">%</span>
+      <motion.div variants={fadeUp}>
+        <DashboardSurface className="overflow-x-auto p-5 sm:p-6">
+          <h2 className="text-sm font-semibold text-white sm:text-base" id="team-performance">
+            Team performance
+          </h2>
+          <p className="mt-1 text-xs text-white/45">
+            Assigned leads, wins, and pending tasks per person — updates with the rest of the dashboard.
+          </p>
+          {team.length === 0 ? (
+            <p className="mt-4 text-sm text-white/45">No active users in this company.</p>
+          ) : (
+            <table className="mt-4 w-full min-w-[32rem] text-left text-sm">
+              <thead>
+                <tr className="border-b border-white/10 text-[10px] uppercase tracking-wider text-white/45">
+                  <th className="pb-2 pr-4 font-medium">Name</th>
+                  <th className="pb-2 pr-4 font-medium">Role</th>
+                  <th className="pb-2 pr-4 font-medium tabular-nums">Assigned</th>
+                  <th className="pb-2 pr-4 font-medium tabular-nums">Won</th>
+                  <th className="pb-2 font-medium tabular-nums">Pending tasks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {team.map((m) => (
+                  <tr key={m.userId} className="border-b border-white/[0.06] text-white/88">
+                    <td className="py-2.5 pr-4">
+                      <span className="font-medium text-white">{m.name}</span>
+                      <span className="mt-0.5 block text-xs text-white/40">{m.email}</span>
+                    </td>
+                    <td className="py-2.5 pr-4 text-white/60">{m.role}</td>
+                    <td className="py-2.5 pr-4 tabular-nums">{m.assignedLeads}</td>
+                    <td className="py-2.5 pr-4 tabular-nums text-emerald-200/90">{m.wonLeads}</td>
+                    <td className="py-2.5 tabular-nums text-amber-200/90">{m.pendingTasks}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </DashboardSurface>
+      </motion.div>
+
+      {isAdmin ? (
+        <motion.div variants={fadeUp} id="add-employee">
+          <DashboardSurface className="p-5 sm:p-6">
+            <h2 className="text-sm font-semibold text-white sm:text-base">Add employee</h2>
+            <p className="mt-1 text-xs text-white/45">
+              Creates a login for your company. Share credentials securely with the new hire.
             </p>
-            <p className="text-xs text-white/45">Performance</p>
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/[0.08]">
-              <motion.div
-                className={`h-full rounded-full bg-gradient-to-r ${d.bar}`}
-                initial={{ width: 0 }}
-                animate={{ width: `${d.pct}%` }}
-                transition={{
-                  duration: reduceMotion ? 0 : 0.9,
-                  delay: reduceMotion ? 0 : 0.15 + i * 0.08,
-                  ease: easePremium,
-                }}
-              />
-            </div>
+            <BgosAddEmployeeForm />
           </DashboardSurface>
         </motion.div>
-      ))}
+      ) : null}
     </motion.section>
   );
 }
 
-function RevenuePanel() {
+function RevenuePanel({
+  breakdown,
+  pendingPaymentCount,
+}: {
+  breakdown: DashboardPayload["revenueBreakdown"] | undefined;
+  pendingPaymentCount: number | undefined;
+}) {
+  const b = breakdown;
   const metrics = [
-    { label: "Monthly revenue", sub: "MTD", value: "₹3.18Cr" },
-    { label: "Pipeline value", sub: "Open", value: "₹8.4Cr" },
-    { label: "Expected closures", sub: "Quarter", value: "12" },
-    { label: "Pending payments", sub: "Settlement", value: "₹42L" },
+    {
+      label: "Revenue (MTD)",
+      sub: "Won deals closed this month",
+      value: formatInr(b?.monthlyWon ?? 0),
+    },
+    {
+      label: "Pipeline value",
+      sub: "Open leads (not won/lost)",
+      value: formatInr(b?.pipelineValue ?? 0),
+    },
+    {
+      label: "Late-stage leads",
+      sub: "Proposal + negotiation",
+      value: String(b?.expectedClosures ?? 0),
+    },
+    {
+      label: "Pending payments",
+      sub:
+        pendingPaymentCount != null
+          ? `${pendingPaymentCount} open record${pendingPaymentCount === 1 ? "" : "s"}`
+          : "Awaiting settlement",
+      value: formatInr(b?.pendingAmount ?? 0),
+    },
   ];
+
+  const maxBar = Math.max(1, b?.monthlyWon ?? 0, b?.pipelineValue ?? 0);
+  const wonPct = ((b?.monthlyWon ?? 0) / maxBar) * 100;
+  const pipePct = ((b?.pipelineValue ?? 0) / maxBar) * 100;
 
   return (
     <motion.section
@@ -434,17 +647,34 @@ function RevenuePanel() {
       <motion.div variants={fadeUp}>
         <DashboardSurface className="p-6">
           <p className="text-xs font-medium uppercase tracking-wider text-white/45">
-            Revenue trend
+            MTD won vs open pipeline
           </p>
-          <p className="text-[10px] text-white/35">Placeholder</p>
-          <div className="mt-4 flex h-36 items-end gap-1">
-            {[40, 65, 52, 78, 58, 88, 70, 92].map((h, i) => (
-              <div
-                key={i}
-                className="min-w-0 flex-1 rounded-t-sm bg-gradient-to-t from-[#FF3B3B]/80 to-[#FFC300]/70 opacity-90"
-                style={{ height: `${h}%` }}
-              />
-            ))}
+          <p className="text-[10px] text-white/35">Normalized to the larger of the two figures</p>
+          <div className="mt-6 space-y-4">
+            <div>
+              <div className="mb-1 flex justify-between text-xs text-white/60">
+                <span>Month-to-date won</span>
+                <span className="tabular-nums">{formatInr(b?.monthlyWon ?? 0)}</span>
+              </div>
+              <div className="h-3 overflow-hidden rounded-full bg-white/[0.08]">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-[#FF3B3B] to-[#FFC300]"
+                  style={{ width: `${wonPct}%` }}
+                />
+              </div>
+            </div>
+            <div>
+              <div className="mb-1 flex justify-between text-xs text-white/60">
+                <span>Open pipeline value</span>
+                <span className="tabular-nums">{formatInr(b?.pipelineValue ?? 0)}</span>
+              </div>
+              <div className="h-3 overflow-hidden rounded-full bg-white/[0.08]">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-white/25 to-white/50"
+                  style={{ width: `${pipePct}%` }}
+                />
+              </div>
+            </div>
           </div>
         </DashboardSurface>
       </motion.div>
@@ -452,16 +682,26 @@ function RevenuePanel() {
   );
 }
 
-function RisksPanel() {
-  const risks = [
-    { label: "Lost leads", value: 7 },
-    { label: "Delays", value: 2 },
-    { label: "Complaints", value: 3 },
+function RisksPanel({
+  risks,
+  opportunitiesCount,
+  pipelineValue,
+}: {
+  risks: DashboardPayload["risks"] | undefined;
+  opportunitiesCount: number | undefined;
+  pipelineValue: number | undefined;
+}) {
+  const r = risks;
+
+  const riskRows = [
+    { label: "Lost leads", value: r?.lostLeads ?? 0 },
+    { label: "Installations past schedule", value: r?.delays ?? 0 },
+    { label: "Open service tickets", value: r?.openServiceTickets ?? 0 },
   ];
-  const opps = [
-    { label: "Hot leads", value: 14 },
-    { label: "Upsells", value: 6 },
-    { label: "Referrals", value: 9 },
+
+  const oppRows = [
+    { label: "Active opportunities", value: String(opportunitiesCount ?? 0) },
+    { label: "Open pipeline value", value: formatInr(pipelineValue ?? 0) },
   ];
 
   return (
@@ -476,15 +716,13 @@ function RisksPanel() {
           Risks
         </h2>
         <ul className="mt-4 space-y-3">
-          {risks.map((r) => (
+          {riskRows.map((row) => (
             <li
-              key={r.label}
+              key={row.label}
               className="flex items-center justify-between border-b border-red-500/15 py-2 last:border-0"
             >
-              <span className="text-sm text-white/85">{r.label}</span>
-              <span className="text-lg font-semibold tabular-nums text-red-200">
-                {r.value}
-              </span>
+              <span className="text-sm text-white/85">{row.label}</span>
+              <span className="text-lg font-semibold tabular-nums text-red-200">{row.value}</span>
             </li>
           ))}
         </ul>
@@ -494,13 +732,13 @@ function RisksPanel() {
           Opportunities
         </h2>
         <ul className="mt-4 space-y-3">
-          {opps.map((o) => (
+          {oppRows.map((o) => (
             <li
               key={o.label}
               className="flex items-center justify-between border-b border-[#FFC300]/20 py-2 last:border-0"
             >
               <span className="text-sm text-white/85">{o.label}</span>
-              <span className="text-lg font-semibold tabular-nums text-[#FFE066]">
+              <span className="max-w-[55%] text-right text-lg font-semibold tabular-nums text-[#FFE066]">
                 {o.value}
               </span>
             </li>
@@ -511,9 +749,40 @@ function RisksPanel() {
   );
 }
 
-function NexaChatPanel() {
-  const [reply, setReply] = useState("Boss, 3 leads are ready to close.");
+function buildNexaBrief(nexa: NexaSnapshot | undefined, insights: NexaInsight[]): string {
+  if (!nexa && insights.length === 0) {
+    return "NEXA is synced with your workspace. No critical signals at this moment.";
+  }
+  const parts: string[] = [];
+  if (nexa) {
+    parts.push(
+      `${nexa.pendingFollowUps} pending follow-up${nexa.pendingFollowUps === 1 ? "" : "s"}`,
+    );
+    if (nexa.overdueFollowUps > 0) {
+      parts.push(`${nexa.overdueFollowUps} overdue`);
+    }
+    if (nexa.delays > 0) {
+      parts.push(`${nexa.delays} installation${nexa.delays === 1 ? "" : "s"} past schedule`);
+    }
+    parts.push(`${nexa.opportunities} opportunity lead${nexa.opportunities === 1 ? "" : "s"}`);
+  }
+  const top = insights[0] ? formatInsightLine(insights[0]) : "";
+  return `Live snapshot: ${parts.join(" · ")}.${top ? ` Top signal: ${top}` : ""}`;
+}
+
+function NexaChatPanel({
+  nexa,
+  insights,
+}: {
+  nexa: NexaSnapshot | undefined;
+  insights: NexaInsight[];
+}) {
   const reduceMotion = useReducedMotion();
+  const brief = useMemo(() => buildNexaBrief(nexa, insights), [nexa, insights]);
+  const [reply, setReply] = useState(brief);
+  useEffect(() => {
+    setReply(brief);
+  }, [brief]);
 
   return (
     <motion.section
@@ -548,22 +817,40 @@ function NexaChatPanel() {
             Quick actions
           </p>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            {["Follow up all hot leads", "Optimize pipeline"].map((label) => (
-              <button
-                key={label}
-                type="button"
-                onClick={() => setReply("Boss, 3 leads are ready to close.")}
-                className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-left text-xs font-medium text-white/85 transition-colors hover:border-[#FFC300]/35 hover:bg-white/[0.07] sm:text-sm"
-              >
-                {label}
-              </button>
-            ))}
+            <button
+              type="button"
+              onClick={() =>
+                setReply(
+                  nexa
+                    ? `Prioritize ${nexa.overdueFollowUps} overdue follow-ups first, then ${Math.max(0, nexa.pendingFollowUps - nexa.overdueFollowUps)} remaining.`
+                    : "Open the pipeline section to prioritize follow-ups.",
+                )
+              }
+              className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-left text-xs font-medium text-white/85 transition-colors hover:border-[#FFC300]/35 hover:bg-white/[0.07] sm:text-sm"
+            >
+              Triage follow-ups
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setReply(
+                  nexa
+                    ? `${nexa.opportunities} leads are in qualified / proposal / negotiation — align owners this week.`
+                    : "Review opportunities in the risks panel.",
+                )
+              }
+              className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-left text-xs font-medium text-white/85 transition-colors hover:border-[#FFC300]/35 hover:bg-white/[0.07] sm:text-sm"
+            >
+              Focus opportunities
+            </button>
           </div>
           <form
             className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center"
             onSubmit={(e) => {
               e.preventDefault();
-              setReply("Boss, 3 leads are ready to close.");
+              setReply(
+                "NEXA rules engine is live; full natural-language answers will ship in a later release. Use the metrics above for decisions.",
+              );
             }}
           >
             <input

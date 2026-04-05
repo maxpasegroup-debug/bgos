@@ -1,10 +1,8 @@
-import { UserRole } from "@prisma/client";
+import { TaskStatus, UserRole } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import {
-  internalServerErrorResponse,
-  prismaKnownErrorResponse,
-} from "@/lib/api-response";
+import { prismaKnownErrorResponse } from "@/lib/api-response";
+import { handleApiError } from "@/lib/route-error";
 import { requireIceconnectRole } from "@/lib/iceconnect-route-guard";
 import { assigneeFilter, isIceconnectPrivileged } from "@/lib/iceconnect-scope";
 import { serializeLead } from "@/lib/lead-serialize";
@@ -30,10 +28,16 @@ export async function GET(request: NextRequest) {
     ? { lead: { companyId } }
     : { userId: session.sub, lead: { companyId } };
 
+  const now = new Date();
+
   let leads;
   let tasks;
+  let leadCount: number;
+  let pendingTaskCount: number;
+  let overdueTaskCount: number;
   try {
-    [leads, tasks] = await Promise.all([
+    const taskCountBase = { ...taskWhere, status: TaskStatus.PENDING };
+    [leads, tasks, leadCount, pendingTaskCount, overdueTaskCount] = await Promise.all([
       prisma.lead.findMany({
         where: leadWhere,
         orderBy: { createdAt: "desc" },
@@ -48,16 +52,28 @@ export async function GET(request: NextRequest) {
         take: 80,
         include,
       }),
+      prisma.lead.count({ where: leadWhere }),
+      prisma.task.count({ where: taskCountBase }),
+      prisma.task.count({
+        where: {
+          ...taskCountBase,
+          dueDate: { lt: now },
+        },
+      }),
     ]);
   } catch (e) {
     const p = prismaKnownErrorResponse(e);
     if (p) return p;
-    console.error("[GET /api/iceconnect/sales/data]", e);
-    return internalServerErrorResponse();
+    return handleApiError("GET /api/iceconnect/sales/data", e);
   }
 
   return NextResponse.json({
     ok: true as const,
+    stats: {
+      leadCount,
+      pendingTaskCount,
+      overdueTaskCount,
+    },
     leads: leads.map((l) => ({
       ...serializeLead({
         ...l,

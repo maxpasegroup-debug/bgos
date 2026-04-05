@@ -158,7 +158,7 @@ export function Hero() {
                 whileTap={{ scale: 0.98 }}
               >
                 <Link
-                  href="/bgos"
+                  href="/signup"
                   className="relative inline-flex min-h-[46px] w-full items-center justify-center overflow-hidden rounded-xl bg-gradient-to-r from-red-500 to-yellow-400 px-8 py-3.5 text-sm font-bold tracking-wide text-neutral-950 shadow-lg shadow-red-500/25 transition-shadow duration-300 hover:shadow-xl hover:shadow-amber-400/30 sm:w-auto"
                 >
                   <span

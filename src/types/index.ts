@@ -50,6 +50,7 @@ export type SalesBoosterPro = {
     reason: string;
     channel: "WhatsApp";
     nextAction: string;
+    trigger: "overdue_task" | "stale_lead" | "due_within_24h";
   }>;
   prioritizedLeads: Array<{
     leadId: string;
@@ -78,6 +79,48 @@ export type SalesBoosterPro = {
 
 export type SalesBoosterPayload = SalesBoosterBasic | SalesBoosterPro;
 
+export type NexaSnapshot = {
+  pendingFollowUps: number;
+  overdueFollowUps: number;
+  delays: number;
+  opportunities: number;
+};
+
+export type DashboardOperations = {
+  installationQueue: number;
+  openServiceTickets: number;
+  pendingPayments: number;
+};
+
+export type DashboardRevenueBreakdown = {
+  monthlyWon: number;
+  pipelineValue: number;
+  expectedClosures: number;
+  pendingAmount: number;
+};
+
+export type DashboardRisks = {
+  lostLeads: number;
+  delays: number;
+  openServiceTickets: number;
+};
+
+export type DashboardHealth = {
+  efficiency: number;
+  conversion: number;
+  teamProductivity: number;
+};
+
+export type TeamMemberPerformance = {
+  userId: string;
+  name: string;
+  email: string;
+  role: string;
+  assignedLeads: number;
+  wonLeads: number;
+  pendingTasks: number;
+};
+
 export type DashboardMetrics = {
   leads: number;
   revenue: number;
@@ -86,4 +129,10 @@ export type DashboardMetrics = {
   pipeline: PipelineStageCount[];
   insights: NexaInsight[];
   salesBooster: SalesBoosterPayload;
+  nexa: NexaSnapshot;
+  operations: DashboardOperations;
+  revenueBreakdown: DashboardRevenueBreakdown;
+  risks: DashboardRisks;
+  health: DashboardHealth;
+  team: TeamMemberPerformance[];
 };

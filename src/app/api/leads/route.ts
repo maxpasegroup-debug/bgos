@@ -2,11 +2,8 @@ import type { LeadStatus } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { parseLeadsQuery } from "@/lib/api-query";
-import {
-  internalServerErrorResponse,
-  prismaKnownErrorResponse,
-  zodValidationErrorResponse,
-} from "@/lib/api-response";
+import { prismaKnownErrorResponse, zodValidationErrorResponse } from "@/lib/api-response";
+import { handleApiError } from "@/lib/route-error";
 import { requireAuth } from "@/lib/auth";
 import { serializeLead } from "@/lib/lead-serialize";
 import { prisma } from "@/lib/prisma";
@@ -58,7 +55,7 @@ export async function GET(request: NextRequest) {
   } catch (e) {
     const p = prismaKnownErrorResponse(e);
     if (p) return p;
-    return internalServerErrorResponse();
+    return handleApiError("GET /api/leads", e);
   }
 
   return NextResponse.json({

@@ -1,4 +1,4 @@
-﻿-- CreateSchema
+-- CreateSchema
 CREATE SCHEMA IF NOT EXISTS "public";
 
 -- CreateEnum
@@ -109,6 +109,7 @@ CREATE TABLE "ActivityLog" (
     "id" TEXT NOT NULL,
     "type" TEXT NOT NULL,
     "message" TEXT NOT NULL,
+    "metadata" JSONB,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "companyId" TEXT,
     "userId" TEXT,

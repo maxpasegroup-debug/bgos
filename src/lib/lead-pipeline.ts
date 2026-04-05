@@ -1,12 +1,16 @@
 import { LeadStatus } from "@prisma/client";
 
-/** Canonical order: forward-only transitions (no backward moves). */
+/**
+ * Canonical pipeline order (forward moves: higher index = later stage).
+ * Terminal: WON, LOST.
+ */
 export const LEAD_PIPELINE_ORDER: LeadStatus[] = [
   LeadStatus.NEW,
   LeadStatus.CONTACTED,
   LeadStatus.QUALIFIED,
-  LeadStatus.VISIT,
-  LeadStatus.PROPOSAL,
+  LeadStatus.SITE_VISIT_SCHEDULED,
+  LeadStatus.SITE_VISIT_COMPLETED,
+  LeadStatus.PROPOSAL_SENT,
   LeadStatus.NEGOTIATION,
   LeadStatus.WON,
   LeadStatus.LOST,
@@ -16,8 +20,9 @@ const LABELS: Record<LeadStatus, string> = {
   [LeadStatus.NEW]: "New",
   [LeadStatus.CONTACTED]: "Contacted",
   [LeadStatus.QUALIFIED]: "Qualified",
-  [LeadStatus.VISIT]: "Visit",
-  [LeadStatus.PROPOSAL]: "Proposal",
+  [LeadStatus.SITE_VISIT_SCHEDULED]: "Site Visit Scheduled",
+  [LeadStatus.SITE_VISIT_COMPLETED]: "Site Visit Completed",
+  [LeadStatus.PROPOSAL_SENT]: "Proposal Sent",
   [LeadStatus.NEGOTIATION]: "Negotiation",
   [LeadStatus.WON]: "Won",
   [LeadStatus.LOST]: "Lost",

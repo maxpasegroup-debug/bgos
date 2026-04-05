@@ -1,10 +1,8 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import {
-  internalServerErrorResponse,
-  prismaKnownErrorResponse,
-} from "@/lib/api-response";
+import { prismaKnownErrorResponse } from "@/lib/api-response";
 import { requireAuth } from "@/lib/auth";
+import { handleApiError } from "@/lib/route-error";
 import { getPipelineStages } from "@/lib/dashboard-pipeline";
 
 /** @deprecated Prefer `GET /api/dashboard` which includes `pipeline`. */
@@ -18,7 +16,6 @@ export async function GET(request: NextRequest) {
   } catch (e) {
     const p = prismaKnownErrorResponse(e);
     if (p) return p;
-    console.error("[GET /api/pipeline]", e);
-    return internalServerErrorResponse();
+    return handleApiError("GET /api/pipeline", e);
   }
 }

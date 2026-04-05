@@ -6,8 +6,11 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 export const ACTIVITY_TYPES = {
   LEAD_CREATED: "LEAD_CREATED",
   LEAD_STATUS_CHANGED: "LEAD_STATUS_CHANGED",
+  LEAD_ASSIGNED: "LEAD_ASSIGNED",
   TASK_COMPLETED: "TASK_COMPLETED",
   DEAL_CLOSED: "DEAL_CLOSED",
+  SALES_BOOSTER_UPGRADE_REQUEST: "SALES_BOOSTER_UPGRADE_REQUEST",
+  AUTOMATION_SIMULATED: "AUTOMATION_SIMULATED",
 } as const;
 
 export type ActivityType = (typeof ACTIVITY_TYPES)[keyof typeof ACTIVITY_TYPES];
@@ -18,7 +21,7 @@ export async function logActivity(
   db: ActivityDb,
   input: {
     companyId: string;
-    userId: string;
+    userId: string | null;
     type: string;
     message: string;
     metadata?: Prisma.InputJsonValue;

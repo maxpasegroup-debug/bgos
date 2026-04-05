@@ -6,6 +6,7 @@ import { ACTIVITY_TYPES, logActivity } from "@/lib/activity-log";
 export const LEAD_ACTIVITY = {
   CREATED: ACTIVITY_TYPES.LEAD_CREATED,
   STATUS_CHANGED: ACTIVITY_TYPES.LEAD_STATUS_CHANGED,
+  ASSIGNED: ACTIVITY_TYPES.LEAD_ASSIGNED,
 } as const;
 
 type ActivityClient = Pick<PrismaClient, "activityLog">;

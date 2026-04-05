@@ -43,7 +43,7 @@ export function Cta() {
               transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
             >
               <Link
-                href="/bgos"
+                href="/signup"
                 className="relative inline-flex min-h-[52px] items-center justify-center overflow-hidden rounded-xl bg-gradient-to-r from-red-500 to-yellow-400 px-12 py-4 text-base font-bold tracking-wide text-neutral-950 shadow-[0_0_0_1px_rgba(255,255,255,0.15)_inset,0_12px_40px_-8px_rgba(239,68,68,0.45),0_8px_32px_-6px_rgba(250,204,21,0.35)] transition-shadow duration-300 hover:shadow-[0_0_0_1px_rgba(255,255,255,0.2)_inset,0_16px_48px_-6px_rgba(239,68,68,0.5),0_12px_40px_-4px_rgba(250,204,21,0.4)]"
               >
                 <span

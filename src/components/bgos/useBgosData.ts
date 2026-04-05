@@ -1,6 +1,6 @@
 "use client";
 
-import { CompanyPlan } from "@prisma/client";
+import { CompanyPlan, UserRole } from "@prisma/client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DashboardMetrics } from "@/types";
 
@@ -22,10 +22,57 @@ async function readDashboardErrorMessage(res: Response): Promise<string> {
   return "Could not load live data.";
 }
 
-export function useBgosData(pollMs = 5000) {
+const EMPTY_NEXA: DashboardMetrics["nexa"] = {
+  pendingFollowUps: 0,
+  overdueFollowUps: 0,
+  delays: 0,
+  opportunities: 0,
+};
+
+const EMPTY_OPS: DashboardMetrics["operations"] = {
+  installationQueue: 0,
+  openServiceTickets: 0,
+  pendingPayments: 0,
+};
+
+const EMPTY_REV: DashboardMetrics["revenueBreakdown"] = {
+  monthlyWon: 0,
+  pipelineValue: 0,
+  expectedClosures: 0,
+  pendingAmount: 0,
+};
+
+const EMPTY_RISKS: DashboardMetrics["risks"] = {
+  lostLeads: 0,
+  delays: 0,
+  openServiceTickets: 0,
+};
+
+const EMPTY_HEALTH: DashboardMetrics["health"] = {
+  efficiency: 0,
+  conversion: 0,
+  teamProductivity: 0,
+};
+
+function normalizeDashboard(d: DashboardPayload): DashboardPayload {
+  return {
+    ...d,
+    insights: Array.isArray(d.insights) ? d.insights : [],
+    pipeline: Array.isArray(d.pipeline) ? d.pipeline : [],
+    nexa: d.nexa ?? EMPTY_NEXA,
+    operations: d.operations ?? EMPTY_OPS,
+    revenueBreakdown: d.revenueBreakdown ?? EMPTY_REV,
+    risks: d.risks ?? EMPTY_RISKS,
+    health: d.health ?? EMPTY_HEALTH,
+    team: Array.isArray(d.team) ? d.team : [],
+  };
+}
+
+export function useBgosData(pollMs = 4000) {
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [companyPlan, setCompanyPlan] = useState<CompanyPlan | null>(null);
+  const [sessionRole, setSessionRole] = useState<UserRole | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const okOnce = useRef(false);
 
@@ -37,10 +84,15 @@ export function useBgosData(pollMs = 5000) {
   useEffect(() => {
     fetch("/api/auth/me", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((j: { user?: { companyPlan?: CompanyPlan } } | null) => {
-        const p = j?.user?.companyPlan;
-        if (p === CompanyPlan.BASIC || p === CompanyPlan.PRO) setCompanyPlan(p);
-      })
+      .then(
+        (j: {
+          user?: { companyPlan?: CompanyPlan; role?: UserRole };
+        } | null) => {
+          const p = j?.user?.companyPlan;
+          if (p === CompanyPlan.BASIC || p === CompanyPlan.PRO) setCompanyPlan(p);
+          if (j?.user?.role) setSessionRole(j.user.role);
+        },
+      )
       .catch(() => {});
   }, []);
 
@@ -67,12 +119,12 @@ export function useBgosData(pollMs = 5000) {
           if (salesBooster.plan === CompanyPlan.BASIC || salesBooster.plan === CompanyPlan.PRO) {
             setCompanyPlan(salesBooster.plan);
           }
-          setDashboard({
-            ...d,
-            insights: Array.isArray(d.insights) ? d.insights : [],
-            pipeline: Array.isArray(d.pipeline) ? d.pipeline : [],
-            salesBooster,
-          });
+          setDashboard(
+            normalizeDashboard({
+              ...d,
+              salesBooster,
+            }),
+          );
           setError(null);
           okOnce.current = true;
         }
@@ -94,5 +146,5 @@ export function useBgosData(pollMs = 5000) {
   const pipeline: PipelineRow[] | null = dashboard?.pipeline ?? null;
   const isLoading = dashboard === null && error === null;
 
-  return { dashboard, pipeline, error, companyPlan, refetch, isLoading };
+  return { dashboard, pipeline, error, companyPlan, sessionRole, refetch, isLoading };
 }

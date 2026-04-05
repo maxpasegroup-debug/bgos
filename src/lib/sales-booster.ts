@@ -20,6 +20,7 @@ export type SalesBoosterProPayload = {
     reason: string;
     channel: "WhatsApp";
     nextAction: string;
+    trigger: "overdue_task" | "stale_lead" | "due_within_24h";
   }>;
   prioritizedLeads: Array<{
     leadId: string;
@@ -51,8 +52,9 @@ export type SalesBoosterPayload = SalesBoosterBasicPayload | SalesBoosterProPayl
 function stageWeight(status: LeadStatus): number {
   const w: Partial<Record<LeadStatus, number>> = {
     [LeadStatus.NEGOTIATION]: 45,
-    [LeadStatus.PROPOSAL]: 38,
-    [LeadStatus.VISIT]: 28,
+    [LeadStatus.PROPOSAL_SENT]: 38,
+    [LeadStatus.SITE_VISIT_COMPLETED]: 32,
+    [LeadStatus.SITE_VISIT_SCHEDULED]: 28,
     [LeadStatus.QUALIFIED]: 22,
     [LeadStatus.CONTACTED]: 15,
     [LeadStatus.NEW]: 10,
@@ -77,7 +79,10 @@ function leadScore(input: {
     score += 18;
     reasons.push("stale new/contacted");
   }
-  if (input.status === LeadStatus.NEGOTIATION || input.status === LeadStatus.PROPOSAL) {
+  if (
+    input.status === LeadStatus.NEGOTIATION ||
+    input.status === LeadStatus.PROPOSAL_SENT
+  ) {
     reasons.push("late pipeline");
   }
   score = Math.min(100, Math.round(score));
@@ -85,7 +90,10 @@ function leadScore(input: {
   return { score, reason };
 }
 
-export async function buildSalesBoosterPayload(companyId: string): Promise<SalesBoosterPayload> {
+export async function buildSalesBoosterPayload(
+  companyId: string,
+  sessionCompanyPlan: CompanyPlan,
+): Promise<SalesBoosterPayload> {
   const company = await prisma.company.findUnique({
     where: { id: companyId },
     select: { plan: true, name: true },
@@ -99,7 +107,10 @@ export async function buildSalesBoosterPayload(companyId: string): Promise<Sales
     };
   }
 
-  if (company.plan !== CompanyPlan.PRO) {
+  const entitled =
+    sessionCompanyPlan === CompanyPlan.PRO && company.plan === CompanyPlan.PRO;
+
+  if (!entitled) {
     return {
       plan: "BASIC",
       featuresUnlocked: false,
@@ -164,6 +175,7 @@ export async function buildSalesBoosterPayload(companyId: string): Promise<Sales
         leadName: lead.name,
         reason: "Pending task is past due",
         channel: "WhatsApp",
+        trigger: "overdue_task",
         nextAction: `Send WhatsApp reminder + log outcome in CRM`,
       });
       continue;
@@ -178,6 +190,7 @@ export async function buildSalesBoosterPayload(companyId: string): Promise<Sales
         leadName: lead.name,
         reason: "No movement in 36h+",
         channel: "WhatsApp",
+        trigger: "stale_lead",
         nextAction: `Auto follow-up sequence: intro ping → value prop`,
       });
     }
@@ -205,6 +218,7 @@ export async function buildSalesBoosterPayload(companyId: string): Promise<Sales
       leadName: t.lead.name,
       reason: "Task due within 24h",
       channel: "WhatsApp",
+      trigger: "due_within_24h",
       nextAction: `Pre-due WhatsApp check-in (simulated automation)`,
     });
   }

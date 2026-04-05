@@ -2,9 +2,32 @@
 
 import Link from "next/link";
 import { CompanyPlan } from "@prisma/client";
+import { useState } from "react";
+import { postSalesBoosterUpgradeRequest } from "@/lib/sales-booster-client";
+
+const UPGRADE_EMAIL = process.env.NEXT_PUBLIC_BGOS_UPGRADE_EMAIL?.trim();
 
 export function PlanUpgradeBanner({ plan }: { plan: CompanyPlan | null }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
   if (plan !== CompanyPlan.BASIC) return null;
+
+  async function onQuickRequest() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const { ok, message } = await postSalesBoosterUpgradeRequest();
+      setMsg(message);
+      if (ok) {
+        window.setTimeout(() => setMsg(null), 8000);
+      }
+    } catch {
+      setMsg("Network error.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="border-b border-[#FFC300]/25 bg-gradient-to-r from-[#FFC300]/10 to-transparent px-4 py-2.5 sm:px-7 lg:px-10">
@@ -12,18 +35,40 @@ export function PlanUpgradeBanner({ plan }: { plan: CompanyPlan | null }) {
         <p className="text-sm text-white/85">
           <span className="font-semibold text-[#FFC300]">Basic plan</span>
           <span className="text-white/50"> — </span>
-          Automation, Pro Sales Booster, and{" "}
-          <code className="rounded bg-white/10 px-1 text-xs text-white/70">/api/automation</code>{" "}
-          are disabled. Upgrade to unlock.
+          Sales Booster (auto follow-ups, prioritization, next actions) and{" "}
+          <code className="rounded bg-white/10 px-1 text-xs text-white/70">/api/automation</code> stay
+          locked until Pro.{" "}
+          {msg ? (
+            <span className="block pt-1 text-xs text-emerald-300/90 sm:inline sm:pl-1 sm:pt-0">
+              {msg}
+            </span>
+          ) : null}
         </p>
-        <div className="flex shrink-0 items-center gap-3">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 sm:gap-3">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void onQuickRequest()}
+            className="rounded-lg bg-[#FFC300]/90 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-black transition hover:bg-[#FFC300] disabled:opacity-50"
+          >
+            {busy ? "Sending…" : "Request Pro"}
+          </button>
           <Link
             href="#sales-booster"
             className="text-xs font-semibold uppercase tracking-wider text-[#FFC300] underline-offset-2 hover:underline"
           >
-            See Pro features
+            Details
           </Link>
-          <span className="text-[10px] text-white/35">Contact ICECONNECT to upgrade</span>
+          {UPGRADE_EMAIL ? (
+            <a
+              href={`mailto:${UPGRADE_EMAIL}?subject=${encodeURIComponent("Pro upgrade")}`}
+              className="text-[10px] text-white/50 underline-offset-2 hover:text-white/70 hover:underline"
+            >
+              Email
+            </a>
+          ) : (
+            <span className="text-[10px] text-white/35">Contact ICECONNECT to upgrade</span>
+          )}
         </div>
       </div>
     </div>

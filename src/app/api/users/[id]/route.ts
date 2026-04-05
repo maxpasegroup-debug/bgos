@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuthWithRoles } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { findUserInCompany, USER_MUTATION_ROLES } from "@/lib/user-company";
+import { findUserInCompany, toPublicUser, USER_ADMIN_ROLES } from "@/lib/user-company";
 
 const patchBodySchema = z
   .object({
@@ -18,32 +18,10 @@ const patchBodySchema = z
     message: "Provide at least one field to update",
   });
 
-function publicUser(u: {
-  id: string;
-  name: string;
-  mobile: string;
-  email: string;
-  role: UserRole;
-  companyId: string;
-  isActive: boolean;
-  createdAt: Date;
-}) {
-  return {
-    id: u.id,
-    name: u.name,
-    mobile: u.mobile,
-    email: u.email,
-    role: u.role,
-    companyId: u.companyId,
-    isActive: u.isActive,
-    createdAt: u.createdAt.toISOString(),
-  };
-}
-
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
-  const session = requireAuthWithRoles(request, USER_MUTATION_ROLES);
+  const session = requireAuthWithRoles(request, USER_ADMIN_ROLES);
   if (session instanceof NextResponse) return session;
 
   const { id } = await context.params;
@@ -92,7 +70,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       data: updateData,
     });
 
-    return NextResponse.json({ ok: true as const, user: publicUser(user) });
+    return NextResponse.json({ ok: true as const, user: toPublicUser(user) });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       return NextResponse.json(

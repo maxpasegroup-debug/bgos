@@ -29,8 +29,9 @@ enum LeadStatus {
   NEW
   CONTACTED
   QUALIFIED
-  VISIT
-  PROPOSAL
+  SITE_VISIT_SCHEDULED
+  SITE_VISIT_COMPLETED
+  PROPOSAL_SENT
   NEGOTIATION
   WON
   LOST
@@ -62,12 +63,18 @@ model Company {
   plan      CompanyPlan  @default(BASIC)
   createdAt DateTime     @default(now())
 
+  businessTemplate String?
+  dashboardConfig  Json?
+
   users         User[]
   leads         Lead[]
+  deals         Deal[]
+  tasks         Task[]
   installations Installation[]
   payments      Payment[]
   activityLogs  ActivityLog[]
   serviceTickets ServiceTicket[]
+  automations    Automation[]
 
   @@index([name])
 }
@@ -99,11 +106,14 @@ model Lead {
   id         String      @id @default(cuid())
   name       String
   phone      String
+  email      String?
+  source     String?
   status     LeadStatus  @default(NEW)
   value      Float?
   companyId  String
   assignedTo String?
   createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
 
   company  Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   assignee User?   @relation("LeadAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
@@ -120,31 +130,53 @@ model Lead {
 model Deal {
   id        String     @id @default(cuid())
   leadId    String
+  companyId String
   value     Float
   status    DealStatus
+  stage     String?
   createdAt DateTime   @default(now())
 
-  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lead    Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([leadId])
+  @@index([companyId])
   @@index([status])
 }
 
 model Task {
-  id        String     @id @default(cuid())
-  title     String
-  status    TaskStatus @default(PENDING)
-  userId    String?
-  leadId    String?
-  dueDate   DateTime?
-  createdAt DateTime   @default(now())
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  status      TaskStatus @default(PENDING)
+  userId      String?
+  leadId      String?
+  companyId   String?
+  dueDate     DateTime?
+  createdAt   DateTime   @default(now())
 
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
-  lead Lead? @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  lead    Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  company Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([leadId])
+  @@index([companyId])
   @@index([status])
+}
+
+model Automation {
+  id        String @id @default(cuid())
+  name      String
+  trigger   String
+  action    String
+  config    Json
+  companyId String
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([companyId, trigger])
 }
 
 model Installation {

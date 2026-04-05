@@ -2,6 +2,7 @@
 
 import { PaymentStatus } from "@prisma/client";
 import { useCallback, useEffect, useState } from "react";
+import { IceconnectWorkspaceView } from "./IceconnectWorkspaceView";
 import { IcPanel } from "./IcPanel";
 
 type PaymentRow = {
@@ -11,8 +12,15 @@ type PaymentRow = {
   createdAt: string;
 };
 
+type PaymentsSummary = {
+  totalPaid: number;
+  totalPending: number;
+  recordCount: number;
+};
+
 export function IceconnectAccountsDashboard() {
   const [payments, setPayments] = useState<PaymentRow[]>([]);
+  const [summary, setSummary] = useState<PaymentsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
@@ -20,16 +28,39 @@ export function IceconnectAccountsDashboard() {
   const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/iceconnect/accounts/payments", { credentials: "include" });
-    if (!res.ok) {
-      setErr("Could not load payments");
-      setLoading(false);
-      return;
-    }
-    const data = (await res.json()) as { payments: PaymentRow[] };
-    setPayments(data.payments);
     setErr(null);
-    setLoading(false);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/iceconnect/accounts/payments", { credentials: "include" });
+      if (!res.ok) {
+        let msg = "Could not load payments.";
+        try {
+          const j = (await res.json()) as { error?: string };
+          if (typeof j.error === "string" && j.error.trim()) msg = j.error;
+        } catch {
+          /* ignore */
+        }
+        setErr(msg);
+        return;
+      }
+      const data = (await res.json()) as {
+        payments: PaymentRow[];
+        summary?: PaymentsSummary;
+      };
+      setPayments(Array.isArray(data.payments) ? data.payments : []);
+      setSummary(
+        data.summary &&
+          typeof data.summary.totalPaid === "number" &&
+          typeof data.summary.totalPending === "number" &&
+          typeof data.summary.recordCount === "number"
+          ? data.summary
+          : null,
+      );
+    } catch {
+      setErr("Network error — check your connection.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -49,7 +80,7 @@ export function IceconnectAccountsDashboard() {
         body: JSON.stringify({ amount: n, status }),
       });
       if (!res.ok) {
-        setErr("Could not add entry");
+        setErr("Could not add entry.");
         return;
       }
       setAmount("");
@@ -59,20 +90,33 @@ export function IceconnectAccountsDashboard() {
     }
   }
 
-  if (loading) {
-    return <p className="text-sm text-white/50">Loading payments…</p>;
-  }
-
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Accounts</h1>
-        <p className="mt-1 text-sm text-white/50">Company payments and manual entries.</p>
-      </div>
-      {err ? (
-        <p className="text-sm text-red-400" role="alert">
-          {err}
-        </p>
+    <IceconnectWorkspaceView
+      title="Accounts"
+      subtitle="Company-wide payment register and manual entries."
+      loading={loading}
+      error={err}
+      onRetry={() => void load()}
+    >
+      {summary ? (
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-wider text-white/45">Paid (total)</p>
+            <p className="mt-1 text-lg font-semibold tabular-nums text-emerald-200">
+              ₹{summary.totalPaid.toLocaleString("en-IN")}
+            </p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-wider text-white/45">Pending (total)</p>
+            <p className="mt-1 text-lg font-semibold tabular-nums text-amber-200">
+              ₹{summary.totalPending.toLocaleString("en-IN")}
+            </p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
+            <p className="text-xs font-medium uppercase tracking-wider text-white/45">Records</p>
+            <p className="mt-1 text-lg font-semibold tabular-nums text-white">{summary.recordCount}</p>
+          </div>
+        </div>
       ) : null}
 
       <IcPanel title="New entry">
@@ -143,6 +187,6 @@ export function IceconnectAccountsDashboard() {
           </div>
         )}
       </IcPanel>
-    </div>
+    </IceconnectWorkspaceView>
   );
 }

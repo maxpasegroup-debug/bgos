@@ -8,13 +8,14 @@ import {
   useBgosData,
 } from "./useBgosData";
 
-import type { CompanyPlan } from "@prisma/client";
+import type { CompanyPlan, UserRole } from "@prisma/client";
 
 type Ctx = {
   dashboard: DashboardPayload | null;
   pipeline: PipelineRow[] | null;
   error: string | null;
   companyPlan: CompanyPlan | null;
+  sessionRole: UserRole | null;
   refetch: () => void;
   isLoading: boolean;
 };
@@ -22,17 +23,19 @@ type Ctx = {
 const BgosDataContext = createContext<Ctx | null>(null);
 
 export function BgosDataProvider({ children }: { children: ReactNode }) {
-  const { dashboard, pipeline, error, companyPlan, refetch, isLoading } = useBgosData();
+  const { dashboard, pipeline, error, companyPlan, sessionRole, refetch, isLoading } =
+    useBgosData();
   const value = useMemo(
     () => ({
       dashboard,
       pipeline,
       error,
       companyPlan,
+      sessionRole,
       refetch,
       isLoading,
     }),
-    [dashboard, pipeline, error, companyPlan, refetch, isLoading],
+    [dashboard, pipeline, error, companyPlan, sessionRole, refetch, isLoading],
   );
   return (
     <BgosDataContext.Provider value={value}>{children}</BgosDataContext.Provider>

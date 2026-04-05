@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   const visits = await prisma.lead.findMany({
     where: {
       companyId: session.companyId,
-      status: LeadStatus.VISIT,
+      status: LeadStatus.SITE_VISIT_SCHEDULED,
       ...assigneeFilter(session),
     },
     orderBy: { createdAt: "desc" },

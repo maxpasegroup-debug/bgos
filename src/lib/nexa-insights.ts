@@ -14,10 +14,21 @@ function sortInsights(a: NexaInsight, b: NexaInsight): number {
   return rank[a.severity] - rank[b.severity];
 }
 
+/** Optional counts from `buildBgosDashboardSnapshot` — avoids duplicate queries. */
+export type NexaSnapshotInput = {
+  pendingFollowUps: number;
+  overdueFollowUps: number;
+  delays: number;
+  opportunities: number;
+};
+
 /**
  * Nexa logic — rule-based insights for a company (dashboard / NEXA surfaces).
  */
-export async function generateInsights(companyId: string): Promise<NexaInsight[]> {
+export async function generateInsights(
+  companyId: string,
+  nexa?: NexaSnapshotInput,
+): Promise<NexaInsight[]> {
   const [leadCount, pendingTasks, wonLeads, lostLeads] = await Promise.all([
     prisma.lead.count({ where: { companyId } }),
     prisma.task.count({
@@ -60,6 +71,33 @@ export async function generateInsights(companyId: string): Promise<NexaInsight[]
         message: "Low conversion",
         code: "LOW_CONVERSION",
         meta: { wonLeads, lostLeads, winRate: Math.round(winRate * 1000) / 1000 },
+      });
+    }
+  }
+
+  if (nexa) {
+    if (nexa.overdueFollowUps > 0) {
+      insights.push({
+        id: "overdue-follow-ups",
+        severity: "alert",
+        message: "Overdue follow-ups",
+        meta: { overdueFollowUps: nexa.overdueFollowUps },
+      });
+    }
+    if (nexa.delays > 0) {
+      insights.push({
+        id: "installation-delays",
+        severity: "warning",
+        message: "Installation delays",
+        meta: { delays: nexa.delays },
+      });
+    }
+    if (nexa.opportunities > 0) {
+      insights.push({
+        id: "opportunities",
+        severity: "info",
+        message: "Active opportunities",
+        meta: { opportunities: nexa.opportunities },
       });
     }
   }
