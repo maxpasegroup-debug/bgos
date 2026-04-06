@@ -16,7 +16,7 @@ const bodySchema = z.object({
  * User stays active and can sign in via email or mobile + password (ICECONNECT).
  */
 export async function POST(request: NextRequest) {
-  const session = requireAuthWithRoles(request, USER_ADMIN_ROLES);
+  const session = await requireAuthWithRoles(request, USER_ADMIN_ROLES);
   if (session instanceof NextResponse) return session;
 
   let json: unknown;

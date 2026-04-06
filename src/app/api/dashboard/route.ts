@@ -1,8 +1,8 @@
-import { CompanyPlan, DealStatus, PaymentStatus } from "@prisma/client";
+import { DealStatus, PaymentStatus } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prismaKnownErrorResponse } from "@/lib/api-response";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthWithCompany } from "@/lib/auth";
 import { handleApiError } from "@/lib/route-error";
 import { buildBgosDashboardSnapshot } from "@/lib/bgos-dashboard-data";
 import { getPipelineStages } from "@/lib/dashboard-pipeline";
@@ -12,7 +12,7 @@ import { buildSalesBoosterPayload } from "@/lib/sales-booster";
 import { ensurePendingTasksForOpenLeads } from "@/lib/task-engine";
 
 export async function GET(request: NextRequest) {
-  const user = requireAuth(request);
+  const user = await requireAuthWithCompany(request);
   if (user instanceof NextResponse) return user;
 
   const companyId = user.companyId;
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
         }),
         generateInsights(companyId, snapshot.nexa),
         getPipelineStages(companyId),
-        buildSalesBoosterPayload(companyId, user.companyPlan ?? CompanyPlan.BASIC),
+        buildSalesBoosterPayload(companyId),
       ]);
   } catch (e) {
     const p = prismaKnownErrorResponse(e);

@@ -4,7 +4,13 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuthWithRoles } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { findUserInCompany, toPublicUser, USER_ADMIN_ROLES } from "@/lib/user-company";
+import {
+  companyMembershipClass,
+  findUserInCompany,
+  getUserCompanyMembership,
+  toPublicUser,
+  USER_ADMIN_ROLES,
+} from "@/lib/user-company";
 
 const patchBodySchema = z
   .object({
@@ -21,7 +27,7 @@ const patchBodySchema = z
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
-  const session = requireAuthWithRoles(request, USER_ADMIN_ROLES);
+  const session = await requireAuthWithRoles(request, USER_ADMIN_ROLES);
   if (session instanceof NextResponse) return session;
 
   const { id } = await context.params;
@@ -61,16 +67,36 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   if (data.name !== undefined) updateData.name = data.name;
   if (data.mobile !== undefined) updateData.mobile = data.mobile;
   if (data.email !== undefined) updateData.email = data.email.toLowerCase();
-  if (data.role !== undefined) updateData.role = data.role;
   if (data.isActive !== undefined) updateData.isActive = data.isActive;
 
   try {
-    const user = await prisma.user.update({
-      where: { id: existing.id },
-      data: updateData,
+    const user = await prisma.$transaction(async (tx) => {
+      if (data.role !== undefined) {
+        await tx.userCompany.update({
+          where: {
+            userId_companyId: { userId: id, companyId: session.companyId },
+          },
+          data: {
+            jobRole: data.role,
+            role: companyMembershipClass(data.role),
+          },
+        });
+      }
+      return tx.user.update({
+        where: { id: existing.id },
+        data: updateData,
+      });
     });
 
-    return NextResponse.json({ ok: true as const, user: toPublicUser(user) });
+    const m = await getUserCompanyMembership(user.id, session.companyId);
+    if (!m) {
+      return NextResponse.json(
+        { ok: false as const, error: "Membership not found", code: "NOT_FOUND" },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json({ ok: true as const, user: toPublicUser(user, m) });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       return NextResponse.json(

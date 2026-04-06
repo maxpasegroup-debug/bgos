@@ -1,21 +1,27 @@
-import { CompanyPlan } from "@prisma/client";
+import { CompanyPlan, UserRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { parseJsonBody, zodValidationErrorResponse } from "@/lib/api-response";
 import { handleApiError } from "@/lib/route-error";
 import { AUTH_ERROR_CODES } from "@/lib/auth-api";
 import { checkLoginRateLimit, getClientIpForRateLimit } from "@/lib/login-rate-limit";
+import { hostTenantFromHeader } from "@/lib/host-routing";
 import { mobileLookupVariants } from "@/lib/mobile-login";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
 import { signAccessToken } from "@/lib/jwt";
-import { setSessionCookie } from "@/lib/session-cookie";
+import { roleCanAccessPath } from "@/lib/role-routing";
+import { setActiveCompanyCookie, setSessionCookie } from "@/lib/session-cookie";
 
 const bodySchema = z
   .object({
     email: z.string().optional(),
     mobile: z.string().optional(),
     password: z.string().min(1, "Password is required"),
+    /** When true (e.g. API clients), return JSON instead of 303 redirect. */
+    respondWithJson: z.boolean().optional(),
+    /** Safe return path after sign-in (same-origin flows). */
+    from: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     const email = data.email?.trim();
@@ -43,6 +49,36 @@ const bodySchema = z
     }
   });
 
+function isBossRole(role: UserRole): boolean {
+  return role === UserRole.ADMIN || role === UserRole.MANAGER;
+}
+
+function crossDomainLoginRequired(hostHeader: string | null, role: UserRole): boolean {
+  const tenant = hostTenantFromHeader(hostHeader);
+  const boss = isBossRole(role);
+  if (tenant === "bgos" && !boss) return true;
+  if (tenant === "ice" && boss) return true;
+  return false;
+}
+
+/** Resolve same-origin Location after login (cookies are set on this response before redirect). */
+function internalPostLoginLocation(
+  role: UserRole,
+  from: string | null | undefined,
+  needsOnboardingFlow: boolean,
+  companyId: string | null,
+  workspaceActivated: boolean,
+): string {
+  if (needsOnboardingFlow || companyId == null || !workspaceActivated) {
+    return "/onboarding";
+  }
+  const safeFrom =
+    from && from.startsWith("/") && roleCanAccessPath(role, from) ? from : null;
+  if (safeFrom) return safeFrom;
+  if (role === UserRole.ADMIN) return "/bgos";
+  return "/iceconnect";
+}
+
 export async function POST(request: Request) {
   const ip = getClientIpForRateLimit(request);
   const limited = checkLoginRateLimit(ip);
@@ -68,7 +104,8 @@ export async function POST(request: Request) {
     return zodValidationErrorResponse(parsed.error);
   }
 
-  const { password } = parsed.data;
+  const { password, respondWithJson, from: fromRaw } = parsed.data;
+  const from = fromRaw?.trim() || undefined;
   const email = parsed.data.email?.trim();
   const mobileRaw = parsed.data.mobile?.trim();
 
@@ -77,7 +114,12 @@ export async function POST(request: Request) {
     if (email) {
       user = await prisma.user.findFirst({
         where: { email: { equals: email, mode: "insensitive" } },
-        include: { company: { select: { plan: true } } },
+        include: {
+          memberships: {
+            include: { company: { select: { id: true, plan: true } } },
+            orderBy: { createdAt: "asc" },
+          },
+        },
       });
     } else {
       const variants = mobileLookupVariants(mobileRaw ?? "");
@@ -97,7 +139,12 @@ export async function POST(request: Request) {
             mobile: { equals: m, mode: "insensitive" as const },
           })),
         },
-        include: { company: { select: { plan: true } } },
+        include: {
+          memberships: {
+            include: { company: { select: { id: true, plan: true } } },
+            orderBy: { createdAt: "asc" },
+          },
+        },
       });
     }
   } catch (e) {
@@ -124,16 +171,55 @@ export async function POST(request: Request) {
     return authError;
   }
 
-  const companyPlan = user.company?.plan ?? CompanyPlan.BASIC;
+  const membership = user.memberships[0];
+  let companyPlan: CompanyPlan;
+  let companyId: string | null;
+  let sessionRole: UserRole;
+  let needsOnboarding: boolean;
+
+  if (!membership) {
+    if (!email) {
+      return NextResponse.json(
+        {
+          ok: false as const,
+          error: "No company access for this account",
+          code: "NO_MEMBERSHIP",
+        },
+        { status: 403 },
+      );
+    }
+    companyPlan = CompanyPlan.BASIC;
+    companyId = null;
+    sessionRole = UserRole.ADMIN;
+    needsOnboarding = true;
+  } else {
+    companyPlan = membership.company?.plan ?? CompanyPlan.BASIC;
+    companyId = membership.companyId;
+    sessionRole = membership.jobRole;
+    needsOnboarding = false;
+  }
+
+  const mems = !membership
+    ? []
+    : user.memberships.map((m) => ({
+        companyId: m.companyId,
+        plan: m.company.plan,
+        jobRole: m.jobRole,
+      }));
+  const primary = mems[0];
 
   let token: string;
   try {
     token = signAccessToken({
       sub: user.id,
       email: user.email,
-      role: user.role,
-      companyId: user.companyId,
-      companyPlan,
+      role: primary?.jobRole ?? sessionRole,
+      companyId: primary?.companyId ?? companyId,
+      companyPlan: primary?.plan ?? companyPlan,
+      workspaceReady: needsOnboarding
+        ? false
+        : Boolean(user.workspaceActivatedAt),
+      ...(mems.length ? { memberships: mems } : {}),
     });
   } catch {
     return NextResponse.json(
@@ -142,19 +228,50 @@ export async function POST(request: Request) {
     );
   }
 
-  const res = NextResponse.json({
-    ok: true as const,
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      companyId: user.companyId,
-      companyPlan,
-    },
-  });
+  const userPayload = {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: sessionRole,
+    companyId,
+    companyPlan,
+    ...(needsOnboarding
+      ? { needsOnboarding: true as const }
+      : {
+          workspaceReady: Boolean(user.workspaceActivatedAt),
+          ...(user.workspaceActivatedAt
+            ? {}
+            : { needsWorkspaceActivation: true as const }),
+        }),
+  };
 
-  setSessionCookie(res, token);
+  const workspaceActivated = Boolean(user.workspaceActivatedAt);
+  const hostHeader = request.headers.get("host");
+  const needsCrossDomainHandoff = crossDomainLoginRequired(hostHeader, sessionRole);
 
-  return res;
+  if (respondWithJson || needsCrossDomainHandoff) {
+    const res = NextResponse.json({
+      ok: true as const,
+      user: userPayload,
+    });
+    setSessionCookie(res, token);
+    if (companyId) {
+      setActiveCompanyCookie(res, companyId);
+    }
+    return res;
+  }
+
+  const location = internalPostLoginLocation(
+    sessionRole,
+    from,
+    needsOnboarding,
+    companyId,
+    workspaceActivated,
+  );
+  const redirectRes = NextResponse.redirect(new URL(location, request.url), 303);
+  setSessionCookie(redirectRes, token);
+  if (companyId) {
+    setActiveCompanyCookie(redirectRes, companyId);
+  }
+  return redirectRes;
 }

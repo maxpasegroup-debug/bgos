@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { ACTIVITY_TYPES, logActivity } from "@/lib/activity-log";
 import { parseJsonBodyZod, prismaKnownErrorResponse } from "@/lib/api-response";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthWithCompany } from "@/lib/auth";
 import { handleApiError } from "@/lib/route-error";
 import { ensurePendingTaskForLead } from "@/lib/task-engine";
 import { serializeTask } from "@/lib/task-serialize";
@@ -20,7 +20,7 @@ const include = {
 } as const;
 
 export async function PATCH(request: NextRequest) {
-  const session = requireAuth(request);
+  const session = await requireAuthWithCompany(request);
   if (session instanceof NextResponse) return session;
 
   const body = await parseJsonBodyZod(request, bodySchema);

@@ -13,8 +13,21 @@ export type AccessTokenPayload = {
   sub: string;
   email: string;
   role: UserRole;
-  companyId: string;
+  /** Set after onboarding; `null` until the user creates or joins a company. */
+  companyId: string | null;
+  /** Snapshot for the active company; detail plans live in `memberships` (Company.plan each). */
   companyPlan: CompanyPlan;
+  /**
+   * `false` until the boss completes onboarding step 2 (NEXA activation).
+   * Omitted in legacy JWTs — decoded as `true` so existing sessions keep access.
+   */
+  workspaceReady: boolean;
+  /** All companies the user belongs to (for active-company cookie validation on Edge). */
+  memberships?: Array<{
+    companyId: string;
+    plan: CompanyPlan;
+    jobRole: UserRole;
+  }>;
   iat?: number;
   exp?: number;
 };

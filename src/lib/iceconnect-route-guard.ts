@@ -3,14 +3,14 @@ import "server-only";
 import type { UserRole } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { forbidden, requireAuth, type AuthUser } from "./auth";
+import { forbidden, requireAuthWithCompany, type AuthUserWithCompany } from "./auth";
 import { isIceconnectPrivileged } from "./iceconnect-scope";
 
-export function requireIceconnectRole(
+export async function requireIceconnectRole(
   request: NextRequest,
   allowedRoles: UserRole[],
-): AuthUser | NextResponse {
-  const user = requireAuth(request);
+): Promise<AuthUserWithCompany | NextResponse> {
+  const user = await requireAuthWithCompany(request);
   if (user instanceof NextResponse) return user;
   if (isIceconnectPrivileged(user.role)) return user;
   if (allowedRoles.includes(user.role)) return user;

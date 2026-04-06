@@ -16,7 +16,7 @@ type RouteContext = { params: Promise<{ id: string }> };
  * Set a new password for an employee (same company). User remains active and can sign in immediately.
  */
 export async function POST(request: NextRequest, context: RouteContext) {
-  const session = requireAuthWithRoles(request, USER_ADMIN_ROLES);
+  const session = await requireAuthWithRoles(request, USER_ADMIN_ROLES);
   if (session instanceof NextResponse) return session;
 
   const { id } = await context.params;

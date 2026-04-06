@@ -4,10 +4,11 @@ import { NextResponse } from "next/server";
 import { parseTasksQuery } from "@/lib/api-query";
 import { prismaKnownErrorResponse, zodValidationErrorResponse } from "@/lib/api-response";
 import { handleApiError } from "@/lib/route-error";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthWithCompany } from "@/lib/auth";
 import { computeTaskOverdue, ensurePendingTasksForOpenLeads } from "@/lib/task-engine";
 import { serializeTask } from "@/lib/task-serialize";
 import { prisma } from "@/lib/prisma";
+import { findUserInCompany } from "@/lib/user-company";
 
 const include = {
   user: { select: { id: true, name: true, email: true } as const },
@@ -27,7 +28,7 @@ function taskListOrderBy(sort: string | undefined): Prisma.TaskOrderByWithRelati
 }
 
 export async function GET(request: NextRequest) {
-  const session = requireAuth(request);
+  const session = await requireAuthWithCompany(request);
   if (session instanceof NextResponse) return session;
 
   const companyId = session.companyId;
@@ -47,6 +48,20 @@ export async function GET(request: NextRequest) {
     offset: skip,
   } = parsedQ.data;
   const overdueOnly = overdue === "1" || overdue === "true";
+
+  if (assignedTo && assignedTo !== "me") {
+    const member = await findUserInCompany(assignedTo, companyId);
+    if (!member) {
+      return NextResponse.json(
+        {
+          ok: false as const,
+          error: "User is not part of this company",
+          code: "INVALID_ASSIGNEE_FILTER" as const,
+        },
+        { status: 400 },
+      );
+    }
+  }
 
   let autoCreatedTasks = 0;
   try {

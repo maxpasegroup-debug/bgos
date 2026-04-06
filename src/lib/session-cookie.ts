@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { NextResponse } from "next/server";
-import { AUTH_COOKIE_NAME } from "./auth-config";
+import { ACTIVE_COMPANY_COOKIE_NAME, AUTH_COOKIE_NAME } from "./auth-config";
 
 export const SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 7;
 
@@ -26,6 +26,20 @@ export function setSessionCookie(res: NextResponse, token: string): void {
 /** Clear session cookie (logout). */
 export function clearSessionCookie(res: NextResponse): void {
   res.cookies.set(AUTH_COOKIE_NAME, "", {
+    ...baseCookieOptions(),
+    maxAge: 0,
+  });
+}
+
+export function setActiveCompanyCookie(res: NextResponse, companyId: string): void {
+  res.cookies.set(ACTIVE_COMPANY_COOKIE_NAME, companyId, {
+    ...baseCookieOptions(),
+    maxAge: SESSION_MAX_AGE_SEC,
+  });
+}
+
+export function clearActiveCompanyCookie(res: NextResponse): void {
+  res.cookies.set(ACTIVE_COMPANY_COOKIE_NAME, "", {
     ...baseCookieOptions(),
     maxAge: 0,
   });

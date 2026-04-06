@@ -5,19 +5,33 @@
  */
 const BASE = (process.env.E2E_BASE_URL || "http://localhost:3000").replace(/\/+$/, "");
 
-function sessionFromResponse(res) {
-  const list = typeof res.headers.getSetCookie === "function" ? res.headers.getSetCookie() : [];
-  for (const line of list) {
-    if (line.startsWith("bgos_session=")) {
-      return line.split(";")[0];
+/** Merge Set-Cookie lines into a single Cookie header value (session + activeCompanyId). */
+function mergeCookieJar(prev, res) {
+  const cookies = new Map();
+  const parsePart = (part) => {
+    const i = part.indexOf("=");
+    if (i > 0) cookies.set(part.slice(0, i), part.slice(i + 1));
+  };
+  if (prev) {
+    for (const c of prev.split(/;\s*/)) {
+      if (c) parsePart(c);
     }
   }
-  const single = res.headers.get("set-cookie");
-  if (single && single.includes("bgos_session=")) {
-    const m = single.match(/bgos_session=[^;]+/);
-    if (m) return m[0];
+  const list = typeof res.headers.getSetCookie === "function" ? res.headers.getSetCookie() : [];
+  for (const line of list) {
+    const first = line.split(";")[0];
+    if (first) parsePart(first);
   }
-  return "";
+  if (list.length === 0) {
+    const single = res.headers.get("set-cookie");
+    if (single) {
+      for (const seg of single.split(/,(?=[^;]+?=)/)) {
+        const first = seg.trim().split(";")[0];
+        if (first) parsePart(first);
+      }
+    }
+  }
+  return [...cookies.entries()].map(([k, v]) => `${k}=${v}`).join("; ");
 }
 
 async function req(path, { method = "GET", jar = "", body } = {}) {
@@ -53,20 +67,44 @@ async function main() {
 
   let bossJar = "";
 
-  // 1) Signup boss
+  // 1) Signup boss (owner only — no company yet)
   {
     const { res, json } = await req("/api/auth/signup", {
       method: "POST",
       body: {
-        companyName: `E2E Co ${t}`,
-        ownerName: "E2E Boss",
+        name: "E2E Boss",
         email: bossEmail,
         password,
       },
     });
     if (!res.ok || !json.ok) fail("signup", `status ${res.status}`, json);
-    bossJar = sessionFromResponse(res);
-    if (!bossJar) fail("signup", "no session cookie");
+    bossJar = mergeCookieJar("", res);
+    if (!bossJar || !bossJar.includes("bgos_session=")) fail("signup", "no session cookie");
+  }
+
+  // 2) Onboarding: create company
+  {
+    const { res, json } = await req("/api/company/create", {
+      method: "POST",
+      jar: bossJar,
+      body: {
+        name: `E2E Co ${t}`,
+        industry: "SOLAR",
+      },
+    });
+    if (!res.ok || !json.ok) fail("company/create", `status ${res.status}`, json);
+    if (!json.companyId) fail("company/create", "missing companyId", json);
+    bossJar = mergeCookieJar(bossJar, res);
+  }
+
+  // 2b) NEXA activation (step 2) — required before tenant APIs
+  {
+    const { res, json } = await req("/api/onboarding/activate", {
+      method: "POST",
+      jar: bossJar,
+    });
+    if (!res.ok || !json.ok) fail("onboarding/activate", `status ${res.status}`, json);
+    bossJar = mergeCookieJar(bossJar, res);
   }
 
   // 3) Add employee (telecaller)
@@ -119,11 +157,11 @@ async function main() {
   {
     const { res, json } = await req("/api/auth/login", {
       method: "POST",
-      body: { mobile: mobileDigits, password },
+      body: { mobile: mobileDigits, password, respondWithJson: true },
     });
     if (!res.ok || !json.ok) fail("login telecaller", `status ${res.status}`, json);
-    empJar = sessionFromResponse(res);
-    if (!empJar) fail("login telecaller", "no session cookie");
+    empJar = mergeCookieJar("", res);
+    if (!empJar || !empJar.includes("bgos_session=")) fail("login telecaller", "no session cookie");
   }
 
   // 7) Employee sees lead + tasks

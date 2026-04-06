@@ -1,4 +1,5 @@
 import {
+  CompanyIndustry,
   CompanyPlan,
   DealStatus,
   LeadStatus,
@@ -9,6 +10,7 @@ import {
 import { applySolarTemplate } from "../src/lib/industry-templates";
 import { hashPassword } from "../src/lib/password";
 import { prisma } from "../src/lib/prisma";
+import { companyMembershipClass } from "../src/lib/user-company";
 
 async function main() {
   await prisma.activityLog.deleteMany();
@@ -18,17 +20,10 @@ async function main() {
   await prisma.payment.deleteMany();
   await prisma.serviceTicket.deleteMany();
   await prisma.installation.deleteMany();
+  await prisma.automation.deleteMany();
+  await prisma.userCompany.deleteMany();
   await prisma.user.deleteMany();
   await prisma.company.deleteMany();
-
-  const company = await prisma.company.create({
-    data: {
-      name: "ICECONNECT Solar Demo",
-      plan: CompanyPlan.PRO,
-    },
-  });
-
-  await applySolarTemplate(company.id);
 
   const passwordHash = await hashPassword("demo-password-change-me");
 
@@ -38,63 +33,61 @@ async function main() {
       mobile: "9999999999",
       email: "boss@iceconnect.demo",
       password: passwordHash,
-      role: UserRole.ADMIN,
-      companyId: company.id,
+      workspaceActivatedAt: new Date(),
     },
   });
 
-  const [telecaller, engineer, installer, accounts, service] = await Promise.all([
-    prisma.user.create({
+  const company = await prisma.company.create({
+    data: {
+      name: "ICECONNECT Solar Demo",
+      plan: CompanyPlan.PRO,
+      ownerId: boss.id,
+      industry: CompanyIndustry.SOLAR,
+    },
+  });
+
+  await prisma.userCompany.create({
+    data: {
+      userId: boss.id,
+      companyId: company.id,
+      role: companyMembershipClass(UserRole.ADMIN),
+      jobRole: UserRole.ADMIN,
+    },
+  });
+
+  await applySolarTemplate(company.id);
+
+  async function member(
+    name: string,
+    mobile: string,
+    email: string,
+    jobRole: UserRole,
+  ) {
+    const u = await prisma.user.create({
       data: {
-        name: "Sales TC",
-        mobile: "9111111111",
-        email: "telecaller@iceconnect.demo",
+        name,
+        mobile,
+        email,
         password: passwordHash,
-        role: UserRole.TELECALLER,
-        companyId: company.id,
+        workspaceActivatedAt: new Date(),
       },
-    }),
-    prisma.user.create({
+    });
+    await prisma.userCompany.create({
       data: {
-        name: "Field Engineer",
-        mobile: "9222222222",
-        email: "engineer@iceconnect.demo",
-        password: passwordHash,
-        role: UserRole.ENGINEER,
+        userId: u.id,
         companyId: company.id,
+        role: companyMembershipClass(jobRole),
+        jobRole,
       },
-    }),
-    prisma.user.create({
-      data: {
-        name: "Lead Installer",
-        mobile: "9333333333",
-        email: "installer@iceconnect.demo",
-        password: passwordHash,
-        role: UserRole.INSTALLER,
-        companyId: company.id,
-      },
-    }),
-    prisma.user.create({
-      data: {
-        name: "Accounts",
-        mobile: "9444444444",
-        email: "accounts@iceconnect.demo",
-        password: passwordHash,
-        role: UserRole.ACCOUNTS,
-        companyId: company.id,
-      },
-    }),
-    prisma.user.create({
-      data: {
-        name: "Service Desk",
-        mobile: "9555555555",
-        email: "service@iceconnect.demo",
-        password: passwordHash,
-        role: UserRole.SERVICE,
-        companyId: company.id,
-      },
-    }),
-  ]);
+    });
+    return u;
+  }
+
+  const telecaller = await member("Sales TC", "9111111111", "telecaller@iceconnect.demo", UserRole.TELECALLER);
+  const engineer = await member("Field Engineer", "9222222222", "engineer@iceconnect.demo", UserRole.ENGINEER);
+  const installer = await member("Lead Installer", "9333333333", "installer@iceconnect.demo", UserRole.INSTALLER);
+  const accounts = await member("Accounts", "9444444444", "accounts@iceconnect.demo", UserRole.ACCOUNTS);
+  const service = await member("Service Desk", "9555555555", "service@iceconnect.demo", UserRole.SERVICE);
 
   const leadsCreated = await prisma.$transaction([
     prisma.lead.create({

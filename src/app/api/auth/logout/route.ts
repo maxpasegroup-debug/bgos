@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { clearSessionCookie } from "@/lib/session-cookie";
+import { clearActiveCompanyCookie, clearSessionCookie } from "@/lib/session-cookie";
 
 /**
  * Clears the HTTP-only session cookie. Safe to call when already logged out.
@@ -7,5 +7,6 @@ import { clearSessionCookie } from "@/lib/session-cookie";
 export async function POST() {
   const res = NextResponse.json({ ok: true as const });
   clearSessionCookie(res);
+  clearActiveCompanyCookie(res);
   return res;
 }

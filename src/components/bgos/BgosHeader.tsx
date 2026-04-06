@@ -3,6 +3,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { useState } from "react";
 import { BgosAddLeadModal } from "./BgosAddLeadModal";
+import { BgosCompanySwitcher } from "./BgosCompanySwitcher";
 import { BGOS_MAIN_PAD } from "./layoutTokens";
 
 export function BgosHeader() {
@@ -22,6 +23,7 @@ export function BgosHeader() {
         <span className="shrink-0 text-sm font-bold tracking-wide text-white sm:text-base">
           BGOS
         </span>
+        <BgosCompanySwitcher />
         <h1 className="min-w-0 flex-1 truncate text-center text-xs font-semibold tracking-wide text-white/90 sm:text-sm">
           Command Center
         </h1>

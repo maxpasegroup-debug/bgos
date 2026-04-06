@@ -37,7 +37,7 @@ const ticketInclude = {
 } as const;
 
 export async function GET(request: NextRequest) {
-  const session = requireIceconnectRole(request, [UserRole.SERVICE]);
+  const session = await requireIceconnectRole(request, [UserRole.SERVICE]);
   if (session instanceof NextResponse) return session;
 
   const parsed = parseIceconnectListQuery(request, 100);

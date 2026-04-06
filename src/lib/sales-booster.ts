@@ -91,10 +91,10 @@ function leadScore(input: {
   return { score, reason };
 }
 
-export async function buildSalesBoosterPayload(
-  companyId: string,
-  sessionCompanyPlan: CompanyPlan,
-): Promise<SalesBoosterPayload> {
+/**
+ * Sales Booster / Pro simulation is gated strictly by {@link Company.plan} for this tenant.
+ */
+export async function buildSalesBoosterPayload(companyId: string): Promise<SalesBoosterPayload> {
   const company = await prisma.company.findUnique({
     where: { id: companyId },
     select: { plan: true, name: true },
@@ -116,8 +116,7 @@ export async function buildSalesBoosterPayload(
     };
   }
 
-  const entitled =
-    sessionCompanyPlan === CompanyPlan.PRO && company.plan === CompanyPlan.PRO;
+  const entitled = company.plan === CompanyPlan.PRO;
 
   if (!entitled) {
     return {

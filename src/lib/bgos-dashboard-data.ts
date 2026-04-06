@@ -88,7 +88,7 @@ export async function buildBgosDashboardSnapshot(companyId: string): Promise<Bgo
     closedLost,
     tasksPending,
     tasksCompleted,
-    users,
+    companyMemberships,
     assignedLeadGroups,
     wonLeadGroups,
     pendingTaskGroups,
@@ -153,10 +153,12 @@ export async function buildBgosDashboardSnapshot(companyId: string): Promise<Bgo
     prisma.task.count({
       where: { status: TaskStatus.COMPLETED, companyId },
     }),
-    prisma.user.findMany({
-      where: { companyId, isActive: true },
-      select: { id: true, name: true, email: true, role: true },
-      orderBy: { name: "asc" },
+    prisma.userCompany.findMany({
+      where: { companyId, user: { isActive: true } },
+      select: {
+        jobRole: true,
+        user: { select: { id: true, name: true, email: true } },
+      },
     }),
     prisma.lead.groupBy({
       by: ["assignedTo"],
@@ -196,14 +198,17 @@ export async function buildBgosDashboardSnapshot(companyId: string): Promise<Bgo
     if (row.userId) taskMap.set(row.userId, row._count._all);
   }
 
-  const team: BgosTeamMemberStats[] = users.map((u) => ({
-    userId: u.id,
-    name: u.name,
-    email: u.email,
-    role: u.role,
-    assignedLeads: assignedMap.get(u.id) ?? 0,
-    wonLeads: wonMap.get(u.id) ?? 0,
-    pendingTasks: taskMap.get(u.id) ?? 0,
+  const teamRows = [...companyMemberships].sort((a, b) =>
+    a.user.name.localeCompare(b.user.name),
+  );
+  const team: BgosTeamMemberStats[] = teamRows.map((m) => ({
+    userId: m.user.id,
+    name: m.user.name,
+    email: m.user.email,
+    role: m.jobRole,
+    assignedLeads: assignedMap.get(m.user.id) ?? 0,
+    wonLeads: wonMap.get(m.user.id) ?? 0,
+    pendingTasks: taskMap.get(m.user.id) ?? 0,
   }));
 
   const closed = wonLeads + closedLost;

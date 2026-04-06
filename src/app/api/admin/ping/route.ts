@@ -5,7 +5,7 @@ import { requireAuthWithRoles } from "@/lib/auth";
 
 /** Example: only ADMIN or MANAGER may call this route. */
 export async function GET(request: NextRequest) {
-  const user = requireAuthWithRoles(request, [UserRole.ADMIN, UserRole.MANAGER]);
+  const user = await requireAuthWithRoles(request, [UserRole.ADMIN, UserRole.MANAGER]);
   if (user instanceof NextResponse) return user;
 
   return NextResponse.json({

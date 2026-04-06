@@ -32,6 +32,7 @@ export function requireProPlan(user: AuthUser): NextResponse | null {
  * even if the session token has not been refreshed yet.
  */
 export async function requireLiveProPlan(user: AuthUser): Promise<NextResponse | null> {
+  if (!user.companyId) return proPlanRequiredResponse();
   if (isPlanLockedToBasic()) return proPlanRequiredResponse();
   const jwt = requireProPlan(user);
   if (jwt) return jwt;

@@ -4,16 +4,17 @@ import { NextResponse } from "next/server";
 import { parseLeadsQuery } from "@/lib/api-query";
 import { prismaKnownErrorResponse, zodValidationErrorResponse } from "@/lib/api-response";
 import { handleApiError } from "@/lib/route-error";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthWithCompany } from "@/lib/auth";
 import { serializeLead } from "@/lib/lead-serialize";
 import { prisma } from "@/lib/prisma";
+import { findUserInCompany } from "@/lib/user-company";
 
 const assignInclude = {
   assignee: { select: { id: true, name: true, email: true } as const },
 } as const;
 
 export async function GET(request: NextRequest) {
-  const session = requireAuth(request);
+  const session = await requireAuthWithCompany(request);
   if (session instanceof NextResponse) return session;
 
   const parsedQ = parseLeadsQuery(request);
@@ -36,6 +37,17 @@ export async function GET(request: NextRequest) {
   if (assignedTo === "me") {
     where.assignedTo = session.sub;
   } else if (assignedTo) {
+    const member = await findUserInCompany(assignedTo, session.companyId);
+    if (!member) {
+      return NextResponse.json(
+        {
+          ok: false as const,
+          error: "User is not part of this company",
+          code: "INVALID_ASSIGNEE_FILTER" as const,
+        },
+        { status: 400 },
+      );
+    }
     where.assignedTo = assignedTo;
   }
 

@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prismaKnownErrorResponse } from "@/lib/api-response";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthWithCompany } from "@/lib/auth";
 import { requireLiveProPlan } from "@/lib/plan-access";
 import { handleApiError } from "@/lib/route-error";
 
@@ -10,7 +10,7 @@ import { handleApiError } from "@/lib/route-error";
  * {@link Company.plan} is still Pro (downgrades apply without waiting for re-login).
  */
 export async function GET(request: NextRequest) {
-  const user = requireAuth(request);
+  const user = await requireAuthWithCompany(request);
   if (user instanceof NextResponse) return user;
 
   try {

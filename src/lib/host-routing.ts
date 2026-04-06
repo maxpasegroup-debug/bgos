@@ -38,3 +38,21 @@ export function publicIceconnectOrigin(): string {
   const u = process.env.NEXT_PUBLIC_ICECONNECT_URL?.trim();
   return u && u.length > 0 ? u.replace(/\/+$/, "") : DEFAULT_ICECONNECT_ORIGIN;
 }
+
+/**
+ * Role home paths are relative: on production split hosts, `/iceconnect/*` must open on ICECONNECT
+ * and `/bgos` on BGOS — never the wrong origin (avoids infinite redirect loops).
+ */
+export function absoluteRoleHomeUrl(
+  tenant: HostTenant,
+  homePath: string,
+  requestUrl: string,
+): URL {
+  if (tenant === "bgos" && (homePath === "/iceconnect" || homePath.startsWith("/iceconnect/"))) {
+    return new URL(homePath, publicIceconnectOrigin());
+  }
+  if (tenant === "ice" && (homePath === "/bgos" || homePath.startsWith("/bgos/"))) {
+    return new URL(homePath, publicBgosOrigin());
+  }
+  return new URL(homePath, requestUrl);
+}

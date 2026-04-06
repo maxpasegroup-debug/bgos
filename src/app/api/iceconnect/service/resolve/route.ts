@@ -11,7 +11,7 @@ const bodySchema = z.object({
 });
 
 export async function PATCH(request: NextRequest) {
-  const session = requireIceconnectRole(request, [UserRole.SERVICE]);
+  const session = await requireIceconnectRole(request, [UserRole.SERVICE]);
   if (session instanceof NextResponse) return session;
 
   let json: unknown;

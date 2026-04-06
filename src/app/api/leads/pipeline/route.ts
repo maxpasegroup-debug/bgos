@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prismaKnownErrorResponse, zodValidationErrorResponse } from "@/lib/api-response";
 import { handleApiError } from "@/lib/route-error";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthWithCompany } from "@/lib/auth";
 import { getCompanyPipelineStatuses } from "@/lib/company-pipeline";
 import { leadStatusLabel } from "@/lib/lead-pipeline";
 import { serializeLead } from "@/lib/lead-serialize";
@@ -22,7 +22,7 @@ const querySchema = z.object({
  * Full CRM pipeline: counts per stage + lead cards per stage (company-scoped).
  */
 export async function GET(request: NextRequest) {
-  const session = requireAuth(request);
+  const session = await requireAuthWithCompany(request);
   if (session instanceof NextResponse) return session;
 
   const q = querySchema.safeParse(

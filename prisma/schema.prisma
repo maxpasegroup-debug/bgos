@@ -1,5 +1,4 @@
-// BGOS + ICECONNECT — production schema
-// https://pris.ly/d/prisma-schema
+// BGOS + ICECONNECT — multi-company schema
 
 generator client {
   provider = "prisma-client-js"
@@ -23,6 +22,10 @@ enum UserRole {
 enum CompanyPlan {
   BASIC
   PRO
+}
+
+enum CompanyIndustry {
+  SOLAR
 }
 
 enum LeadStatus {
@@ -58,15 +61,18 @@ enum ServiceTicketStatus {
 }
 
 model Company {
-  id        String       @id @default(cuid())
-  name      String
-  plan      CompanyPlan  @default(BASIC)
-  createdAt DateTime     @default(now())
+  id         String          @id @default(cuid())
+  name       String
+  industry   CompanyIndustry @default(SOLAR)
+  plan       CompanyPlan     @default(BASIC)
+  ownerId    String
+  createdAt  DateTime        @default(now())
 
   businessTemplate String?
   dashboardConfig  Json?
 
-  users         User[]
+  owner         User            @relation("OwnedCompany", fields: [ownerId], references: [id], onDelete: Restrict)
+  memberships   UserCompany[]
   leads         Lead[]
   deals         Deal[]
   tasks         Task[]
@@ -74,32 +80,49 @@ model Company {
   payments      Payment[]
   activityLogs  ActivityLog[]
   serviceTickets ServiceTicket[]
-  automations    Automation[]
+  automations   Automation[]
 
   @@index([name])
+  @@index([ownerId])
+}
+
+/// Membership: `role` is company-level (ADMIN vs EMPLOYEE); `jobRole` is operational RBAC (TELECALLER, ENGINEER, …).
+model UserCompany {
+  id        String   @id @default(cuid())
+  userId    String
+  companyId String
+  role      String
+  jobRole   UserRole
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, companyId])
+  @@index([companyId])
+  @@index([userId])
 }
 
 model User {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   name      String
-  mobile    String
-  email     String   @unique
+  email     String    @unique
   password  String
-  role      UserRole
-  companyId String
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
+  mobile    String?   @unique
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  /** Set when the boss completes onboarding step 2 (NEXA activation). Invited employees get this on create. */
+  workspaceActivatedAt DateTime?
 
-  company       Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  assignedLeads     Lead[]          @relation("LeadAssignee")
-  tasks             Task[]
-  activityLogs      ActivityLog[]
+  companiesOwned       Company[]        @relation("OwnedCompany")
+  memberships          UserCompany[]
+  assignedLeads        Lead[]         @relation("LeadAssignee")
+  tasks                Task[]
+  activityLogs         ActivityLog[]
   assignedInstallations Installation[] @relation("InstallationAssignee")
   assignedServiceTickets ServiceTicket[] @relation("TicketAssignee")
 
-  @@index([companyId])
   @@index([email])
-  @@index([mobile])
 }
 
 model Lead {

@@ -2,7 +2,7 @@ import { LeadStatus, UserRole } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { forbidden, requireAuth } from "@/lib/auth";
+import { forbidden, requireAuthWithCompany } from "@/lib/auth";
 import { applyLeadPipelineUpdate } from "@/lib/lead-status-service";
 
 const bodySchema = z
@@ -19,7 +19,7 @@ const bodySchema = z
  * Move lead in the pipeline and/or reassign. Logs LEAD_STATUS_CHANGED / LEAD_ASSIGNED.
  */
 export async function PATCH(request: NextRequest) {
-  const session = requireAuth(request);
+  const session = await requireAuthWithCompany(request);
   if (session instanceof NextResponse) return session;
 
   let json: unknown;

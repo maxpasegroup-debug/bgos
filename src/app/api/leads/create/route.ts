@@ -2,7 +2,7 @@ import { LeadStatus } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthWithCompany } from "@/lib/auth";
 import { ACTIVITY_TYPES, logActivity } from "@/lib/activity-log";
 import { LEAD_ACTIVITY, logLeadActivity } from "@/lib/lead-activity";
 import { leadStatusLabel } from "@/lib/lead-pipeline";
@@ -20,7 +20,7 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const session = requireAuth(request);
+  const session = await requireAuthWithCompany(request);
   if (session instanceof NextResponse) return session;
 
   let json: unknown;

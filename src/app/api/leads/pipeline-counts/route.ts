@@ -3,13 +3,13 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prismaKnownErrorResponse } from "@/lib/api-response";
 import { handleApiError } from "@/lib/route-error";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthWithCompany } from "@/lib/auth";
 import { getCompanyPipelineStatuses } from "@/lib/company-pipeline";
 import { leadStatusLabel } from "@/lib/lead-pipeline";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
-  const session = requireAuth(request);
+  const session = await requireAuthWithCompany(request);
   if (session instanceof NextResponse) return session;
 
   const companyId = session.companyId;

@@ -155,7 +155,9 @@ export async function applyLeadPipelineUpdate(
     }
 
     if (statusChanging && (targetStatus === LeadStatus.WON || targetStatus === LeadStatus.LOST)) {
-      const existingDeal = await tx.deal.findFirst({ where: { leadId: updated.id } });
+      const existingDeal = await tx.deal.findFirst({
+        where: { leadId: updated.id, companyId },
+      });
       if (!existingDeal) {
         const won = targetStatus === LeadStatus.WON;
         const dealStatus = won ? DealStatus.WON : DealStatus.LOST;

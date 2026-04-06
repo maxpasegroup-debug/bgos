@@ -103,7 +103,7 @@ export function useBgosData(pollMs = 4000) {
         },
       )
       .catch(() => {});
-  }, []);
+  }, [reloadToken]);
 
   useEffect(() => {
     let cancelled = false;

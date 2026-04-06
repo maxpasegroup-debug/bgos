@@ -7,7 +7,11 @@ import { requireAuthWithRoles } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
 import { handleApiError } from "@/lib/route-error";
 import { prisma } from "@/lib/prisma";
-import { toPublicUser, USER_ADMIN_ROLES } from "@/lib/user-company";
+import {
+  companyMembershipClass,
+  toPublicUser,
+  USER_ADMIN_ROLES,
+} from "@/lib/user-company";
 
 const createBodySchema = z.object({
   name: z.string().trim().min(1).max(200),
@@ -18,7 +22,7 @@ const createBodySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const session = requireAuthWithRoles(request, USER_ADMIN_ROLES);
+  const session = await requireAuthWithRoles(request, USER_ADMIN_ROLES);
   if (session instanceof NextResponse) return session;
 
   let json: unknown;
@@ -47,26 +51,36 @@ export async function POST(request: NextRequest) {
   const passwordHash = await hashPassword(password);
 
   try {
-    const user = await prisma.user.create({
-      data: {
-        name,
-        mobile,
-        email: email.toLowerCase(),
-        password: passwordHash,
-        role,
-        companyId: session.companyId,
-        isActive: true,
-      },
+    const { user, membership } = await prisma.$transaction(async (tx) => {
+      const u = await tx.user.create({
+        data: {
+          name,
+          mobile,
+          email: email.toLowerCase(),
+          password: passwordHash,
+          isActive: true,
+          workspaceActivatedAt: new Date(),
+        },
+      });
+      const mem = await tx.userCompany.create({
+        data: {
+          userId: u.id,
+          companyId: session.companyId,
+          role: companyMembershipClass(role),
+          jobRole: role,
+        },
+      });
+      return { user: u, membership: mem };
     });
 
     return NextResponse.json(
-      { ok: true as const, user: toPublicUser(user) },
+      { ok: true as const, user: toPublicUser(user, membership) },
       { status: 201 },
     );
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       return NextResponse.json(
-        { ok: false as const, error: "Email is already registered", code: "DUPLICATE_EMAIL" },
+        { ok: false as const, error: "Email or mobile is already registered", code: "DUPLICATE_EMAIL" },
         { status: 409 },
       );
     }

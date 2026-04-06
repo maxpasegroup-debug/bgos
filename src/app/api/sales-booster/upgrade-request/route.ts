@@ -24,7 +24,7 @@ const BOSS_ROLES: UserRole[] = [UserRole.ADMIN, UserRole.MANAGER];
  * Reachable on Basic plans — excluded from Pro middleware gate (`PRO_PLAN_SALES_BOOSTER_ALLOWLIST`).
  */
 export async function POST(request: NextRequest) {
-  const user = requireAuthWithRoles(request, BOSS_ROLES);
+  const user = await requireAuthWithRoles(request, BOSS_ROLES);
   if (user instanceof NextResponse) return user;
 
   if (isPlanLockedToBasic()) {

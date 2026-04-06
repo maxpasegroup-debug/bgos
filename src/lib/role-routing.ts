@@ -82,17 +82,19 @@ export function roleCanAccessPath(role: string, pathname: string): boolean {
 }
 
 export function getRoleHome(role: string): string {
-  return ROLE_HOME[role] ?? "/login";
+  return ROLE_HOME[role] ?? "/iceconnect";
 }
 
 /**
  * After login: honor `from` only if the role may open that path.
+ * Default: ADMIN → `/bgos`, all other roles → `/iceconnect` (middleware then sends users to role home if needed).
  */
 export function postLoginDestination(role: string, from: string | null): string {
   if (from && from.startsWith("/") && roleCanAccessPath(role, from)) {
     return from;
   }
-  return getRoleHome(role);
+  if (role === "ADMIN") return "/bgos";
+  return "/iceconnect";
 }
 
 /** Path segment after `/iceconnect/` → roles allowed on that dashboard. */

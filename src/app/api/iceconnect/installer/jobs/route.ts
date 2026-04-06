@@ -6,7 +6,7 @@ import { assigneeFilter } from "@/lib/iceconnect-scope";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
-  const session = requireIceconnectRole(request, [UserRole.INSTALLER]);
+  const session = await requireIceconnectRole(request, [UserRole.INSTALLER]);
   if (session instanceof NextResponse) return session;
 
   const jobs = await prisma.installation.findMany({

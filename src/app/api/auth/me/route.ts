@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { AUTH_COOKIE_NAME } from "@/lib/auth-config";
+import { ACTIVE_COMPANY_COOKIE_NAME, AUTH_COOKIE_NAME } from "@/lib/auth-config";
 import { getMeSessionFromToken } from "@/lib/auth";
 import { isPlanLockedToBasic } from "@/lib/plan-production-lock";
 
@@ -9,7 +9,9 @@ import { isPlanLockedToBasic } from "@/lib/plan-production-lock";
  * Bad or expired token → 401 with `TOKEN_EXPIRED` / `TOKEN_INVALID`.
  */
 export async function GET() {
-  const token = (await cookies()).get(AUTH_COOKIE_NAME)?.value;
+  const jar = await cookies();
+  const token = jar.get(AUTH_COOKIE_NAME)?.value;
+  const activeCompanyIdCookie = jar.get(ACTIVE_COMPANY_COOKIE_NAME)?.value ?? null;
   const session = getMeSessionFromToken(token);
 
   switch (session.status) {
@@ -49,6 +51,12 @@ export async function GET() {
           role: session.user.role,
           companyId: session.user.companyId,
           companyPlan: session.user.companyPlan,
+          needsOnboarding: session.user.companyId === null,
+          workspaceReady: session.user.workspaceReady,
+          needsWorkspaceActivation:
+            session.user.companyId !== null && !session.user.workspaceReady,
+          activeCompanyIdCookie,
+          memberships: session.user.memberships ?? null,
         },
       });
   }

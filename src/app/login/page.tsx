@@ -32,19 +32,39 @@ function LoginForm() {
     }
     setPending(true);
     try {
+      const from = searchParams.get("from");
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        redirect: "manual",
         body: JSON.stringify({
           email: fields.data.email,
           password: fields.data.password,
+          ...(from ? { from } : {}),
         }),
       });
+
+      if ([301, 302, 303, 307, 308].includes(res.status)) {
+        const loc = res.headers.get("Location");
+        if (!loc) {
+          setError("Sign-in failed");
+          return;
+        }
+        window.location.assign(loc);
+        return;
+      }
+
       const data = (await res.json()) as {
         ok?: boolean;
         error?: string;
         code?: string;
-        user?: { role: string };
+        user?: {
+          role: string;
+          companyId?: string | null;
+          needsOnboarding?: boolean;
+          needsWorkspaceActivation?: boolean;
+        };
       };
       if (!res.ok) {
         if (typeof data.error === "string" && data.error.trim()) {
@@ -56,12 +76,20 @@ function LoginForm() {
         }
         return;
       }
+      if (
+        data.user?.needsOnboarding ||
+        data.user?.companyId == null ||
+        data.user?.needsWorkspaceActivation
+      ) {
+        router.push("/onboarding");
+        router.refresh();
+        return;
+      }
       const role = data.user?.role;
       if (!role) {
         setError("Invalid sign-in response");
         return;
       }
-      const from = searchParams.get("from");
       const nav = resolveAfterLoginNavigation({
         role,
         from,

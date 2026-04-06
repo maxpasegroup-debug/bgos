@@ -2,25 +2,95 @@ import { jwtVerify, errors } from "jose";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { AUTH_ERROR_CODES, authErrorResponse } from "@/lib/auth-api";
+import { resolveTenantFromJwt } from "@/lib/auth-active-company";
 import {
+  ACTIVE_COMPANY_COOKIE_NAME,
   AUTH_COOKIE_NAME,
   AUTH_HEADER_COMPANY_ID,
   AUTH_HEADER_COMPANY_PLAN,
+  AUTH_HEADER_NEEDS_COMPANY,
+  AUTH_HEADER_WORKSPACE_READY,
   AUTH_HEADER_USER_EMAIL,
   AUTH_HEADER_USER_ID,
   AUTH_HEADER_USER_ROLE,
   AUTH_HEADER_PREFIX,
   AUTH_JWT_ISSUER,
-  companyPlanFromJwtClaim,
   pathnameRequiresProPlan,
 } from "@/lib/auth-config";
 import { isPlanLockedToBasic } from "@/lib/plan-production-lock";
-import { hostTenantFromHeader } from "@/lib/host-routing";
+import {
+  absoluteRoleHomeUrl,
+  hostTenantFromHeader,
+  publicIceconnectOrigin,
+  type HostTenant,
+} from "@/lib/host-routing";
 import { getRoleHome, roleCanAccessPath } from "@/lib/role-routing";
 
+function normalizePathname(pathname: string): string {
+  if (pathname.length > 1 && pathname.endsWith("/")) {
+    return pathname.replace(/\/+$/, "");
+  }
+  return pathname;
+}
+
+/**
+ * Page routes that skip JWT enforcement here (no redirect to `/login` from middleware).
+ * `/` is excluded from this list on purpose — it is handled in `app/page.tsx`.
+ */
+const PUBLIC_ROUTES = ["/login", "/signup", "/onboarding"] as const;
+
+function isPublicRoute(pathname: string): boolean {
+  const p = normalizePathname(pathname);
+  for (const route of PUBLIC_ROUTES) {
+    if (p === route || p.startsWith(`${route}/`)) return true;
+  }
+  return false;
+}
+
+function isRootPath(pathname: string): boolean {
+  return normalizePathname(pathname) === "/";
+}
+
+/**
+ * Skip session/JWT gate: marketing root, public pages, session APIs, ICECONNECT login.
+ */
+function skipsMiddlewareAuth(pathname: string, method: string): boolean {
+  if (isRootPath(pathname)) return true;
+  if (isPublicRoute(pathname)) return true;
+  if (pathname === "/iceconnect/login") return true;
+  if (
+    pathname === "/api/auth/login" ||
+    pathname === "/api/auth/signup" ||
+    pathname === "/api/auth/logout" ||
+    pathname === "/api/auth/me"
+  ) {
+    return true;
+  }
+  if (pathname === "/api/auth/refresh-session" && method === "POST") return true;
+  return false;
+}
+
+/** Domain-based login: bgos.online → `/login`, iceconnect.in → `/iceconnect/login`, dev → `/login`. */
+function loginRedirectUrl(request: NextRequest, pathname: string, tenant: HostTenant): URL {
+  const loginPath = tenant === "ice" ? "/iceconnect/login" : "/login";
+  const login = new URL(loginPath, request.url);
+  const p = normalizePathname(pathname);
+  if (
+    !isRootPath(pathname) &&
+    p !== "/login" &&
+    p !== "/signup" &&
+    p !== "/iceconnect/login"
+  ) {
+    login.searchParams.set("from", pathname);
+  }
+  return login;
+}
+
 function bgosAllowsPagePath(pathname: string): boolean {
+  /** `/` is handled in `app/page.tsx` (logged in → `/bgos`, else → `/login`). */
+  if (pathname === "/") return true;
   if (pathname === "/bgos" || pathname.startsWith("/bgos/")) return true;
-  if (pathname === "/login" || pathname === "/signup") return true;
+  if (isPublicRoute(pathname)) return true;
   return false;
 }
 
@@ -56,22 +126,32 @@ function stripInternalAuthHeaders(headers: Headers): void {
 function tryAttachUserHeaders(
   headers: Headers,
   payload: Record<string, unknown>,
+  activeCompanyIdCookie: string | undefined,
 ): boolean {
   const sub = payload.sub;
   const email = payload.email;
-  const role = payload.role;
-  const companyId = payload.companyId;
   if (typeof sub !== "string" || !sub) return false;
   if (typeof email !== "string" || !email) return false;
-  if (typeof role !== "string" || !role) return false;
-  if (typeof companyId !== "string" || !companyId) return false;
+
+  const tenant = resolveTenantFromJwt(payload, activeCompanyIdCookie);
+
   headers.set(AUTH_HEADER_USER_ID, sub);
   headers.set(AUTH_HEADER_USER_EMAIL, email);
-  headers.set(AUTH_HEADER_USER_ROLE, role);
-  headers.set(AUTH_HEADER_COMPANY_ID, companyId);
-  headers.set(AUTH_HEADER_COMPANY_PLAN, companyPlanFromJwtClaim(payload.companyPlan));
-  if (isPlanLockedToBasic()) {
+  headers.set(AUTH_HEADER_USER_ROLE, tenant.jobRole);
+
+  if (tenant.needsCompany) {
+    headers.set(AUTH_HEADER_NEEDS_COMPANY, "1");
+    headers.delete(AUTH_HEADER_COMPANY_ID);
     headers.set(AUTH_HEADER_COMPANY_PLAN, "BASIC");
+    headers.set(AUTH_HEADER_WORKSPACE_READY, tenant.workspaceReady ? "1" : "0");
+  } else {
+    headers.set(AUTH_HEADER_COMPANY_ID, tenant.companyId!);
+    headers.set(AUTH_HEADER_COMPANY_PLAN, tenant.companyPlan);
+    if (isPlanLockedToBasic()) {
+      headers.set(AUTH_HEADER_COMPANY_PLAN, "BASIC");
+    }
+    headers.delete(AUTH_HEADER_NEEDS_COMPANY);
+    headers.set(AUTH_HEADER_WORKSPACE_READY, tenant.workspaceReady ? "1" : "0");
   }
   return true;
 }
@@ -110,21 +190,9 @@ function readToken(request: NextRequest): string | null {
   return null;
 }
 
-/** Paths that skip auth (marketing, sign-in, session helpers). */
-function isPublicPath(pathname: string): boolean {
-  if (pathname === "/") return true;
-  if (pathname === "/login") return true;
-  if (pathname === "/iceconnect/login") return true;
-  if (pathname === "/api/auth/login") return true;
-  if (pathname === "/api/auth/signup") return true;
-  if (pathname === "/api/auth/logout") return true;
-  if (pathname === "/api/auth/me") return true;
-  if (pathname === "/signup") return true;
-  return false;
-}
-
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const method = request.method;
   const host = request.headers.get("host") || "";
   const tenant = hostTenantFromHeader(host);
 
@@ -133,6 +201,10 @@ export async function middleware(request: NextRequest) {
       if (pathname.startsWith("/api/iceconnect")) {
         return wrongHostJson("ICECONNECT API is only available on iceconnect.in");
       }
+    } else if (pathname === "/iceconnect" || pathname.startsWith("/iceconnect/")) {
+      const dest = new URL(pathname, publicIceconnectOrigin());
+      dest.search = request.nextUrl.search;
+      return NextResponse.redirect(dest);
     } else if (!bgosAllowsPagePath(pathname)) {
       return NextResponse.redirect(new URL("/bgos", request.url));
     }
@@ -150,11 +222,16 @@ export async function middleware(request: NextRequest) {
         if (from) url.searchParams.set("from", from);
         return NextResponse.redirect(url);
       }
+      if (isRootPath(pathname)) {
+        const rootIce = new URL("/iceconnect", request.url);
+        rootIce.search = request.nextUrl.search;
+        return NextResponse.redirect(rootIce);
+      }
       return NextResponse.redirect(new URL("/iceconnect/login", request.url));
     }
   }
 
-  if (isPublicPath(pathname)) {
+  if (skipsMiddlewareAuth(pathname, method)) {
     if (pathname === "/iceconnect/login") {
       const iceToken = readToken(request);
       if (!iceToken) return NextResponse.next();
@@ -163,11 +240,23 @@ export async function middleware(request: NextRequest) {
         iceVerified.ok &&
         typeof iceVerified.payload.role === "string"
       ) {
-        return NextResponse.redirect(
-          new URL(getRoleHome(String(iceVerified.payload.role)), request.url),
-        );
+        const homePath = getRoleHome(String(iceVerified.payload.role));
+        return NextResponse.redirect(absoluteRoleHomeUrl(tenant, homePath, request.url));
       }
       return NextResponse.next();
+    }
+    if (normalizePathname(pathname) === "/login" && tenant === "bgos") {
+      const loginToken = readToken(request);
+      if (loginToken) {
+        const loginVerified = await verifyJwtEdge(loginToken);
+        if (
+          loginVerified.ok &&
+          typeof loginVerified.payload.role === "string"
+        ) {
+          const homePath = getRoleHome(String(loginVerified.payload.role));
+          return NextResponse.redirect(absoluteRoleHomeUrl(tenant, homePath, request.url));
+        }
+      }
     }
     return NextResponse.next();
   }
@@ -181,12 +270,7 @@ export async function middleware(request: NextRequest) {
     if (pathname.startsWith("/api")) {
       return authErrorResponse(AUTH_ERROR_CODES.NO_TOKEN);
     }
-    const login =
-      pathname.startsWith("/iceconnect") && pathname !== "/iceconnect/login"
-        ? new URL("/iceconnect/login", request.url)
-        : new URL("/login", request.url);
-    login.searchParams.set("from", pathname);
-    return NextResponse.redirect(login);
+    return NextResponse.redirect(loginRedirectUrl(request, pathname, tenant));
   }
 
   const verified = await verifyJwtEdge(token);
@@ -199,31 +283,102 @@ export async function middleware(request: NextRequest) {
           : AUTH_ERROR_CODES.TOKEN_INVALID,
       );
     }
-    const login =
-      pathname.startsWith("/iceconnect") && pathname !== "/iceconnect/login"
-        ? new URL("/iceconnect/login", request.url)
-        : new URL("/login", request.url);
-    login.searchParams.set("from", pathname);
-    return NextResponse.redirect(login);
+    return NextResponse.redirect(loginRedirectUrl(request, pathname, tenant));
   }
 
-  if (!tryAttachUserHeaders(requestHeaders, verified.payload)) {
+  if (
+    !tryAttachUserHeaders(
+      requestHeaders,
+      verified.payload,
+      request.cookies.get(ACTIVE_COMPANY_COOKIE_NAME)?.value,
+    )
+  ) {
     if (pathname.startsWith("/api")) {
       return authErrorResponse(AUTH_ERROR_CODES.TOKEN_INVALID);
     }
-    const login =
-      pathname.startsWith("/iceconnect") && pathname !== "/iceconnect/login"
-        ? new URL("/iceconnect/login", request.url)
-        : new URL("/login", request.url);
-    login.searchParams.set("from", pathname);
-    return NextResponse.redirect(login);
+    return NextResponse.redirect(loginRedirectUrl(request, pathname, tenant));
+  }
+
+  const needsCompany = requestHeaders.get(AUTH_HEADER_NEEDS_COMPANY) === "1";
+  const normalizedPath = normalizePathname(pathname);
+
+  if (normalizedPath === "/api/company/create") {
+    if (request.method !== "POST") {
+      return NextResponse.json(
+        { ok: false, error: "Method not allowed", code: "METHOD_NOT_ALLOWED" },
+        { status: 405 },
+      );
+    }
+  }
+
+  if (needsCompany) {
+    const allowed =
+      normalizedPath === "/onboarding" ||
+      normalizedPath.startsWith("/onboarding/") ||
+      normalizedPath === "/api/auth/me" ||
+      normalizedPath === "/api/auth/logout" ||
+      normalizedPath === "/api/company/create" ||
+      (normalizedPath === "/api/company/list" && request.method === "GET");
+    if (!allowed) {
+      if (pathname.startsWith("/api")) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Complete company setup first",
+            code: "NEEDS_ONBOARDING",
+          },
+          { status: 403 },
+        );
+      }
+      return NextResponse.redirect(new URL("/onboarding", request.url));
+    }
+  }
+
+  const hasCompanyContext =
+    !needsCompany && Boolean(requestHeaders.get(AUTH_HEADER_COMPANY_ID));
+  const awaitingWorkspaceActivation =
+    hasCompanyContext && verified.payload.workspaceReady === false;
+
+  if (awaitingWorkspaceActivation) {
+    const isActivatePost =
+      normalizedPath === "/api/onboarding/activate" && request.method === "POST";
+    if (normalizedPath === "/api/onboarding/activate" && !isActivatePost) {
+      return NextResponse.json(
+        { ok: false, error: "Method not allowed", code: "METHOD_NOT_ALLOWED" },
+        { status: 405 },
+      );
+    }
+    if (!isActivatePost) {
+      const allowedActivation =
+        normalizedPath === "/onboarding" ||
+        normalizedPath.startsWith("/onboarding/") ||
+        normalizedPath === "/api/auth/me" ||
+        normalizedPath === "/api/auth/logout" ||
+        (normalizedPath === "/api/auth/refresh-session" && request.method === "POST") ||
+        (normalizedPath === "/api/company/list" && request.method === "GET");
+      if (!allowedActivation) {
+        if (pathname.startsWith("/api")) {
+          return NextResponse.json(
+            {
+              ok: false,
+              error: "Complete workspace activation to continue",
+              code: "WORKSPACE_NOT_ACTIVATED",
+            },
+            { status: 403 },
+          );
+        }
+        return NextResponse.redirect(new URL("/onboarding", request.url));
+      }
+    }
   }
 
   const role = String(verified.payload.role);
 
   if (pathname === "/iceconnect" || pathname === "/iceconnect/") {
-    const home = getRoleHome(role);
-    return NextResponse.redirect(new URL(home, request.url));
+    const homePath = getRoleHome(role);
+    if (normalizePathname(homePath) !== normalizePathname(pathname)) {
+      return NextResponse.redirect(absoluteRoleHomeUrl(tenant, homePath, request.url));
+    }
   }
 
   if (!roleCanAccessPath(role, pathname)) {
@@ -233,11 +388,15 @@ export async function middleware(request: NextRequest) {
         { status: 403 },
       );
     }
-    return NextResponse.redirect(new URL(getRoleHome(role), request.url));
+    const homePath = getRoleHome(role);
+    if (normalizePathname(homePath) === normalizePathname(pathname)) {
+      return NextResponse.redirect(loginRedirectUrl(request, pathname, tenant));
+    }
+    return NextResponse.redirect(absoluteRoleHomeUrl(tenant, homePath, request.url));
   }
 
-  // Company.plan (BASIC | PRO): block Pro-only APIs for Basic JWTs — see `pathnameRequiresProPlan`
-  // in auth-config (automation + sales-booster, except upgrade-request allowlist).
+  // Active company's plan (JWT membership row for activeCompanyId cookie). Not per-user.
+  // See `pathnameRequiresProPlan` — automation + sales-booster (except upgrade allowlist).
   const companyPlanRaw = requestHeaders.get(AUTH_HEADER_COMPANY_PLAN) ?? "BASIC";
   const companyPlan = isPlanLockedToBasic() ? "BASIC" : companyPlanRaw;
   if (

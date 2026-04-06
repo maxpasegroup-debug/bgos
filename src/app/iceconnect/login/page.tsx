@@ -55,14 +55,29 @@ function IceconnectLoginForm() {
 
     setPending(true);
     try {
+      const from = searchParams.get("from");
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        redirect: "manual",
         body: JSON.stringify({
           mobile: parsed.data.mobile,
           password: parsed.data.password,
+          ...(from ? { from } : {}),
         }),
       });
+
+      if ([301, 302, 303, 307, 308].includes(res.status)) {
+        const loc = res.headers.get("Location");
+        if (!loc) {
+          setFormError("Sign-in failed");
+          return;
+        }
+        window.location.assign(loc);
+        return;
+      }
+
       const data = (await res.json()) as {
         ok?: boolean;
         error?: string;
@@ -92,7 +107,6 @@ function IceconnectLoginForm() {
         return;
       }
 
-      const from = searchParams.get("from");
       const nav = resolveAfterLoginNavigation({
         role,
         from,

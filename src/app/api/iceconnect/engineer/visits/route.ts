@@ -7,7 +7,7 @@ import { leadStatusLabel } from "@/lib/lead-pipeline";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
-  const session = requireIceconnectRole(request, [UserRole.ENGINEER]);
+  const session = await requireIceconnectRole(request, [UserRole.ENGINEER]);
   if (session instanceof NextResponse) return session;
 
   const visits = await prisma.lead.findMany({

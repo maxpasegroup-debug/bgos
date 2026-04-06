@@ -5,7 +5,7 @@ import { parseActivityQuery, parseActivityTypesFilter } from "@/lib/api-query";
 import { prismaKnownErrorResponse, zodValidationErrorResponse } from "@/lib/api-response";
 import { handleApiError } from "@/lib/route-error";
 import { ACTIVITY_TYPES, type ActivityType } from "@/lib/activity-log";
-import { requireAuth } from "@/lib/auth";
+import { requireAuthWithCompany } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 function encodeCursor(createdAt: Date, id: string): string {
@@ -37,7 +37,7 @@ function decodeCursor(raw: string): { createdAt: Date; id: string } | null {
 }
 
 export async function GET(request: NextRequest) {
-  const session = requireAuth(request);
+  const session = await requireAuthWithCompany(request);
   if (session instanceof NextResponse) return session;
 
   const parsedQ = parseActivityQuery(request);
