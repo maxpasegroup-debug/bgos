@@ -2,6 +2,7 @@
 
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
+import { normalizeFinancialOverview } from "@/lib/dashboard-client-defaults";
 import type { DashboardMetrics, NexaInsight } from "@/types";
 import { DashboardSurface } from "./DashboardSurface";
 
@@ -118,6 +119,7 @@ export function CommandCenterSection() {
                 featuresUnlocked: false,
                 companyName: "",
               },
+            financial: normalizeFinancialOverview(json.financial),
           });
           setLoadError(null);
           hasLoadedOnce.current = true;

@@ -2,6 +2,7 @@
 
 import { LeadStatus, UserRole } from "@prisma/client";
 import { motion } from "framer-motion";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DashboardSurface } from "@/components/dashboard/DashboardSurface";
 import {
@@ -171,12 +172,16 @@ const cardSelectClass =
 export function BgosPipelineBoard() {
   const { refetch: refetchDashboard, sessionRole, syncGeneration } = useBgosDashboardContext();
   const isAdmin = sessionRole === UserRole.ADMIN;
+  const canMoney = sessionRole === UserRole.ADMIN || sessionRole === UserRole.MANAGER;
 
   const [stages, setStages] = useState<PipelineStageColumn[]>(() => emptyBoard());
   const [loading, setLoading] = useState(true);
   const [banner, setBanner] = useState<string | null>(null);
   const [users, setUsers] = useState<PublicUser[]>([]);
   const [busyLeadId, setBusyLeadId] = useState<string | null>(null);
+  const [approvedQuotationByLead, setApprovedQuotationByLead] = useState<Record<string, string>>(
+    {},
+  );
   const pipelineInitialLoad = useRef(true);
 
   const loadPipeline = useCallback(async () => {
@@ -240,6 +245,36 @@ export function BgosPipelineBoard() {
       cancelled = true;
     };
   }, [loadPipeline, loadUsers, syncGeneration]);
+
+  useEffect(() => {
+    if (!canMoney) {
+      setApprovedQuotationByLead({});
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/quotation/list", { credentials: "include" });
+        const data = (await res.json()) as {
+          ok?: boolean;
+          quotations?: { id: string; leadId: string | null; status: string }[];
+        };
+        if (!res.ok || !data.ok || !Array.isArray(data.quotations) || cancelled) return;
+        const m: Record<string, string> = {};
+        for (const q of data.quotations) {
+          if (q.status === "APPROVED" && q.leadId && !m[q.leadId]) {
+            m[q.leadId] = q.id;
+          }
+        }
+        if (!cancelled) setApprovedQuotationByLead(m);
+      } catch {
+        if (!cancelled) setApprovedQuotationByLead({});
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canMoney, syncGeneration]);
 
   async function patchLead(body: {
     leadId: string;
@@ -429,6 +464,23 @@ export function BgosPipelineBoard() {
                             ? formatInr(lead.value)
                             : "—"}
                         </p>
+
+                        {canMoney && lead.status === LeadStatus.PROPOSAL_SENT ? (
+                          <Link
+                            href={`/bgos/money/quotation/create?leadId=${encodeURIComponent(lead.id)}`}
+                            className="mt-2 inline-flex text-[11px] font-semibold text-[#FFC300] transition hover:text-[#FFE066]"
+                          >
+                            Create quotation →
+                          </Link>
+                        ) : null}
+                        {canMoney && approvedQuotationByLead[lead.id] ? (
+                          <Link
+                            href={`/bgos/money/invoices?quotationId=${encodeURIComponent(approvedQuotationByLead[lead.id])}`}
+                            className="mt-1 inline-flex text-[11px] font-semibold text-emerald-200/90 transition hover:text-emerald-100"
+                          >
+                            Generate invoice →
+                          </Link>
+                        ) : null}
 
                         <div className="mt-2 space-y-1.5 border-t border-white/10 pt-2">
                           <div>

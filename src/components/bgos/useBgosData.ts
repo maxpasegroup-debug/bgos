@@ -2,6 +2,7 @@
 
 import { CompanyPlan, UserRole } from "@prisma/client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { normalizeFinancialOverview } from "@/lib/dashboard-client-defaults";
 import type { DashboardMetrics } from "@/types";
 
 export type DashboardPayload = DashboardMetrics;
@@ -63,6 +64,7 @@ function normalizeDashboard(d: DashboardPayload): DashboardPayload {
     risks: d.risks ?? EMPTY_RISKS,
     health: d.health ?? EMPTY_HEALTH,
     team: Array.isArray(d.team) ? d.team : [],
+    financial: normalizeFinancialOverview(d.financial),
   };
 }
 

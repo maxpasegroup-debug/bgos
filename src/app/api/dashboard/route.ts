@@ -5,6 +5,7 @@ import { prismaKnownErrorResponse } from "@/lib/api-response";
 import { requireAuthWithCompany } from "@/lib/auth";
 import { handleApiError } from "@/lib/route-error";
 import { buildBgosDashboardSnapshot } from "@/lib/bgos-dashboard-data";
+import { getFinancialOverview } from "@/lib/financial-metrics";
 import { getPipelineStages } from "@/lib/dashboard-pipeline";
 import { generateInsights } from "@/lib/nexa-insights";
 import { prisma } from "@/lib/prisma";
@@ -25,11 +26,12 @@ export async function GET(request: NextRequest) {
   let insights: Awaited<ReturnType<typeof generateInsights>>;
   let pipeline: Awaited<ReturnType<typeof getPipelineStages>>;
   let salesBooster: Awaited<ReturnType<typeof buildSalesBoosterPayload>>;
+  let financial: Awaited<ReturnType<typeof getFinancialOverview>>;
 
   try {
     await ensurePendingTasksForOpenLeads(companyId, user.sub);
     snapshot = await buildBgosDashboardSnapshot(companyId);
-    [leads, revenue, installations, pendingPayments, insights, pipeline, salesBooster] =
+    [leads, revenue, installations, pendingPayments, insights, pipeline, salesBooster, financial] =
       await Promise.all([
         prisma.lead.count({ where: { companyId } }),
         prisma.deal.aggregate({
@@ -48,6 +50,7 @@ export async function GET(request: NextRequest) {
         generateInsights(companyId, snapshot.nexa),
         getPipelineStages(companyId),
         buildSalesBoosterPayload(companyId),
+        getFinancialOverview(companyId),
       ]);
   } catch (e) {
     const p = prismaKnownErrorResponse(e);
@@ -69,5 +72,14 @@ export async function GET(request: NextRequest) {
     risks: snapshot.risks,
     health: snapshot.health,
     team: snapshot.team,
+    financial: {
+      totalRevenue: financial.totalRevenue,
+      pendingPayments: financial.pendingPayments,
+      monthlyRevenue: financial.monthlyRevenue,
+      totalExpenses: financial.totalExpenses,
+      netProfit: financial.netProfit,
+      monthlyRevenueTrend: financial.monthlyRevenueTrend,
+      expenseChangePercent: financial.expenseChangePercent,
+    },
   });
 }

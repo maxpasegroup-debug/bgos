@@ -124,6 +124,23 @@ export type DashboardHealth = {
   teamProductivity: number;
 };
 
+/** Money-layer metrics (invoices, payments, expenses) for BGOS financial overview. */
+export type DashboardMonthlyTrendPoint = {
+  monthKey: string;
+  label: string;
+  amount: number;
+};
+
+export type DashboardFinancialOverview = {
+  totalRevenue: number;
+  pendingPayments: number;
+  monthlyRevenue: number;
+  totalExpenses: number;
+  netProfit: number;
+  monthlyRevenueTrend: DashboardMonthlyTrendPoint[];
+  expenseChangePercent: number | null;
+};
+
 export type TeamMemberPerformance = {
   userId: string;
   name: string;
@@ -148,4 +165,5 @@ export type DashboardMetrics = {
   risks: DashboardRisks;
   health: DashboardHealth;
   team: TeamMemberPerformance[];
+  financial: DashboardFinancialOverview;
 };

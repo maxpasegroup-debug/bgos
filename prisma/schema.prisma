@@ -88,8 +88,12 @@ model Company {
   deals         Deal[]
   tasks         Task[]
   installations Installation[]
-  payments      Payment[]
-  activityLogs  ActivityLog[]
+  payments        Payment[]
+  quotations      Quotation[]
+  moneyInvoices   Invoice[]
+  expenses        Expense[]
+  invoicePayments InvoicePayment[]
+  activityLogs    ActivityLog[]
   serviceTickets ServiceTicket[]
   automations   Automation[]
 
@@ -151,9 +155,11 @@ model Lead {
 
   company  Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   assignee User?   @relation("LeadAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
-  deals    Deal[]
-  tasks    Task[]
-  siteReport String? @db.Text
+  deals       Deal[]
+  tasks       Task[]
+  quotations  Quotation[]
+  invoices    Invoice[]
+  siteReport  String? @db.Text
 
   @@index([companyId])
   @@index([status])
@@ -244,6 +250,91 @@ model Payment {
 
   @@index([companyId])
   @@index([status])
+}
+
+/// Customer quotation (money layer). Numbers are per-company unique (e.g. Q-0001).
+model Quotation {
+  id               String   @id @default(cuid())
+  companyId        String
+  leadId           String?
+  /** Snapshot / override when not using a lead or for PDF display. */
+  customerName     String?
+  customerPhone    String?
+  quotationNumber  String
+  status           String
+  totalAmount      Float
+  items            Json
+  notes            String?  @db.Text
+  createdAt        DateTime @default(now())
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead     Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  invoices Invoice[]
+
+  @@unique([companyId, quotationNumber])
+  @@index([companyId])
+  @@index([leadId])
+  @@index([status])
+}
+
+/// Invoice linked optionally to quotation + lead.
+model Invoice {
+  id            String    @id @default(cuid())
+  companyId     String
+  quotationId   String?
+  leadId        String?
+  invoiceNumber String
+  status        String
+  totalAmount   Float
+  paidAmount    Float     @default(0)
+  dueDate       DateTime?
+  items         Json
+  createdAt     DateTime  @default(now())
+
+  company     Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  quotation   Quotation?       @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+  lead        Lead?            @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  payments    InvoicePayment[]
+
+  @@unique([companyId, invoiceNumber])
+  @@index([companyId])
+  @@index([quotationId])
+  @@index([leadId])
+  @@index([status])
+}
+
+/// Payment allocated to an invoice (distinct from legacy `Payment` register rows).
+model InvoicePayment {
+  id        String   @id @default(cuid())
+  companyId String
+  invoiceId String
+  amount    Float
+  method    String
+  date      DateTime
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([invoiceId])
+  @@index([date])
+}
+
+model Expense {
+  id        String   @id @default(cuid())
+  companyId String
+  title     String
+  amount    Float
+  category  String
+  date      DateTime
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([companyId, date])
+  @@index([category])
 }
 
 model ServiceTicket {

@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DashboardSurface } from "@/components/dashboard/DashboardSurface";
 import { useBgosDashboardContext } from "./BgosDataProvider";
@@ -29,13 +30,22 @@ type PublicUser = {
 const selectClass =
   "mt-0.5 w-full max-w-[14rem] rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-xs text-white outline-none focus:border-[#FFC300]/40 disabled:cursor-not-allowed disabled:opacity-50";
 
-export function BgosLeadsAssignmentPanel({ isAdmin }: { isAdmin: boolean }) {
+export function BgosLeadsAssignmentPanel({
+  isAdmin,
+  canUseMoney,
+}: {
+  isAdmin: boolean;
+  canUseMoney: boolean;
+}) {
   const { refetch, syncGeneration } = useBgosDashboardContext();
   const [leads, setLeads] = useState<SerializedLead[]>([]);
   const [users, setUsers] = useState<PublicUser[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [approvedQuotationByLead, setApprovedQuotationByLead] = useState<Record<string, string>>(
+    {},
+  );
   const tableInitialLoad = useRef(true);
 
   const loadLeads = useCallback(async () => {
@@ -91,6 +101,36 @@ export function BgosLeadsAssignmentPanel({ isAdmin }: { isAdmin: boolean }) {
       cancelled = true;
     };
   }, [loadLeads, loadUsers, syncGeneration]);
+
+  useEffect(() => {
+    if (!canUseMoney) {
+      setApprovedQuotationByLead({});
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/quotation/list", { credentials: "include" });
+        const data = (await res.json()) as {
+          ok?: boolean;
+          quotations?: { id: string; leadId: string | null; status: string }[];
+        };
+        if (!res.ok || !data.ok || !Array.isArray(data.quotations) || cancelled) return;
+        const m: Record<string, string> = {};
+        for (const q of data.quotations) {
+          if (q.status === "APPROVED" && q.leadId && !m[q.leadId]) {
+            m[q.leadId] = q.id;
+          }
+        }
+        if (!cancelled) setApprovedQuotationByLead(m);
+      } catch {
+        if (!cancelled) setApprovedQuotationByLead({});
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canUseMoney, syncGeneration]);
 
   async function handleAssignChange(lead: SerializedLead, rawValue: string) {
     if (!isAdmin) return;
@@ -193,6 +233,7 @@ export function BgosLeadsAssignmentPanel({ isAdmin }: { isAdmin: boolean }) {
                   <th className="pb-2 pr-3">Phone</th>
                   <th className="pb-2 pr-3">Stage</th>
                   <th className="pb-2 pr-3">Assignee</th>
+                  {canUseMoney ? <th className="pb-2 pr-3">Money</th> : null}
                   {isAdmin ? (
                     <th className="pb-2">Assign to</th>
                   ) : null}
@@ -207,6 +248,34 @@ export function BgosLeadsAssignmentPanel({ isAdmin }: { isAdmin: boolean }) {
                     <td className="py-2.5 pr-3 text-white/70">
                       {lead.assignee?.name ?? "—"}
                     </td>
+                    {canUseMoney ? (
+                      <td className="py-2.5 pr-3 align-top">
+                        <div className="flex max-w-[10rem] flex-col gap-1">
+                          {lead.status === "PROPOSAL_SENT" ? (
+                            <Link
+                              href={`/bgos/money/quotation/create?leadId=${encodeURIComponent(lead.id)}`}
+                              className="text-[11px] font-semibold text-[#FFC300] transition hover:text-[#FFE066]"
+                            >
+                              Create quotation
+                            </Link>
+                          ) : null}
+                          {approvedQuotationByLead[lead.id] ? (
+                            <Link
+                              href={`/bgos/money/invoices?quotationId=${encodeURIComponent(approvedQuotationByLead[lead.id])}`}
+                              className="text-[11px] font-semibold text-emerald-200/90 transition hover:text-emerald-100"
+                            >
+                              Generate invoice
+                            </Link>
+                          ) : null}
+                          <Link
+                            href={`/bgos/money?tab=quotations&leadId=${encodeURIComponent(lead.id)}`}
+                            className="text-[10px] text-white/40 underline-offset-2 hover:text-white/60 hover:underline"
+                          >
+                            Open money
+                          </Link>
+                        </div>
+                      </td>
+                    ) : null}
                     {isAdmin ? (
                       <td className="py-2 align-middle">
                         <label className="sr-only" htmlFor={`assign-${lead.id}`}>

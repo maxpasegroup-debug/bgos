@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { DashboardSurface } from "@/components/dashboard/DashboardSurface";
 import { BgosAddEmployeeForm } from "./BgosAddEmployeeForm";
+import { BgosFinancialOverview } from "./BgosFinancialOverview";
 import { BgosLeadsAssignmentPanel } from "./BgosLeadsAssignmentPanel";
 import { BgosPipelineBoard } from "./BgosPipelineBoard";
 import { useBgosDashboardContext } from "./BgosDataProvider";
@@ -13,6 +14,7 @@ import { BgosShineButton } from "./BgosShineButton";
 import { SalesBoosterModule } from "./SalesBoosterModule";
 import { BGOS_GRID_GAP, BGOS_MAIN_PAD } from "./layoutTokens";
 import { easePremium, fadeUp, sectionReveal, staggerRow } from "./motion";
+import { emptyFinancialOverview } from "@/lib/dashboard-client-defaults";
 import type {
   DashboardHealth,
   NexaInsight,
@@ -95,11 +97,16 @@ export function BgosDashboardGrid({
         ))}
       </motion.section>
 
+      <BgosFinancialOverview
+        financial={dashboard?.financial ?? emptyFinancialOverview()}
+      />
+
       <DashboardControlsStrip
         isAdmin={isAdmin}
         canCompanySettings={
           sessionRole === UserRole.ADMIN || sessionRole === UserRole.MANAGER
         }
+        canMoney={sessionRole === UserRole.ADMIN || sessionRole === UserRole.MANAGER}
       />
 
       {/* 2 — NEXA priority + health */}
@@ -113,7 +120,10 @@ export function BgosDashboardGrid({
       <BgosPipelineBoard />
 
       {/* 3b — Leads list + admin assignment */}
-      <BgosLeadsAssignmentPanel isAdmin={isAdmin} />
+      <BgosLeadsAssignmentPanel
+        isAdmin={isAdmin}
+        canUseMoney={sessionRole === UserRole.ADMIN || sessionRole === UserRole.MANAGER}
+      />
 
       {/* 4 — Sales booster (hidden when deployment locks plan to BASIC) */}
       {!planLockedToBasic ? (
@@ -151,9 +161,11 @@ export function BgosDashboardGrid({
 function DashboardControlsStrip({
   isAdmin,
   canCompanySettings,
+  canMoney,
 }: {
   isAdmin: boolean;
   canCompanySettings: boolean;
+  canMoney: boolean;
 }) {
   return (
     <motion.section
@@ -195,6 +207,14 @@ function DashboardControlsStrip({
               className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/15 bg-white/[0.06] px-4 text-sm font-medium text-white/90 transition hover:border-[#FFC300]/40"
             >
               Company settings
+            </Link>
+          ) : null}
+          {canMoney ? (
+            <Link
+              href="/bgos/money"
+              className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-4 text-sm font-semibold text-emerald-200/90 transition hover:border-emerald-400/45"
+            >
+              Money / billing
             </Link>
           ) : null}
         </div>
