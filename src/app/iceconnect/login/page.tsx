@@ -1,40 +1,56 @@
 "use client";
 
 import { motion } from "framer-motion";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { z } from "zod";
+import { writeStoredCompanyBrand } from "@/contexts/company-branding-context";
 import { resolveAfterLoginNavigation } from "@/lib/cross-domain-login";
 
-const formSchema = z.object({
-  mobile: z.string().trim().min(1, "Enter mobile number"),
-  password: z.string().min(1, "Enter password"),
-});
+const formSchema = z
+  .object({
+    identifier: z.string().trim().min(1, "Enter mobile number or email"),
+    password: z.string().min(1, "Enter password"),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.identifier.includes("@")) return;
+    if (!z.string().email().safeParse(data.identifier).success) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["identifier"],
+        message: "Enter a valid email",
+      });
+    }
+  });
 
-type FieldErrors = { mobile?: string; password?: string };
+type FieldErrors = { identifier?: string; password?: string };
 
 function flattenZodFieldErrors(details: unknown): FieldErrors {
   if (!details || typeof details !== "object") return {};
   const fieldErrors = (details as { fieldErrors?: Record<string, string[]> }).fieldErrors;
   if (!fieldErrors) return {};
   return {
-    mobile: fieldErrors.mobile?.[0],
+    identifier: fieldErrors.mobile?.[0] ?? fieldErrors.email?.[0],
     password: fieldErrors.password?.[0],
   };
+}
+
+function isEmailLike(value: string): boolean {
+  return value.includes("@");
 }
 
 function IceconnectLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [mobile, setMobile] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [credentialsMismatch, setCredentialsMismatch] = useState(false);
   const [pending, setPending] = useState(false);
+  const [logoSrc, setLogoSrc] = useState("/logo.jpg");
 
-  const mobileInvalid = Boolean(fieldErrors.mobile) || credentialsMismatch;
+  const identifierInvalid = Boolean(fieldErrors.identifier) || credentialsMismatch;
   const passwordInvalid = Boolean(fieldErrors.password) || credentialsMismatch;
 
   async function onSubmit(e: React.FormEvent) {
@@ -43,29 +59,30 @@ function IceconnectLoginForm() {
     setFormError(null);
     setCredentialsMismatch(false);
 
-    const parsed = formSchema.safeParse({ mobile, password });
+    const parsed = formSchema.safeParse({ identifier, password });
     if (!parsed.success) {
       const fe = parsed.error.flatten().fieldErrors;
       setFieldErrors({
-        mobile: fe.mobile?.[0],
+        identifier: fe.identifier?.[0],
         password: fe.password?.[0],
       });
       return;
     }
 
+    const from = searchParams.get("from");
+    const id = parsed.data.identifier;
+    const loginBody = isEmailLike(id)
+      ? { email: id, password: parsed.data.password, ...(from ? { from } : {}) }
+      : { mobile: id, password: parsed.data.password, ...(from ? { from } : {}) };
+
     setPending(true);
     try {
-      const from = searchParams.get("from");
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         redirect: "manual",
-        body: JSON.stringify({
-          mobile: parsed.data.mobile,
-          password: parsed.data.password,
-          ...(from ? { from } : {}),
-        }),
+        body: JSON.stringify(loginBody),
       });
 
       if ([301, 302, 303, 307, 308].includes(res.status)) {
@@ -83,13 +100,19 @@ function IceconnectLoginForm() {
         error?: string;
         code?: string;
         details?: unknown;
+        user?: {
+          role: string;
+          companyId?: string | null;
+          needsOnboarding?: boolean;
+          needsWorkspaceActivation?: boolean;
+        };
       };
 
       if (!res.ok) {
         if (data.code === "VALIDATION_ERROR" && data.details) {
           const fe = flattenZodFieldErrors(data.details);
           setFieldErrors(fe);
-          if (!fe.mobile && !fe.password && data.error) setFormError(data.error);
+          if (!fe.identifier && !fe.password && data.error) setFormError(data.error);
           return;
         }
         if (typeof data.error === "string" && data.error.trim()) {
@@ -101,10 +124,48 @@ function IceconnectLoginForm() {
         return;
       }
 
-      const role = (data as { user?: { role: string } }).user?.role;
+      const u = data.user;
+      if (
+        u?.needsOnboarding ||
+        u?.companyId == null ||
+        u?.needsWorkspaceActivation
+      ) {
+        router.push("/onboarding");
+        router.refresh();
+        return;
+      }
+
+      const role = u?.role;
       if (!role) {
         setFormError("Invalid sign-in response");
         return;
+      }
+
+      try {
+        const [listRes, curRes] = await Promise.all([
+          fetch("/api/company/list", { credentials: "include" }),
+          fetch("/api/company/current", { credentials: "include" }),
+        ]);
+        const listJson = (await listRes.json()) as { ok?: boolean; companies?: unknown[] };
+        if (listJson.ok && Array.isArray(listJson.companies) && listJson.companies.length > 1) {
+          router.push("/iceconnect/select-company");
+          router.refresh();
+          return;
+        }
+        const curJson = (await curRes.json()) as {
+          ok?: boolean;
+          company?: {
+            name: string;
+            logoUrl: string | null;
+            primaryColor: string | null;
+            secondaryColor: string | null;
+          };
+        };
+        if (curJson.ok === true && curJson.company) {
+          writeStoredCompanyBrand(curJson.company);
+        }
+      } catch {
+        /* non-fatal */
       }
 
       const nav = resolveAfterLoginNavigation({
@@ -126,62 +187,88 @@ function IceconnectLoginForm() {
   }
 
   const inputBase =
-    "w-full rounded-lg border px-4 py-3 outline-none transition-[border-color,box-shadow] duration-200 focus:ring-2 focus:ring-yellow-400";
+    "w-full rounded-lg border border-gray-300 bg-white/80 px-4 py-3 outline-none transition-all duration-300 focus:border-yellow-400/80 focus:ring-2 focus:ring-yellow-400";
+
+  const cardMotion = {
+    initial: { opacity: 0, y: 20 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const },
+  };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#F8FAFC] bg-gradient-to-b from-white to-[#F1F5F9] px-6 py-10">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#F8FAFC] bg-gradient-to-br from-white via-[#F8FAFC] to-[#EEF2F7] px-6">
       <motion.div
-        className="m-auto w-full max-w-md"
-        initial={{ opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.45, ease: [0.4, 0, 0.2, 1] }}
+        className="pointer-events-none absolute top-0 left-0 h-96 w-96 rounded-full bg-yellow-200 opacity-20 blur-3xl"
+        initial={{ x: 0, y: 0 }}
+        animate={{ x: [0, 24, -12, 0], y: [0, 16, 8, 0] }}
+        transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
+        aria-hidden
+      />
+      <motion.div
+        className="pointer-events-none absolute right-0 bottom-0 h-96 w-96 rounded-full bg-red-200 opacity-20 blur-3xl"
+        initial={{ x: 0, y: 0 }}
+        animate={{ x: [0, -20, 14, 0], y: [0, -12, -6, 0] }}
+        transition={{ duration: 26, repeat: Infinity, ease: "easeInOut" }}
+        aria-hidden
+      />
+
+      <motion.div
+        className="relative z-10 w-full max-w-md"
+        {...cardMotion}
       >
-        <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-xl">
+        <div
+          className="rounded-2xl border border-gray-200 bg-white/70 p-8 shadow-[0_20px_60px_rgba(0,0,0,0.08)] backdrop-blur-xl"
+        >
           <div className="text-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/bgos-logo-placeholder.svg"
+              src={logoSrc}
               alt="ICECONNECT"
-              className="mx-auto mb-4 h-12 w-auto"
-              width={160}
+              className="mx-auto mb-4 h-12 w-auto object-contain"
+              width={200}
               height={48}
+              onError={() => setLogoSrc("/bgos-logo-placeholder.svg")}
             />
-            <h1 className="text-xl font-semibold tracking-tight text-gray-900">
+            <h1 className="text-center text-xl font-semibold tracking-tight text-gray-900">
               ICECONNECT
             </h1>
-            <p className="mt-1 text-sm text-gray-500">Access your work dashboard</p>
+            <p className="mt-1 text-center text-sm font-medium text-gray-600">
+              Access your work dashboard
+            </p>
+            <p className="mt-1 text-center text-xs text-gray-400">
+              Powered by BGOS • Secure • Intelligent
+            </p>
           </div>
 
           <form className="mt-8 space-y-4" onSubmit={onSubmit} noValidate>
             <div>
-              <label htmlFor="ice-mobile" className="sr-only">
-                Mobile number
+              <label htmlFor="ice-identifier" className="sr-only">
+                Mobile or email
               </label>
               <input
-                id="ice-mobile"
-                name="mobile"
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                placeholder="Enter mobile number"
-                value={mobile}
+                id="ice-identifier"
+                name="identifier"
+                type="text"
+                autoComplete="username"
+                placeholder="Mobile or email"
+                value={identifier}
                 onChange={(e) => {
-                  setMobile(e.target.value);
-                  setFieldErrors((p) => ({ ...p, mobile: undefined }));
+                  setIdentifier(e.target.value);
+                  setFieldErrors((p) => ({ ...p, identifier: undefined }));
                   setFormError(null);
                   setCredentialsMismatch(false);
                 }}
-                aria-invalid={mobileInvalid}
+                aria-invalid={identifierInvalid}
                 aria-busy={pending}
                 className={`${inputBase} ${
-                  mobileInvalid
+                  identifierInvalid
                     ? "border-red-400 focus:border-red-400 focus:ring-red-200"
-                    : "border-gray-300"
+                    : ""
                 }`}
               />
-              {fieldErrors.mobile?.trim() ? (
+              {fieldErrors.identifier?.trim() ? (
                 <p className="mt-1.5 text-sm text-red-600" role="alert">
-                  {fieldErrors.mobile}
+                  {fieldErrors.identifier}
                 </p>
               ) : null}
             </div>
@@ -195,7 +282,7 @@ function IceconnectLoginForm() {
                 name="password"
                 type="password"
                 autoComplete="current-password"
-                placeholder="Enter password"
+                placeholder="Password"
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
@@ -207,7 +294,7 @@ function IceconnectLoginForm() {
                 className={`${inputBase} ${
                   passwordInvalid
                     ? "border-red-400 focus:border-red-400 focus:ring-red-200"
-                    : "border-gray-300"
+                    : ""
                 }`}
               />
               {fieldErrors.password?.trim() ? (
@@ -223,40 +310,35 @@ function IceconnectLoginForm() {
               </p>
             ) : null}
 
-            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.99 }}>
-              <button
-                type="submit"
-                disabled={pending}
-                aria-busy={pending}
-                className="w-full rounded-lg bg-gradient-to-r from-red-500 to-yellow-400 py-3 text-center text-sm font-semibold text-white shadow-sm transition-shadow duration-200 hover:shadow-md disabled:pointer-events-none disabled:opacity-60"
-              >
-                {pending ? "Signing in…" : "Login"}
-              </button>
-            </motion.div>
+            <motion.button
+              type="submit"
+              disabled={pending}
+              aria-busy={pending}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.98 }}
+              transition={{ type: "spring", stiffness: 400, damping: 22 }}
+              className="w-full rounded-lg bg-gradient-to-r from-red-500 to-yellow-400 py-3 text-center font-semibold text-white shadow-md transition duration-300 hover:shadow-lg hover:brightness-110 disabled:pointer-events-none disabled:opacity-60"
+            >
+              {pending ? "Signing in…" : "Sign in"}
+            </motion.button>
           </form>
 
-          <div className="mt-5 text-center">
-            <Link
-              href="#"
-              className="text-sm text-gray-500 underline-offset-2 transition-colors hover:text-gray-800 hover:underline"
-              onClick={(e) => e.preventDefault()}
-            >
-              Forgot password?
-            </Link>
-          </div>
+          <p className="mt-4 text-center text-xs text-gray-500">
+            Use credentials provided by your company
+          </p>
 
-          <p className="mt-8 text-center text-xs text-gray-400">Powered by BGOS</p>
+          <p className="mt-6 text-center text-[11px] tracking-wide text-gray-400/90">
+            Powered by BGOS
+          </p>
         </div>
       </motion.div>
-
-      {/* Future: OTP toggle */}
     </div>
   );
 }
 
 function LoginFallback() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#F8FAFC] px-6">
+    <div className="flex min-h-screen items-center justify-center bg-[#F8FAFC] bg-gradient-to-br from-white via-[#F8FAFC] to-[#EEF2F7] px-6">
       <div
         className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-amber-400"
         aria-hidden

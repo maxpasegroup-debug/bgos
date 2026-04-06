@@ -95,7 +95,12 @@ export function BgosDashboardGrid({
         ))}
       </motion.section>
 
-      <DashboardControlsStrip isAdmin={isAdmin} />
+      <DashboardControlsStrip
+        isAdmin={isAdmin}
+        canCompanySettings={
+          sessionRole === UserRole.ADMIN || sessionRole === UserRole.MANAGER
+        }
+      />
 
       {/* 2 — NEXA priority + health */}
       <NexaPriorityPanel
@@ -143,7 +148,13 @@ export function BgosDashboardGrid({
   );
 }
 
-function DashboardControlsStrip({ isAdmin }: { isAdmin: boolean }) {
+function DashboardControlsStrip({
+  isAdmin,
+  canCompanySettings,
+}: {
+  isAdmin: boolean;
+  canCompanySettings: boolean;
+}) {
   return (
     <motion.section
       variants={fadeUp}
@@ -178,6 +189,14 @@ function DashboardControlsStrip({ isAdmin }: { isAdmin: boolean }) {
           >
             Nexa focus view
           </Link>
+          {canCompanySettings ? (
+            <Link
+              href="/bgos/settings"
+              className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/15 bg-white/[0.06] px-4 text-sm font-medium text-white/90 transition hover:border-[#FFC300]/40"
+            >
+              Company settings
+            </Link>
+          ) : null}
         </div>
         {!isAdmin ? (
           <p className="mt-3 text-xs text-white/40">

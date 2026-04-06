@@ -8,6 +8,11 @@ import { BGOS_ADD_BUSINESS_INTENT_KEY } from "@/lib/bgos-add-business-intent";
 const step1Schema = z.object({
   name: z.string().trim().min(1, "Business name is required").max(200, "Name is too long"),
   industry: z.literal("SOLAR"),
+  logoUrl: z.string().max(2048).optional(),
+  companyEmail: z.union([z.literal(""), z.string().email("Enter a valid email")]).optional(),
+  companyPhone: z.string().max(40).optional(),
+  billingAddress: z.string().max(4000).optional(),
+  gstNumber: z.string().max(32).optional(),
 });
 
 type MeUser = {
@@ -22,6 +27,11 @@ export default function OnboardingPage() {
   const [step, setStep] = useState<1 | 2>(1);
   const [name, setName] = useState("");
   const [industry, setIndustry] = useState<"SOLAR">("SOLAR");
+  const [logoUrl, setLogoUrl] = useState("");
+  const [companyEmail, setCompanyEmail] = useState("");
+  const [companyPhone, setCompanyPhone] = useState("");
+  const [billingAddress, setBillingAddress] = useState("");
+  const [gstNumber, setGstNumber] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [probing, setProbing] = useState(true);
@@ -75,6 +85,11 @@ export default function OnboardingPage() {
       setStep(1);
       setName("");
       setIndustry("SOLAR");
+      setLogoUrl("");
+      setCompanyEmail("");
+      setCompanyPhone("");
+      setBillingAddress("");
+      setGstNumber("");
       return true;
     }
     if (typeof window !== "undefined") {
@@ -103,7 +118,15 @@ export default function OnboardingPage() {
   async function onSubmitStep1(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const fields = step1Schema.safeParse({ name, industry });
+    const fields = step1Schema.safeParse({
+      name,
+      industry,
+      logoUrl: logoUrl.trim() || undefined,
+      companyEmail: companyEmail.trim() || undefined,
+      companyPhone: companyPhone.trim() || undefined,
+      billingAddress: billingAddress.trim() || undefined,
+      gstNumber: gstNumber.trim() || undefined,
+    });
     if (!fields.success) {
       const fe = fields.error.flatten().fieldErrors;
       setError(fe.name?.[0] ?? fe.industry?.[0] ?? "Check the form.");
@@ -119,6 +142,19 @@ export default function OnboardingPage() {
         body: JSON.stringify({
           name: fields.data.name,
           industry: fields.data.industry,
+          ...(fields.data.logoUrl?.trim() ? { logoUrl: fields.data.logoUrl.trim() } : {}),
+          ...(fields.data.companyEmail?.trim()
+            ? { companyEmail: fields.data.companyEmail.trim() }
+            : {}),
+          ...(fields.data.companyPhone?.trim()
+            ? { companyPhone: fields.data.companyPhone.trim() }
+            : {}),
+          ...(fields.data.billingAddress?.trim()
+            ? { billingAddress: fields.data.billingAddress.trim() }
+            : {}),
+          ...(fields.data.gstNumber?.trim()
+            ? { gstNumber: fields.data.gstNumber.trim() }
+            : {}),
         }),
       });
       const data = (await res.json()) as {
@@ -276,9 +312,9 @@ export default function OnboardingPage() {
       <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-8 shadow-xl backdrop-blur">
         <h1 className="text-center text-xl font-semibold tracking-tight">Set up your business</h1>
         <p className="mt-1 text-center text-sm text-white/60">
-          Tell NEXA your business name and category to create your workspace.
+          Business name, solar category, and optional logo &amp; legal details for documents.
         </p>
-        <form className="mt-8 space-y-4" onSubmit={onSubmitStep1} noValidate>
+        <form className="mt-8 max-h-[70vh] space-y-4 overflow-y-auto pr-1" onSubmit={onSubmitStep1} noValidate>
           <div>
             <label htmlFor="business-name" className="block text-xs font-medium text-white/70">
               Business name
@@ -306,6 +342,77 @@ export default function OnboardingPage() {
             >
               <option value="SOLAR">Solar</option>
             </select>
+          </div>
+          <div>
+            <label htmlFor="logo-url" className="block text-xs font-medium text-white/70">
+              Company logo URL <span className="text-white/40">(optional)</span>
+            </label>
+            <input
+              id="logo-url"
+              name="logoUrl"
+              type="text"
+              inputMode="url"
+              placeholder="https://… or /path-in-public"
+              value={logoUrl}
+              onChange={(e) => setLogoUrl(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none ring-cyan-500/40 focus:ring-2"
+            />
+            <p className="mt-1 text-[11px] text-white/40">
+              Use HTTPS or a path like <code className="text-white/60">/logo.jpg</code>. File upload can be added
+              to storage later.
+            </p>
+          </div>
+          <div>
+            <label htmlFor="co-email" className="block text-xs font-medium text-white/70">
+              Company email <span className="text-white/40">(optional)</span>
+            </label>
+            <input
+              id="co-email"
+              name="companyEmail"
+              type="email"
+              autoComplete="email"
+              value={companyEmail}
+              onChange={(e) => setCompanyEmail(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none ring-cyan-500/40 focus:ring-2"
+            />
+          </div>
+          <div>
+            <label htmlFor="co-phone" className="block text-xs font-medium text-white/70">
+              Company phone <span className="text-white/40">(optional)</span>
+            </label>
+            <input
+              id="co-phone"
+              name="companyPhone"
+              type="tel"
+              value={companyPhone}
+              onChange={(e) => setCompanyPhone(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none ring-cyan-500/40 focus:ring-2"
+            />
+          </div>
+          <div>
+            <label htmlFor="address" className="block text-xs font-medium text-white/70">
+              Address <span className="text-white/40">(optional)</span>
+            </label>
+            <textarea
+              id="address"
+              name="billingAddress"
+              rows={3}
+              value={billingAddress}
+              onChange={(e) => setBillingAddress(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none ring-cyan-500/40 focus:ring-2"
+            />
+          </div>
+          <div>
+            <label htmlFor="gst" className="block text-xs font-medium text-white/70">
+              GST number <span className="text-white/40">(optional)</span>
+            </label>
+            <input
+              id="gst"
+              name="gstNumber"
+              value={gstNumber}
+              onChange={(e) => setGstNumber(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none ring-cyan-500/40 focus:ring-2"
+            />
           </div>
           {error ? (
             <p className="text-center text-sm text-red-400" role="alert">

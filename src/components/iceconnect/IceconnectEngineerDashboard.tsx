@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCompanyBranding } from "@/contexts/company-branding-context";
 import { IceconnectWorkspaceView } from "./IceconnectWorkspaceView";
 import { IcPanel } from "./IcPanel";
 
@@ -12,11 +14,16 @@ type Visit = {
 };
 
 export function IceconnectEngineerDashboard() {
+  const { company } = useCompanyBranding();
   const [visits, setVisits] = useState<Visit[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
+
+  const submitStyle = {
+    background: "linear-gradient(90deg, var(--ice-primary), var(--ice-secondary))",
+  } as CSSProperties;
 
   const load = useCallback(async () => {
     setErr(null);
@@ -69,6 +76,24 @@ export function IceconnectEngineerDashboard() {
     }
   }
 
+  const cn = company?.name?.trim() ?? "your company";
+  const hero = (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+      className="rounded-2xl border border-gray-200/90 bg-white/85 p-5 shadow-sm backdrop-blur-md"
+    >
+      <p className="text-xs font-medium uppercase tracking-wider text-[color:var(--ice-primary)]">
+        Engineer · {cn}
+      </p>
+      <h2 className="mt-1 text-lg font-semibold text-gray-900">Site visits & reports</h2>
+      <p className="mt-1 text-sm text-gray-500">
+        Field visits, measurements, and documentation for installations — tailored to your role.
+      </p>
+    </motion.div>
+  );
+
   return (
     <IceconnectWorkspaceView
       title="Site visits"
@@ -76,19 +101,36 @@ export function IceconnectEngineerDashboard() {
       loading={loading}
       error={err}
       onRetry={() => void load()}
+      hero={hero}
     >
+      <div className="grid gap-3 sm:grid-cols-2">
+        <IcPanel title="Today’s focus">
+          <p className="text-sm text-gray-600">
+            Complete surveys for assigned visits and sync reports so sales can move deals forward.
+          </p>
+        </IcPanel>
+        <IcPanel title="Checklist">
+          <ul className="list-inside list-disc space-y-1 text-sm text-gray-600">
+            <li>Verify roof/site conditions</li>
+            <li>Capture customer sign-off where required</li>
+            <li>Upload report before leaving site</li>
+          </ul>
+        </IcPanel>
+      </div>
+
       <IcPanel title="Assigned visits">
         {visits.length === 0 ? (
-          <p className="text-sm text-white/45">No site visits assigned.</p>
+          <p className="text-sm text-gray-500">No site visits assigned.</p>
         ) : (
           <ul className="space-y-6">
             {visits.map((v) => (
-              <li key={v.id} className="rounded-lg border border-white/10 bg-black/20 p-4">
-                <p className="font-medium text-white">{v.name}</p>
-                <p className="text-xs text-white/45">{v.phone}</p>
+              <li key={v.id} className="rounded-lg border border-gray-200 bg-white/90 p-4 shadow-sm">
+                <p className="font-medium text-gray-900">{v.name}</p>
+                <p className="text-xs text-gray-500">{v.phone}</p>
                 {v.siteReport ? (
-                  <p className="mt-2 text-sm text-white/70">
-                    <span className="text-white/40">Saved report:</span> {v.siteReport.slice(0, 200)}
+                  <p className="mt-2 text-sm text-gray-600">
+                    <span className="font-medium text-gray-400">Saved report:</span>{" "}
+                    {v.siteReport.slice(0, 200)}
                     {v.siteReport.length > 200 ? "…" : ""}
                   </p>
                 ) : null}
@@ -97,13 +139,14 @@ export function IceconnectEngineerDashboard() {
                   onChange={(e) => setDrafts((d) => ({ ...d, [v.id]: e.target.value }))}
                   placeholder="Site survey notes, measurements, photos summary…"
                   rows={4}
-                  className="mt-3 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/30 outline-none focus:border-cyan-500/40"
+                  className="mt-3 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition focus:border-[color:var(--ice-primary)] focus:ring-2 focus:ring-[color:var(--ice-primary)]"
                 />
                 <button
                   type="button"
                   disabled={busy === v.id || !(drafts[v.id]?.trim())}
                   onClick={() => void submitReport(v.id)}
-                  className="mt-2 rounded-lg bg-cyan-500/90 px-4 py-2 text-sm font-medium text-black hover:bg-cyan-400 disabled:opacity-50"
+                  className="mt-2 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:shadow-lg disabled:opacity-50"
+                  style={submitStyle}
                 >
                   Upload report
                 </button>

@@ -12,14 +12,12 @@ export default async function Home() {
   if (tenant === "bgos") {
     const jar = await cookies();
     const token = jar.get(AUTH_COOKIE_NAME)?.value?.trim();
-    if (!token) {
-      redirect("/login");
+    if (token) {
+      const verified = verifyAccessTokenResult(token);
+      if (verified.ok) {
+        redirect("/bgos");
+      }
     }
-    const verified = verifyAccessTokenResult(token);
-    if (!verified.ok) {
-      redirect("/login");
-    }
-    redirect("/bgos");
   }
 
   return <Landing />;

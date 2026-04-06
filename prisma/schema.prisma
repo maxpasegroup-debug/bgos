@@ -68,6 +68,17 @@ model Company {
   ownerId    String
   createdAt  DateTime        @default(now())
 
+  logoUrl         String?
+  primaryColor    String?
+  secondaryColor  String?
+
+  /** Public / document-facing profile (quotations, invoices, PDFs). */
+  companyEmail    String?
+  companyPhone    String?
+  billingAddress  String? @db.Text
+  gstNumber       String?
+  bankDetails     String? @db.Text
+
   businessTemplate String?
   dashboardConfig  Json?
 

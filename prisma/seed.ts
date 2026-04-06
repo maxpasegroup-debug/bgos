@@ -43,6 +43,9 @@ async function main() {
       plan: CompanyPlan.PRO,
       ownerId: boss.id,
       industry: CompanyIndustry.SOLAR,
+      logoUrl: "/bgos-logo-placeholder.svg",
+      primaryColor: "#DC2626",
+      secondaryColor: "#EAB308",
     },
   });
 

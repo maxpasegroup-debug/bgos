@@ -11,18 +11,7 @@ export async function GET(request: NextRequest) {
 
   const rows = await prisma.userCompany.findMany({
     where: { userId: session.sub },
-    include: {
-      company: {
-        select: {
-          id: true,
-          name: true,
-          industry: true,
-          plan: true,
-          ownerId: true,
-          createdAt: true,
-        },
-      },
-    },
+    include: { company: true },
     orderBy: { createdAt: "asc" },
   });
 
@@ -38,6 +27,13 @@ export async function GET(request: NextRequest) {
       jobRole: r.jobRole,
       joinedAt: r.createdAt.toISOString(),
       createdAt: r.company.createdAt.toISOString(),
+      logoUrl: r.company.logoUrl,
+      primaryColor: r.company.primaryColor,
+      secondaryColor: r.company.secondaryColor,
+      companyEmail: (r.company as { companyEmail?: string | null }).companyEmail ?? null,
+      companyPhone: (r.company as { companyPhone?: string | null }).companyPhone ?? null,
+      gstNumber: (r.company as { gstNumber?: string | null }).gstNumber ?? null,
     })),
   });
 }
+

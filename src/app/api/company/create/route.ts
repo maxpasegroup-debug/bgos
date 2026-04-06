@@ -11,6 +11,7 @@ import { loadMembershipsForJwt } from "@/lib/memberships-for-jwt";
 import { prisma } from "@/lib/prisma";
 import { setActiveCompanyCookie, setSessionCookie } from "@/lib/session-cookie";
 import { signAccessToken } from "@/lib/jwt";
+import { normalizeLogoUrl } from "@/lib/company-profile";
 import { companyMembershipClass } from "@/lib/user-company";
 
 const bodySchema = z.object({
@@ -20,6 +21,14 @@ const bodySchema = z.object({
     .min(1, "Company name is required")
     .max(200, "Company name is too long"),
   industry: z.nativeEnum(CompanyIndustry),
+  logoUrl: z.string().max(2048).optional(),
+  primaryColor: z.string().max(32).optional(),
+  secondaryColor: z.string().max(32).optional(),
+  companyEmail: z.union([z.literal(""), z.string().email().max(200)]).optional(),
+  companyPhone: z.string().max(40).optional(),
+  billingAddress: z.string().max(4000).optional(),
+  gstNumber: z.string().max(32).optional(),
+  bankDetails: z.string().max(4000).optional(),
 });
 
 function jwtHasCompanyContext(
@@ -90,7 +99,34 @@ export async function POST(request: NextRequest) {
     return zodValidationErrorResponse(parsed.error);
   }
 
-  const { name, industry } = parsed.data;
+  const {
+    name,
+    industry,
+    logoUrl: logoIn,
+    primaryColor,
+    secondaryColor,
+    companyEmail,
+    companyPhone,
+    billingAddress,
+    gstNumber,
+    bankDetails,
+  } = parsed.data;
+
+  let logoUrl: string | null = null;
+  if (logoIn != null && logoIn.trim() !== "") {
+    try {
+      logoUrl = normalizeLogoUrl(logoIn);
+    } catch {
+      return NextResponse.json(
+        {
+          ok: false as const,
+          error: "Logo must be an https URL or a path starting with /",
+          code: "VALIDATION_ERROR" as const,
+        },
+        { status: 400 },
+      );
+    }
+  }
 
   const addingAnotherBusiness = jwtHasCompanyContext(jwtOnly);
 
@@ -135,12 +171,21 @@ export async function POST(request: NextRequest) {
   try {
     const row = await prisma.$transaction(async (tx) => {
       const co = await tx.company.create({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         data: {
           name,
           industry,
           plan: CompanyPlan.BASIC,
           ownerId: session.sub,
-        },
+          ...(logoUrl != null ? { logoUrl } : {}),
+          ...(primaryColor?.trim() ? { primaryColor: primaryColor.trim() } : {}),
+          ...(secondaryColor?.trim() ? { secondaryColor: secondaryColor.trim() } : {}),
+          ...(companyEmail?.trim() ? { companyEmail: companyEmail.trim() } : {}),
+          ...(companyPhone?.trim() ? { companyPhone: companyPhone.trim() } : {}),
+          ...(billingAddress?.trim() ? { billingAddress: billingAddress.trim() } : {}),
+          ...(gstNumber?.trim() ? { gstNumber: gstNumber.trim().toUpperCase() } : {}),
+          ...(bankDetails?.trim() ? { bankDetails: bankDetails.trim() } : {}),
+        } as any,
       });
       await tx.userCompany.create({
         data: {

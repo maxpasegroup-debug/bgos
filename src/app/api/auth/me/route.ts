@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { ACTIVE_COMPANY_COOKIE_NAME, AUTH_COOKIE_NAME } from "@/lib/auth-config";
 import { getMeSessionFromToken } from "@/lib/auth";
 import { isPlanLockedToBasic } from "@/lib/plan-production-lock";
+import { prisma } from "@/lib/prisma";
 
 /**
  * Current session (cookie JWT). No cookie → `authenticated: false` (200).
@@ -40,13 +41,18 @@ export async function GET() {
         },
         { status: 401 },
       );
-    case "valid":
+    case "valid": {
+      const u = await prisma.user.findUnique({
+        where: { id: session.user.sub },
+        select: { name: true },
+      });
       return NextResponse.json({
         ok: true as const,
         authenticated: true as const,
         planLockedToBasic: isPlanLockedToBasic(),
         user: {
           id: session.user.sub,
+          name: u?.name ?? "",
           email: session.user.email,
           role: session.user.role,
           companyId: session.user.companyId,
@@ -59,5 +65,6 @@ export async function GET() {
           memberships: session.user.memberships ?? null,
         },
       });
+    }
   }
 }
