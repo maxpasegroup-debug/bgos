@@ -2,6 +2,7 @@ import "server-only";
 
 import { CompanyPlan, LeadStatus, TaskStatus } from "@prisma/client";
 import { forwardLeadStatuses, leadStatusLabel } from "@/lib/lead-pipeline";
+import { isPlanLockedToBasic } from "@/lib/plan-production-lock";
 import { prisma } from "@/lib/prisma";
 
 export type SalesBoosterBasicPayload = {
@@ -107,6 +108,14 @@ export async function buildSalesBoosterPayload(
     };
   }
 
+  if (isPlanLockedToBasic()) {
+    return {
+      plan: "BASIC",
+      featuresUnlocked: false,
+      companyName: company.name,
+    };
+  }
+
   const entitled =
     sessionCompanyPlan === CompanyPlan.PRO && company.plan === CompanyPlan.PRO;
 
@@ -200,7 +209,8 @@ export async function buildSalesBoosterPayload(
     where: {
       status: TaskStatus.PENDING,
       dueDate: { lte: new Date(now + 24 * 60 * 60 * 1000) },
-      lead: { companyId },
+      companyId,
+      leadId: { not: null },
     },
     take: 8,
     include: { lead: true },

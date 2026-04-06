@@ -18,7 +18,13 @@ export function Header() {
           className="flex min-w-0 items-center gap-2.5 transition-opacity duration-300 hover:opacity-90 sm:gap-3"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.jpg" alt="BGOS" className="h-10 w-auto shrink-0" width={160} height={40} />
+          <img
+            src="/bgos-logo-placeholder.svg"
+            alt="BGOS"
+            className="h-10 w-auto shrink-0"
+            width={160}
+            height={40}
+          />
           <div className="min-w-0 text-left">
             <span className="block text-sm font-bold tracking-tight text-slate-900">
               BGOS

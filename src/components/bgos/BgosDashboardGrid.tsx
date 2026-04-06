@@ -5,8 +5,9 @@ import { motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { DashboardSurface } from "@/components/dashboard/DashboardSurface";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { BgosAddEmployeeForm } from "./BgosAddEmployeeForm";
+import { BgosLeadsAssignmentPanel } from "./BgosLeadsAssignmentPanel";
+import { BgosPipelineBoard } from "./BgosPipelineBoard";
 import { useBgosDashboardContext } from "./BgosDataProvider";
 import { BgosShineButton } from "./BgosShineButton";
 import { SalesBoosterModule } from "./SalesBoosterModule";
@@ -18,7 +19,7 @@ import type {
   NexaSnapshot,
   TeamMemberPerformance,
 } from "@/types";
-import type { DashboardPayload, PipelineRow } from "./useBgosData";
+import type { DashboardPayload } from "./useBgosData";
 
 const METRIC_LABELS = [
   "Total leads",
@@ -37,15 +38,12 @@ function formatInr(n: number) {
 
 export function BgosDashboardGrid({
   dashboard,
-  pipeline,
   metricsUnavailable,
 }: {
   dashboard: DashboardPayload | null;
-  pipeline: PipelineRow[] | null;
   metricsUnavailable: boolean;
 }) {
-  const { sessionRole } = useBgosDashboardContext();
-  const reduceMotion = useReducedMotion();
+  const { sessionRole, planLockedToBasic } = useBgosDashboardContext();
   const isAdmin = sessionRole === UserRole.ADMIN;
 
   const metrics = useMemo(() => {
@@ -106,14 +104,19 @@ export function BgosDashboardGrid({
       />
       <BusinessHealthPanel health={dashboard?.health} />
 
-      {/* 3 — Pipeline */}
-      <PipelinePanel pipeline={pipeline} reduceMotion={!!reduceMotion} />
+      {/* 3 — Pipeline Kanban */}
+      <BgosPipelineBoard />
 
-      {/* 4 — Sales booster */}
-      <SalesBoosterModule
-        salesBooster={dashboard?.salesBooster}
-        hasDashboard={dashboard !== null}
-      />
+      {/* 3b — Leads list + admin assignment */}
+      <BgosLeadsAssignmentPanel isAdmin={isAdmin} />
+
+      {/* 4 — Sales booster (hidden when deployment locks plan to BASIC) */}
+      {!planLockedToBasic ? (
+        <SalesBoosterModule
+          salesBooster={dashboard?.salesBooster}
+          hasDashboard={dashboard !== null}
+        />
+      ) : null}
 
       {/* 5 — Operations */}
       <OperationsPanel operations={dashboard?.operations} />
@@ -392,87 +395,6 @@ function BusinessHealthPanel({ health }: { health: DashboardHealth | undefined }
               </div>
             </div>
           ))}
-        </div>
-      </DashboardSurface>
-    </motion.section>
-  );
-}
-
-function PipelinePanel({
-  pipeline,
-  reduceMotion,
-}: {
-  pipeline: PipelineRow[] | null;
-  reduceMotion: boolean;
-}) {
-  const stages = pipeline ?? [];
-  const pipelineTotal = useMemo(
-    () => stages.reduce((acc, s) => acc + s.count, 0),
-    [stages],
-  );
-
-  return (
-    <motion.section
-      id="sales"
-      variants={fadeUp}
-      className="col-span-full"
-      style={{ scrollMarginTop: "5.5rem" }}
-    >
-      <DashboardSurface tilt={false} className="p-5 sm:p-6">
-        <h2 className="text-sm font-semibold text-white sm:text-base">
-          Sales pipeline
-        </h2>
-        {pipelineTotal === 0 && stages.length > 0 ? (
-          <div className="mt-4">
-            <EmptyState
-              title="No leads in the pipeline yet"
-              description="Add leads from your CRM or ICECONNECT so stages populate here."
-            />
-          </div>
-        ) : null}
-        <div className="relative mb-3 mt-4 hidden h-1 w-full overflow-hidden rounded-full bg-white/[0.07] md:block">
-          <motion.div
-            className="absolute inset-y-0 w-[28%] rounded-full bg-gradient-to-r from-transparent via-[#FFC300]/60 to-transparent"
-            animate={reduceMotion ? undefined : { x: ["-100%", "320%"] }}
-            transition={{
-              duration: 3.5,
-              repeat: Infinity,
-              ease: "linear",
-            }}
-          />
-        </div>
-        <div className="relative flex min-w-0 items-stretch gap-0 overflow-x-auto pb-2 pt-1 [scrollbar-width:thin]">
-          {stages.length === 0
-            ? [0, 1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="flex shrink-0 items-stretch">
-                  <div className="flex w-[5.5rem] flex-col gap-2 rounded-lg border border-white/10 bg-white/[0.04] p-3 sm:w-24">
-                    <div className="h-6 w-8 animate-pulse rounded bg-white/10" />
-                    <div className="h-3 w-full animate-pulse rounded bg-white/10" />
-                  </div>
-                  {i < 6 ? (
-                    <div className="flex w-5 shrink-0 items-center sm:w-6">
-                      <div className="h-px w-full bg-white/15" />
-                    </div>
-                  ) : null}
-                </div>
-              ))
-            : stages.map((s, i) => (
-                <div key={s.stage} className="flex shrink-0 items-stretch">
-                  <DashboardSurface className="flex w-[5.5rem] flex-col p-3 sm:w-[5.75rem]">
-                    <p className="text-xl font-semibold tabular-nums text-white sm:text-2xl">
-                      {s.count}
-                    </p>
-                    <p className="mt-1.5 text-[9px] font-medium uppercase leading-tight tracking-wide text-white/45">
-                      {s.stage}
-                    </p>
-                  </DashboardSurface>
-                  {i < stages.length - 1 ? (
-                    <div className="relative flex w-5 shrink-0 items-center self-center sm:w-6">
-                      <div className="h-px w-full rounded-full bg-white/18" />
-                    </div>
-                  ) : null}
-                </div>
-              ))}
         </div>
       </DashboardSurface>
     </motion.section>

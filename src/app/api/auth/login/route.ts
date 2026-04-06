@@ -4,6 +4,7 @@ import { z } from "zod";
 import { parseJsonBody, zodValidationErrorResponse } from "@/lib/api-response";
 import { handleApiError } from "@/lib/route-error";
 import { AUTH_ERROR_CODES } from "@/lib/auth-api";
+import { checkLoginRateLimit, getClientIpForRateLimit } from "@/lib/login-rate-limit";
 import { mobileLookupVariants } from "@/lib/mobile-login";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
@@ -43,6 +44,22 @@ const bodySchema = z
   });
 
 export async function POST(request: Request) {
+  const ip = getClientIpForRateLimit(request);
+  const limited = checkLoginRateLimit(ip);
+  if (!limited.ok) {
+    return NextResponse.json(
+      {
+        ok: false as const,
+        error: "Too many login attempts. Please wait and try again.",
+        code: "RATE_LIMITED" as const,
+      },
+      {
+        status: 429,
+        headers: { "Retry-After": String(limited.retryAfterSec) },
+      },
+    );
+  }
+
   const raw = await parseJsonBody(request);
   if (!raw.ok) return raw.response;
 

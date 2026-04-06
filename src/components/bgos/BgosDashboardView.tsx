@@ -17,7 +17,7 @@ const routeToSection: Record<string, string> = {
 };
 
 export function BgosDashboardView({ section }: { section?: string }) {
-  const { dashboard, pipeline, error, refetch, isLoading } = useBgosDashboardContext();
+  const { dashboard, error, refetch, isLoading } = useBgosDashboardContext();
   const scrollKey = section ? routeToSection[section] ?? section : undefined;
 
   useEffect(() => {
@@ -57,7 +57,6 @@ export function BgosDashboardView({ section }: { section?: string }) {
   return (
     <BgosDashboardGrid
       dashboard={dashboard}
-      pipeline={pipeline}
       metricsUnavailable={error !== null && dashboard === null}
     />
   );

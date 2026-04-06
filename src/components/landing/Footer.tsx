@@ -25,7 +25,7 @@ export function Footer() {
           <div className="flex flex-col items-center gap-3 text-center sm:items-start sm:text-left">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/logo.jpg"
+              src="/bgos-logo-placeholder.svg"
               alt="BGOS"
               className="h-8 w-auto opacity-95 sm:h-9"
               width={140}

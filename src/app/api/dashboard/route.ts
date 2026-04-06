@@ -9,6 +9,7 @@ import { getPipelineStages } from "@/lib/dashboard-pipeline";
 import { generateInsights } from "@/lib/nexa-insights";
 import { prisma } from "@/lib/prisma";
 import { buildSalesBoosterPayload } from "@/lib/sales-booster";
+import { ensurePendingTasksForOpenLeads } from "@/lib/task-engine";
 
 export async function GET(request: NextRequest) {
   const user = requireAuth(request);
@@ -26,6 +27,7 @@ export async function GET(request: NextRequest) {
   let salesBooster: Awaited<ReturnType<typeof buildSalesBoosterPayload>>;
 
   try {
+    await ensurePendingTasksForOpenLeads(companyId, user.sub);
     snapshot = await buildBgosDashboardSnapshot(companyId);
     [leads, revenue, installations, pendingPayments, insights, pipeline, salesBooster] =
       await Promise.all([

@@ -1,10 +1,13 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import { useState } from "react";
+import { BgosAddLeadModal } from "./BgosAddLeadModal";
 import { BGOS_MAIN_PAD } from "./layoutTokens";
 
 export function BgosHeader() {
   const reduceMotion = useReducedMotion();
+  const [addLeadOpen, setAddLeadOpen] = useState(false);
 
   return (
     <motion.header
@@ -23,6 +26,23 @@ export function BgosHeader() {
           Command Center
         </h1>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <motion.button
+            type="button"
+            onClick={() => setAddLeadOpen(true)}
+            whileHover={
+              reduceMotion
+                ? undefined
+                : {
+                    backgroundColor: "rgba(255, 195, 0, 0.12)",
+                    boxShadow: "0 0 20px rgba(255, 195, 0, 0.15)",
+                  }
+            }
+            whileTap={reduceMotion ? undefined : { scale: 0.98 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            className="inline-flex min-h-9 shrink-0 items-center rounded-lg border border-[#FFC300]/40 bg-[#FFC300]/10 px-2.5 text-xs font-semibold text-[#FFC300] sm:px-3"
+          >
+            Add Lead
+          </motion.button>
           <motion.button
             type="button"
             whileHover={
@@ -63,6 +83,7 @@ export function BgosHeader() {
           </div>
         </div>
       </div>
+      <BgosAddLeadModal open={addLeadOpen} onClose={() => setAddLeadOpen(false)} />
     </motion.header>
   );
 }

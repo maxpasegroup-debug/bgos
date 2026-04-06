@@ -15,6 +15,7 @@ import {
   companyPlanFromJwtClaim,
 } from "./auth-config";
 import { verifyAccessTokenResult } from "./jwt";
+import { isPlanLockedToBasic } from "./plan-production-lock";
 
 export type AuthUser = AccessTokenPayload;
 
@@ -45,7 +46,11 @@ function payloadToUser(decoded: Record<string, unknown>): AuthUser | null {
   if (typeof role !== "string" || !role) return null;
   if (typeof companyId !== "string" || !companyId) return null;
   const planLit = companyPlanFromJwtClaim(decoded.companyPlan);
-  const companyPlan = planLit === "PRO" ? CompanyPlan.PRO : CompanyPlan.BASIC;
+  const companyPlan = isPlanLockedToBasic()
+    ? CompanyPlan.BASIC
+    : planLit === "PRO"
+      ? CompanyPlan.PRO
+      : CompanyPlan.BASIC;
   return { sub, email, role: role as UserRole, companyId, companyPlan };
 }
 
@@ -94,8 +99,11 @@ export async function getAuthUserFromHeaders(): Promise<AuthUser | null> {
   const companyId = h.get(AUTH_HEADER_COMPANY_ID);
   const planHeader = h.get(AUTH_HEADER_COMPANY_PLAN);
   if (!sub || !email || !role || !companyId) return null;
-  const companyPlan =
-    planHeader === "PRO" ? CompanyPlan.PRO : CompanyPlan.BASIC;
+  const companyPlan = isPlanLockedToBasic()
+    ? CompanyPlan.BASIC
+    : planHeader === "PRO"
+      ? CompanyPlan.PRO
+      : CompanyPlan.BASIC;
   return { sub, email, role: role as UserRole, companyId, companyPlan };
 }
 

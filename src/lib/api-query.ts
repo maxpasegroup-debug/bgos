@@ -17,6 +17,8 @@ export const tasksListQuerySchema = z
     leadId: z.preprocess(emptyToUndef, z.string().min(1).max(128).optional()),
     assignedTo: z.preprocess(emptyToUndef, z.string().min(1).max(128).optional()),
     overdue: z.preprocess(emptyToUndef, z.enum(["1", "true", "0", "false"]).optional()),
+    /** `priority` (default): higher priority first, then due date. `due`: due date ascending. `created`: newest first. */
+    sort: z.preprocess(emptyToUndef, z.enum(["priority", "due", "created"]).optional()),
     limit: z.coerce.number().int().min(1).max(100).catch(50),
     offset: z.coerce.number().int().min(0).max(500_000).catch(0),
   })

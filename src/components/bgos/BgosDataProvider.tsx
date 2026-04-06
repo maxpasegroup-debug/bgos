@@ -2,40 +2,57 @@
 
 import type { ReactNode } from "react";
 import { createContext, useContext, useMemo } from "react";
-import {
-  type DashboardPayload,
-  type PipelineRow,
-  useBgosData,
-} from "./useBgosData";
+import { type DashboardPayload, useBgosData } from "./useBgosData";
 
 import type { CompanyPlan, UserRole } from "@prisma/client";
 
 type Ctx = {
   dashboard: DashboardPayload | null;
-  pipeline: PipelineRow[] | null;
   error: string | null;
   companyPlan: CompanyPlan | null;
+  /** When true, Sales Booster and Pro upgrade prompts are hidden (deployment lock). */
+  planLockedToBasic: boolean;
   sessionRole: UserRole | null;
   refetch: () => void;
   isLoading: boolean;
+  /** Increments when dashboard data successfully reloads — use to sync child fetches. */
+  syncGeneration: number;
 };
 
 const BgosDataContext = createContext<Ctx | null>(null);
 
 export function BgosDataProvider({ children }: { children: ReactNode }) {
-  const { dashboard, pipeline, error, companyPlan, sessionRole, refetch, isLoading } =
-    useBgosData();
+  const {
+    dashboard,
+    error,
+    companyPlan,
+    planLockedToBasic,
+    sessionRole,
+    refetch,
+    isLoading,
+    syncGeneration,
+  } = useBgosData();
   const value = useMemo(
     () => ({
       dashboard,
-      pipeline,
       error,
       companyPlan,
+      planLockedToBasic,
       sessionRole,
       refetch,
       isLoading,
+      syncGeneration,
     }),
-    [dashboard, pipeline, error, companyPlan, sessionRole, refetch, isLoading],
+    [
+      dashboard,
+      error,
+      companyPlan,
+      planLockedToBasic,
+      sessionRole,
+      refetch,
+      isLoading,
+      syncGeneration,
+    ],
   );
   return (
     <BgosDataContext.Provider value={value}>{children}</BgosDataContext.Provider>

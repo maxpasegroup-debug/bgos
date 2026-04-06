@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { AUTH_COOKIE_NAME } from "@/lib/auth-config";
 import { getMeSessionFromToken } from "@/lib/auth";
+import { isPlanLockedToBasic } from "@/lib/plan-production-lock";
 
 /**
  * Current session (cookie JWT). No cookie → `authenticated: false` (200).
@@ -41,6 +42,7 @@ export async function GET() {
       return NextResponse.json({
         ok: true as const,
         authenticated: true as const,
+        planLockedToBasic: isPlanLockedToBasic(),
         user: {
           id: session.user.sub,
           email: session.user.email,

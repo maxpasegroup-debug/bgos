@@ -3,6 +3,7 @@ import "server-only";
 import { CompanyPlan } from "@prisma/client";
 import { NextResponse } from "next/server";
 import type { AuthUser } from "./auth";
+import { isPlanLockedToBasic } from "./plan-production-lock";
 import { prisma } from "./prisma";
 
 export function userHasProPlan(user: AuthUser): boolean {
@@ -31,6 +32,7 @@ export function requireProPlan(user: AuthUser): NextResponse | null {
  * even if the session token has not been refreshed yet.
  */
 export async function requireLiveProPlan(user: AuthUser): Promise<NextResponse | null> {
+  if (isPlanLockedToBasic()) return proPlanRequiredResponse();
   const jwt = requireProPlan(user);
   if (jwt) return jwt;
   const row = await prisma.company.findUnique({

@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { prismaKnownErrorResponse } from "@/lib/api-response";
 import { handleApiError } from "@/lib/route-error";
 import { requireIceconnectRole } from "@/lib/iceconnect-route-guard";
-import { assigneeFilter, isIceconnectPrivileged } from "@/lib/iceconnect-scope";
+import { isIceconnectPrivileged } from "@/lib/iceconnect-scope";
 import { serializeLead } from "@/lib/lead-serialize";
 import { prisma } from "@/lib/prisma";
 import { serializeTask } from "@/lib/task-serialize";
@@ -19,14 +19,15 @@ export async function GET(request: NextRequest) {
   if (session instanceof NextResponse) return session;
 
   const companyId = session.companyId;
+  /** Sales dashboard: only leads assigned to the current user (no company-wide list here). */
   const leadWhere = {
     companyId,
-    ...assigneeFilter(session),
+    assignedTo: session.sub,
   };
 
   const taskWhere = isIceconnectPrivileged(session.role)
-    ? { lead: { companyId } }
-    : { userId: session.sub, lead: { companyId } };
+    ? { companyId }
+    : { companyId, userId: session.sub };
 
   const now = new Date();
 
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
       }),
       prisma.task.findMany({
         where: taskWhere,
-        orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+        orderBy: [{ priority: "desc" }, { dueDate: "asc" }, { createdAt: "desc" }],
         take: 80,
         include,
       }),

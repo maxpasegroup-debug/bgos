@@ -32,7 +32,7 @@ export async function PATCH(request: NextRequest) {
     const existing = await prisma.task.findFirst({
       where: {
         id: taskId,
-        lead: { companyId: session.companyId },
+        companyId: session.companyId,
       },
       include,
     });

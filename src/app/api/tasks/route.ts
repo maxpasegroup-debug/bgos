@@ -1,4 +1,4 @@
-import { TaskStatus } from "@prisma/client";
+import { TaskStatus, type Prisma } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { parseTasksQuery } from "@/lib/api-query";
@@ -13,6 +13,18 @@ const include = {
   user: { select: { id: true, name: true, email: true } as const },
   lead: { select: { id: true, name: true, status: true, companyId: true } as const },
 } as const;
+
+function taskListOrderBy(sort: string | undefined): Prisma.TaskOrderByWithRelationInput[] {
+  switch (sort) {
+    case "due":
+      return [{ dueDate: "asc" }, { priority: "desc" }, { createdAt: "desc" }];
+    case "created":
+      return [{ createdAt: "desc" }];
+    case "priority":
+    default:
+      return [{ priority: "desc" }, { dueDate: "asc" }, { createdAt: "desc" }];
+  }
+}
 
 export async function GET(request: NextRequest) {
   const session = requireAuth(request);
@@ -30,6 +42,7 @@ export async function GET(request: NextRequest) {
     leadId,
     assignedTo,
     overdue,
+    sort: sortParam,
     limit: take,
     offset: skip,
   } = parsedQ.data;
@@ -44,14 +57,9 @@ export async function GET(request: NextRequest) {
     return handleApiError("GET /api/tasks [ensurePendingTasksForOpenLeads]", e);
   }
 
-  const where: {
-    lead: { companyId: string; id?: string };
-    status?: TaskStatus;
-    userId?: string;
-    dueDate?: { lt: Date };
-  } = { lead: { companyId } };
+  const where: Prisma.TaskWhereInput = { companyId };
 
-  if (leadId) where.lead.id = leadId;
+  if (leadId) where.leadId = leadId;
 
   if (overdueOnly) {
     where.status = TaskStatus.PENDING;
@@ -66,11 +74,13 @@ export async function GET(request: NextRequest) {
     where.userId = assignedTo;
   }
 
-  const overdueCountWhere = {
+  const overdueCountWhere: Prisma.TaskWhereInput = {
     ...where,
     status: TaskStatus.PENDING,
     dueDate: { lt: new Date() },
   };
+
+  const orderBy = taskListOrderBy(sortParam);
 
   let tasks;
   let total: number;
@@ -79,7 +89,7 @@ export async function GET(request: NextRequest) {
     [tasks, total, overdueTotal] = await Promise.all([
       prisma.task.findMany({
         where,
-        orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+        orderBy,
         take,
         skip,
         include,
@@ -106,5 +116,6 @@ export async function GET(request: NextRequest) {
     autoCreatedTasks,
     overdueTotal,
     overdueInPage,
+    sort: sortParam ?? "priority",
   });
 }

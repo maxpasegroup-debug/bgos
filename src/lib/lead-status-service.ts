@@ -10,6 +10,7 @@ import {
   createLeadTask,
   defaultTaskDueDate,
   dueDateFollowUp,
+  taskPriorityAfterStatusChange,
   taskTitleAfterStatusChange,
 } from "@/lib/task-engine";
 import { findUserInCompany } from "@/lib/user-company";
@@ -188,7 +189,7 @@ export async function applyLeadPipelineUpdate(
 
     if (statusChanging) {
       await tx.task.updateMany({
-        where: { leadId: updated.id, status: TaskStatus.PENDING },
+        where: { leadId: updated.id, companyId, status: TaskStatus.PENDING },
         data: { status: TaskStatus.COMPLETED },
       });
 
@@ -205,6 +206,7 @@ export async function applyLeadPipelineUpdate(
           leadId: updated.id,
           companyId,
           dueDate: due,
+          priority: taskPriorityAfterStatusChange(targetStatus),
         });
       }
     }
@@ -212,7 +214,7 @@ export async function applyLeadPipelineUpdate(
     if (assigneeChanging) {
       const taskOwner = updated.assignedTo ?? actorId;
       await tx.task.updateMany({
-        where: { leadId: updated.id, status: TaskStatus.PENDING },
+        where: { leadId: updated.id, companyId, status: TaskStatus.PENDING },
         data: { userId: taskOwner },
       });
     }

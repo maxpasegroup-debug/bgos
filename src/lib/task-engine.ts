@@ -51,6 +51,21 @@ export function taskTitleReminder(leadName: string): string {
   return `Reminder task — ${leadName}`;
 }
 
+/** Higher sorts first in default task lists. */
+export function taskPriorityFromTitle(title: string): number {
+  if (title.startsWith("Reminder task")) return 10;
+  if (title.startsWith("Call lead")) return 8;
+  if (title.startsWith("Follow-up") || title.startsWith("Follow up")) return 6;
+  if (title.startsWith("Pipeline:")) return 5;
+  if (title.startsWith("Next:")) return 5;
+  return 5;
+}
+
+export function taskPriorityAfterStatusChange(newStatus: LeadStatus): number {
+  if (newStatus === LeadStatus.PROPOSAL_SENT) return 7;
+  return 5;
+}
+
 /**
  * Title for the next task after a pipeline move. No task for terminal statuses.
  */
@@ -109,6 +124,7 @@ export async function createLeadTask(
     leadId: string;
     companyId: string;
     dueDate: Date;
+    priority?: number;
   },
 ) {
   await db.task.create({
@@ -119,6 +135,7 @@ export async function createLeadTask(
       companyId: input.companyId,
       dueDate: input.dueDate,
       status: TaskStatus.PENDING,
+      priority: input.priority ?? taskPriorityFromTitle(input.title),
     },
   });
 }
@@ -147,7 +164,7 @@ export async function ensurePendingTaskForLead(
   if (!lead) return false;
 
   const pending = await prisma.task.count({
-    where: { leadId: lead.id, status: TaskStatus.PENDING },
+    where: { leadId: lead.id, companyId, status: TaskStatus.PENDING },
   });
   if (pending > 0) return false;
 
@@ -160,6 +177,7 @@ export async function ensurePendingTaskForLead(
       companyId: lead.companyId,
       dueDate: dueDateForAutoTitle(title),
       status: TaskStatus.PENDING,
+      priority: taskPriorityFromTitle(title),
     },
   });
   return true;
@@ -194,6 +212,7 @@ export async function ensurePendingTasksForOpenLeads(
     by: ["leadId"],
     where: {
       leadId: { in: leadIds },
+      companyId,
       status: TaskStatus.PENDING,
     },
     _count: { _all: true },
@@ -217,6 +236,7 @@ export async function ensurePendingTasksForOpenLeads(
           companyId: lead.companyId,
           dueDate: dueDateForAutoTitle(title),
           status: TaskStatus.PENDING,
+          priority: taskPriorityFromTitle(title),
         },
       });
     }),

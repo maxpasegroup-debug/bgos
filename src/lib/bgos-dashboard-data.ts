@@ -94,13 +94,13 @@ export async function buildBgosDashboardSnapshot(companyId: string): Promise<Bgo
     pendingTaskGroups,
   ] = await Promise.all([
     prisma.task.count({
-      where: { status: TaskStatus.PENDING, lead: { companyId } },
+      where: { status: TaskStatus.PENDING, companyId },
     }),
     prisma.task.count({
       where: {
         status: TaskStatus.PENDING,
         dueDate: { lt: now },
-        lead: { companyId },
+        companyId,
       },
     }),
     prisma.installation.count({
@@ -148,10 +148,10 @@ export async function buildBgosDashboardSnapshot(companyId: string): Promise<Bgo
     prisma.lead.count({ where: { companyId, status: LeadStatus.WON } }),
     prisma.lead.count({ where: { companyId, status: LeadStatus.LOST } }),
     prisma.task.count({
-      where: { status: TaskStatus.PENDING, lead: { companyId } },
+      where: { status: TaskStatus.PENDING, companyId },
     }),
     prisma.task.count({
-      where: { status: TaskStatus.COMPLETED, lead: { companyId } },
+      where: { status: TaskStatus.COMPLETED, companyId },
     }),
     prisma.user.findMany({
       where: { companyId, isActive: true },
@@ -177,7 +177,7 @@ export async function buildBgosDashboardSnapshot(companyId: string): Promise<Bgo
       where: {
         status: TaskStatus.PENDING,
         userId: { not: null },
-        lead: { companyId },
+        companyId,
       },
       _count: { _all: true },
     }),

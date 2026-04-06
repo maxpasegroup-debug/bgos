@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { z } from "zod";
-import { postLoginDestination } from "@/lib/role-routing";
+import { resolveAfterLoginNavigation } from "@/lib/cross-domain-login";
 
 const formSchema = z.object({
   mobile: z.string().trim().min(1, "Enter mobile number"),
@@ -93,7 +93,16 @@ function IceconnectLoginForm() {
       }
 
       const from = searchParams.get("from");
-      router.push(postLoginDestination(role, from));
+      const nav = resolveAfterLoginNavigation({
+        role,
+        from,
+        hostname: typeof window !== "undefined" ? window.location.hostname : "",
+      });
+      if (nav.kind === "external") {
+        window.location.assign(nav.url);
+        return;
+      }
+      router.push(nav.path);
       router.refresh();
     } catch {
       setFormError("Network error");
@@ -117,8 +126,8 @@ function IceconnectLoginForm() {
           <div className="text-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/logo.jpg"
-              alt="BGOS"
+              src="/bgos-logo-placeholder.svg"
+              alt="ICECONNECT"
               className="mx-auto mb-4 h-12 w-auto"
               width={160}
               height={48}

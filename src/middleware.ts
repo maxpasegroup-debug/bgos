@@ -14,7 +14,34 @@ import {
   companyPlanFromJwtClaim,
   pathnameRequiresProPlan,
 } from "@/lib/auth-config";
+import { isPlanLockedToBasic } from "@/lib/plan-production-lock";
+import { hostTenantFromHeader } from "@/lib/host-routing";
 import { getRoleHome, roleCanAccessPath } from "@/lib/role-routing";
+
+function bgosAllowsPagePath(pathname: string): boolean {
+  if (pathname === "/bgos" || pathname.startsWith("/bgos/")) return true;
+  if (pathname === "/login" || pathname === "/signup") return true;
+  return false;
+}
+
+function iceAllowsPagePath(pathname: string): boolean {
+  return pathname === "/iceconnect" || pathname.startsWith("/iceconnect/");
+}
+
+function iceAllowsApiPath(pathname: string): boolean {
+  return (
+    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/iceconnect") ||
+    pathname.startsWith("/api/tasks/complete")
+  );
+}
+
+function wrongHostJson(message: string): NextResponse {
+  return NextResponse.json(
+    { ok: false as const, error: message, code: "WRONG_HOST" },
+    { status: 403 },
+  );
+}
 
 function stripInternalAuthHeaders(headers: Headers): void {
   const toRemove: string[] = [];
@@ -43,6 +70,9 @@ function tryAttachUserHeaders(
   headers.set(AUTH_HEADER_USER_ROLE, role);
   headers.set(AUTH_HEADER_COMPANY_ID, companyId);
   headers.set(AUTH_HEADER_COMPANY_PLAN, companyPlanFromJwtClaim(payload.companyPlan));
+  if (isPlanLockedToBasic()) {
+    headers.set(AUTH_HEADER_COMPANY_PLAN, "BASIC");
+  }
   return true;
 }
 
@@ -95,6 +125,34 @@ function isPublicPath(pathname: string): boolean {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const host = request.headers.get("host") || "";
+  const tenant = hostTenantFromHeader(host);
+
+  if (tenant === "bgos") {
+    if (pathname.startsWith("/api")) {
+      if (pathname.startsWith("/api/iceconnect")) {
+        return wrongHostJson("ICECONNECT API is only available on iceconnect.in");
+      }
+    } else if (!bgosAllowsPagePath(pathname)) {
+      return NextResponse.redirect(new URL("/bgos", request.url));
+    }
+  }
+
+  if (tenant === "ice") {
+    if (pathname.startsWith("/api")) {
+      if (!iceAllowsApiPath(pathname)) {
+        return wrongHostJson("This API is only available on bgos.online");
+      }
+    } else if (!iceAllowsPagePath(pathname)) {
+      if (pathname === "/login" || pathname === "/signup") {
+        const url = new URL("/iceconnect/login", request.url);
+        const from = request.nextUrl.searchParams.get("from");
+        if (from) url.searchParams.set("from", from);
+        return NextResponse.redirect(url);
+      }
+      return NextResponse.redirect(new URL("/iceconnect/login", request.url));
+    }
+  }
 
   if (isPublicPath(pathname)) {
     if (pathname === "/iceconnect/login") {
@@ -180,7 +238,8 @@ export async function middleware(request: NextRequest) {
 
   // Company.plan (BASIC | PRO): block Pro-only APIs for Basic JWTs — see `pathnameRequiresProPlan`
   // in auth-config (automation + sales-booster, except upgrade-request allowlist).
-  const companyPlan = requestHeaders.get(AUTH_HEADER_COMPANY_PLAN) ?? "BASIC";
+  const companyPlanRaw = requestHeaders.get(AUTH_HEADER_COMPANY_PLAN) ?? "BASIC";
+  const companyPlan = isPlanLockedToBasic() ? "BASIC" : companyPlanRaw;
   if (
     pathname.startsWith("/api") &&
     pathnameRequiresProPlan(pathname) &&

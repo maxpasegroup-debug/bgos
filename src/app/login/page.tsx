@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { z } from "zod";
-import { postLoginDestination } from "@/lib/role-routing";
+import { resolveAfterLoginNavigation } from "@/lib/cross-domain-login";
 
 const clientLoginSchema = z.object({
   email: z.string().trim().min(1, "Email is required").email("Enter a valid email"),
@@ -62,7 +62,16 @@ function LoginForm() {
         return;
       }
       const from = searchParams.get("from");
-      router.push(postLoginDestination(role, from));
+      const nav = resolveAfterLoginNavigation({
+        role,
+        from,
+        hostname: typeof window !== "undefined" ? window.location.hostname : "",
+      });
+      if (nav.kind === "external") {
+        window.location.assign(nav.url);
+        return;
+      }
+      router.push(nav.path);
       router.refresh();
     } catch {
       setError("Network error");

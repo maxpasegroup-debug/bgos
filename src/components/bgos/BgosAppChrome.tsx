@@ -8,7 +8,7 @@ import { useBgosDashboardContext } from "./BgosDataProvider";
 import { PlanUpgradeBanner } from "./PlanUpgradeBanner";
 
 export function BgosAppChrome({ children }: { children: ReactNode }) {
-  const { companyPlan } = useBgosDashboardContext();
+  const { companyPlan, planLockedToBasic } = useBgosDashboardContext();
 
   return (
     <>
@@ -16,7 +16,7 @@ export function BgosAppChrome({ children }: { children: ReactNode }) {
       <BgosSidebar />
       <div className="relative flex min-h-screen flex-col pl-16">
         <BgosHeader />
-        <PlanUpgradeBanner plan={companyPlan} />
+        {!planLockedToBasic ? <PlanUpgradeBanner plan={companyPlan} /> : null}
         <div className="flex-1">{children}</div>
       </div>
     </>

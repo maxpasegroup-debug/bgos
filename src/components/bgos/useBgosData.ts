@@ -6,8 +6,6 @@ import type { DashboardMetrics } from "@/types";
 
 export type DashboardPayload = DashboardMetrics;
 
-export type PipelineRow = { stage: string; count: number };
-
 async function readDashboardErrorMessage(res: Response): Promise<string> {
   try {
     const j = (await res.json()) as { error?: string; code?: string };
@@ -72,8 +70,14 @@ export function useBgosData(pollMs = 4000) {
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [companyPlan, setCompanyPlan] = useState<CompanyPlan | null>(null);
+  /** Optimistic: hide Pro upsell surfaces until `/api/auth/me` confirms (avoids flash in production). */
+  const [planLockedToBasic, setPlanLockedToBasic] = useState(
+    () => process.env.NODE_ENV === "production",
+  );
   const [sessionRole, setSessionRole] = useState<UserRole | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  /** Bumped after each successful `/api/dashboard` load so pipeline / lists stay in sync. */
+  const [syncGeneration, setSyncGeneration] = useState(0);
   const okOnce = useRef(false);
 
   const refetch = useCallback(() => {
@@ -86,8 +90,13 @@ export function useBgosData(pollMs = 4000) {
       .then((r) => (r.ok ? r.json() : null))
       .then(
         (j: {
+          authenticated?: boolean;
+          planLockedToBasic?: boolean;
           user?: { companyPlan?: CompanyPlan; role?: UserRole };
         } | null) => {
+          if (j?.authenticated === true) {
+            setPlanLockedToBasic(j.planLockedToBasic === true);
+          }
           const p = j?.user?.companyPlan;
           if (p === CompanyPlan.BASIC || p === CompanyPlan.PRO) setCompanyPlan(p);
           if (j?.user?.role) setSessionRole(j.user.role);
@@ -127,6 +136,7 @@ export function useBgosData(pollMs = 4000) {
           );
           setError(null);
           okOnce.current = true;
+          setSyncGeneration((n) => n + 1);
         }
       } catch {
         if (!cancelled && !okOnce.current) {
@@ -143,8 +153,16 @@ export function useBgosData(pollMs = 4000) {
     };
   }, [pollMs, reloadToken]);
 
-  const pipeline: PipelineRow[] | null = dashboard?.pipeline ?? null;
   const isLoading = dashboard === null && error === null;
 
-  return { dashboard, pipeline, error, companyPlan, sessionRole, refetch, isLoading };
+  return {
+    dashboard,
+    error,
+    companyPlan,
+    planLockedToBasic,
+    sessionRole,
+    refetch,
+    isLoading,
+    syncGeneration,
+  };
 }

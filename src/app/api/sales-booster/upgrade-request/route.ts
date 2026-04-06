@@ -10,6 +10,7 @@ import {
   zodValidationErrorResponse,
 } from "@/lib/api-response";
 import { handleApiError } from "@/lib/route-error";
+import { isPlanLockedToBasic } from "@/lib/plan-production-lock";
 import { prisma } from "@/lib/prisma";
 
 const bodySchema = z.object({
@@ -25,6 +26,17 @@ const BOSS_ROLES: UserRole[] = [UserRole.ADMIN, UserRole.MANAGER];
 export async function POST(request: NextRequest) {
   const user = requireAuthWithRoles(request, BOSS_ROLES);
   if (user instanceof NextResponse) return user;
+
+  if (isPlanLockedToBasic()) {
+    return NextResponse.json(
+      {
+        ok: false as const,
+        error: "Plan upgrades are not available in this deployment.",
+        code: "PLAN_UPGRADE_DISABLED" as const,
+      },
+      { status: 403 },
+    );
+  }
 
   if (user.companyPlan === CompanyPlan.PRO) {
     return NextResponse.json(

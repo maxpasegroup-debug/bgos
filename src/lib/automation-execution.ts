@@ -4,7 +4,9 @@ import { LeadStatus, TaskStatus } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import { ACTIVITY_TYPES, logActivity } from "@/lib/activity-log";
 import { createLogger } from "@/lib/logger";
+import { isPlanLockedToBasic } from "@/lib/plan-production-lock";
 import { prisma } from "@/lib/prisma";
+import { taskPriorityFromTitle } from "@/lib/task-engine";
 
 function endOfDayUtc(base: Date, addDays: number): Date {
   const d = new Date(base);
@@ -70,6 +72,7 @@ export async function executeAutomationRow(
 
   switch (auto.action) {
     case "SEND_WHATSAPP": {
+      if (isPlanLockedToBasic()) return;
       const raw = cfg.message;
       const message =
         typeof raw === "string" ? applyLeadTemplate(raw, lead) : `[Automation] ${auto.name}`;
@@ -102,6 +105,7 @@ export async function executeAutomationRow(
           companyId: lead.companyId,
           userId: lead.assignedTo,
           dueDate,
+          priority: taskPriorityFromTitle(title),
         },
       });
       await logActivity(prisma, {

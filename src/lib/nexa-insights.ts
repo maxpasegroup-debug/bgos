@@ -34,7 +34,7 @@ export async function generateInsights(
     prisma.task.count({
       where: {
         status: TaskStatus.PENDING,
-        lead: { companyId },
+        companyId,
       },
     }),
     prisma.lead.count({ where: { companyId, status: LeadStatus.WON } }),

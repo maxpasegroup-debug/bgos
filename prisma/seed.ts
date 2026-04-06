@@ -156,6 +156,7 @@ async function main() {
         userId: telecaller.id,
         leadId: ravi.id,
         companyId: company.id,
+        priority: 6,
       },
       {
         title: "Send proposal",
@@ -163,6 +164,7 @@ async function main() {
         userId: telecaller.id,
         leadId: arun.id,
         companyId: company.id,
+        priority: 5,
       },
     ],
   });

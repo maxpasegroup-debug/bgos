@@ -1,8 +1,8 @@
-import { LeadStatus } from "@prisma/client";
+import { LeadStatus, UserRole } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth";
+import { forbidden, requireAuth } from "@/lib/auth";
 import { applyLeadPipelineUpdate } from "@/lib/lead-status-service";
 
 const bodySchema = z
@@ -38,6 +38,13 @@ export async function PATCH(request: NextRequest) {
       { ok: false as const, error: parsed.error.flatten(), code: "VALIDATION_ERROR" },
       { status: 400 },
     );
+  }
+
+  if (
+    parsed.data.assignedToUserId !== undefined &&
+    session.role !== UserRole.ADMIN
+  ) {
+    return forbidden("Only company admins can assign leads");
   }
 
   const result = await applyLeadPipelineUpdate({

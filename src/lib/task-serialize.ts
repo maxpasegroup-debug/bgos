@@ -8,6 +8,8 @@ export type TaskWithRelations = {
   status: TaskStatus;
   userId: string | null;
   leadId: string | null;
+  companyId: string;
+  priority: number;
   dueDate: Date | null;
   createdAt: Date;
   user: { id: string; name: string; email: string } | null;
@@ -27,6 +29,8 @@ export function serializeTask(task: TaskWithRelations) {
     status: task.status,
     userId: task.userId,
     leadId: task.leadId,
+    companyId: task.companyId,
+    priority: task.priority,
     dueDate: task.dueDate?.toISOString() ?? null,
     createdAt: task.createdAt.toISOString(),
     overdue,
