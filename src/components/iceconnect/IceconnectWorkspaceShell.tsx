@@ -11,11 +11,18 @@ import {
 const ROLE_LABEL: Record<string, string> = {
   ADMIN: "Admin",
   MANAGER: "Manager",
-  TELECALLER: "Telecaller",
-  ENGINEER: "Engineer",
-  INSTALLER: "Installer",
-  ACCOUNTS: "Accounts",
-  SERVICE: "Service",
+  SALES_HEAD: "Sales Head",
+  SALES_EXECUTIVE: "Sales Executive",
+  CHANNEL_PARTNER: "Channel Partner",
+  OPERATIONS_HEAD: "Operations Head",
+  SITE_ENGINEER: "Site Engineer",
+  PRO: "PRO",
+  INSTALLATION_TEAM: "Installation Team",
+  SERVICE_TEAM: "Service Team",
+  INVENTORY_MANAGER: "Inventory Manager",
+  ACCOUNTANT: "Accountant",
+  LCO: "Loan Compliance Officer",
+  HR_MANAGER: "HR Manager",
 };
 
 export type IceconnectNavItem = { seg: string; label: string; href: string };
@@ -54,17 +61,17 @@ function HeaderLogo({
 }: {
   logoUrl: string | null | undefined;
 }) {
-  const [src, setSrc] = useState(logoUrl || "/logo.jpg");
-  useEffect(() => {
-    setSrc(logoUrl || "/logo.jpg");
-  }, [logoUrl]);
+  const [fallback, setFallback] = useState(false);
+  const src = fallback ? "/bgos-logo-placeholder.svg" : (logoUrl || "/logo.jpg");
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
+      key={logoUrl || "default-logo"}
       src={src}
       alt=""
       className="h-full w-full object-contain p-0.5"
-      onError={() => setSrc("/bgos-logo-placeholder.svg")}
+      onError={() => setFallback(true)}
+      onLoad={() => setFallback(false)}
     />
   );
 }
@@ -80,6 +87,36 @@ function IceconnectWorkspaceChrome({
   const { company, ready, primaryColor, secondaryColor } = useCompanyBranding();
   const displayCompany = company?.name?.trim() || "Your company";
   const roleDisplay = ROLE_LABEL[role] ?? role;
+  const [nextAction, setNextAction] = useState("Review your assigned queue.");
+  const [badgeCount, setBadgeCount] = useState(0);
+  const [showToast, setShowToast] = useState(false);
+  const [toastShownOnce, setToastShownOnce] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch("/api/nexa/next-action", { credentials: "include" });
+        if (!res.ok) return;
+        const j = (await res.json()) as { ok?: boolean; nextAction?: string; badgeCount?: number };
+        if (cancelled || j.ok !== true) return;
+        if (typeof j.nextAction === "string" && j.nextAction.trim()) setNextAction(j.nextAction.trim());
+        setBadgeCount(typeof j.badgeCount === "number" ? Math.max(0, j.badgeCount) : 0);
+        if ((j.badgeCount ?? 0) > 0 && !toastShownOnce) {
+          setShowToast(true);
+          setToastShownOnce(true);
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+    void load();
+    const id = window.setInterval(() => void load(), 20000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [toastShownOnce]);
 
   if (!ready) {
     return <SystemLoading companyName={displayCompany} />;
@@ -111,6 +148,9 @@ function IceconnectWorkspaceChrome({
                 </span>
               </div>
               <p className="text-[11px] text-gray-500">ICECONNECT · Secure workspace</p>
+              <p className="mt-0.5 text-[11px] text-gray-500">
+                Next Action: <span className="font-medium text-gray-700">{nextAction}</span>
+              </p>
             </div>
           </div>
           <div className="flex flex-col items-start gap-2 sm:items-end">
@@ -142,10 +182,23 @@ function IceconnectWorkspaceChrome({
                   ))}
                 </nav>
               ) : null}
+              <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700">
+                Alerts {badgeCount}
+              </span>
             </div>
           </div>
         </div>
       </header>
+      {showToast ? (
+        <div className="fixed right-4 top-4 z-50 max-w-xs rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 shadow">
+          <div className="flex items-start justify-between gap-3">
+            <p>NEXA alert: {nextAction}</p>
+            <button type="button" className="font-semibold" onClick={() => setShowToast(false)}>
+              x
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <motion.main
         initial={{ opacity: 0, y: 8 }}

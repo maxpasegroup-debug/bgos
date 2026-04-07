@@ -52,6 +52,7 @@ export type SalesBoosterPayload = SalesBoosterBasicPayload | SalesBoosterProPayl
 
 function stageWeight(status: LeadStatus): number {
   const w: Partial<Record<LeadStatus, number>> = {
+    [LeadStatus.PROPOSAL_WON]: 48,
     [LeadStatus.NEGOTIATION]: 45,
     [LeadStatus.PROPOSAL_SENT]: 38,
     [LeadStatus.SITE_VISIT_COMPLETED]: 32,
@@ -81,6 +82,7 @@ function leadScore(input: {
     reasons.push("stale new/contacted");
   }
   if (
+    input.status === LeadStatus.PROPOSAL_WON ||
     input.status === LeadStatus.NEGOTIATION ||
     input.status === LeadStatus.PROPOSAL_SENT
   ) {

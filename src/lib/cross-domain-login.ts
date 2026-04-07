@@ -8,11 +8,18 @@ import {
 
 const BOSS_ROLES = new Set(["ADMIN", "MANAGER"]);
 const FIELD_ROLES = new Set([
-  "TELECALLER",
-  "ENGINEER",
-  "INSTALLER",
-  "ACCOUNTS",
-  "SERVICE",
+  "SALES_HEAD",
+  "SALES_EXECUTIVE",
+  "CHANNEL_PARTNER",
+  "OPERATIONS_HEAD",
+  "SITE_ENGINEER",
+  "PRO",
+  "INSTALLATION_TEAM",
+  "INVENTORY_MANAGER",
+  "ACCOUNTANT",
+  "LCO",
+  "HR_MANAGER",
+  "SERVICE_TEAM",
 ]);
 
 export type AfterLoginNavigation =

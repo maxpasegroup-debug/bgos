@@ -1,5 +1,6 @@
 "use client";
 
+import { LeadStatus } from "@prisma/client";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -43,9 +44,12 @@ export function BgosLeadsAssignmentPanel({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [assigningId, setAssigningId] = useState<string | null>(null);
-  const [approvedQuotationByLead, setApprovedQuotationByLead] = useState<Record<string, string>>(
-    {},
-  );
+  const [quotationTipByLead, setQuotationTipByLead] = useState<
+    Record<string, { id: string; status: string; quotationNumber: string }>
+  >({});
+  const [invoiceTipByLead, setInvoiceTipByLead] = useState<
+    Record<string, { id: string; paymentBucket: string; invoiceNumber: string }>
+  >({});
   const tableInitialLoad = useRef(true);
 
   const loadLeads = useCallback(async () => {
@@ -104,27 +108,63 @@ export function BgosLeadsAssignmentPanel({
 
   useEffect(() => {
     if (!canUseMoney) {
-      setApprovedQuotationByLead({});
+      setQuotationTipByLead({});
+      setInvoiceTipByLead({});
       return;
     }
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch("/api/quotation/list", { credentials: "include" });
-        const data = (await res.json()) as {
+        const [qRes, iRes] = await Promise.all([
+          fetch("/api/quotation/list", { credentials: "include" }),
+          fetch("/api/invoice/list", { credentials: "include" }),
+        ]);
+        const qData = (await qRes.json()) as {
           ok?: boolean;
-          quotations?: { id: string; leadId: string | null; status: string }[];
+          quotations?: { id: string; leadId: string | null; status: string; quotationNumber: string }[];
         };
-        if (!res.ok || !data.ok || !Array.isArray(data.quotations) || cancelled) return;
-        const m: Record<string, string> = {};
-        for (const q of data.quotations) {
-          if (q.status === "APPROVED" && q.leadId && !m[q.leadId]) {
-            m[q.leadId] = q.id;
+        const iData = (await iRes.json()) as {
+          ok?: boolean;
+          invoices?: {
+            id: string;
+            leadId: string | null;
+            paymentBucket: string;
+            invoiceNumber: string;
+          }[];
+        };
+        if (cancelled) return;
+        if (!qRes.ok || !qData.ok || !Array.isArray(qData.quotations)) {
+          setQuotationTipByLead({});
+        } else {
+          const qt: Record<string, { id: string; status: string; quotationNumber: string }> = {};
+          for (const q of qData.quotations) {
+            if (q.leadId && !qt[q.leadId]) {
+              qt[q.leadId] = { id: q.id, status: q.status, quotationNumber: q.quotationNumber };
+            }
           }
+          setQuotationTipByLead(qt);
         }
-        if (!cancelled) setApprovedQuotationByLead(m);
+        if (!iRes.ok || !iData.ok || !Array.isArray(iData.invoices)) {
+          setInvoiceTipByLead({});
+        } else {
+          const inv: Record<string, { id: string; paymentBucket: string; invoiceNumber: string }> =
+            {};
+          for (const invRow of iData.invoices) {
+            if (invRow.leadId && !inv[invRow.leadId]) {
+              inv[invRow.leadId] = {
+                id: invRow.id,
+                paymentBucket: invRow.paymentBucket,
+                invoiceNumber: invRow.invoiceNumber,
+              };
+            }
+          }
+          setInvoiceTipByLead(inv);
+        }
       } catch {
-        if (!cancelled) setApprovedQuotationByLead({});
+        if (!cancelled) {
+          setQuotationTipByLead({});
+          setInvoiceTipByLead({});
+        }
       }
     })();
     return () => {
@@ -242,7 +282,14 @@ export function BgosLeadsAssignmentPanel({
               <tbody>
                 {leads.map((lead) => (
                   <tr key={lead.id} className="border-b border-white/[0.06]">
-                    <td className="py-2.5 pr-3 font-medium text-white">{lead.name}</td>
+                    <td className="py-2.5 pr-3 font-medium text-white">
+                      <Link
+                        href={`/bgos/leads/${encodeURIComponent(lead.id)}`}
+                        className="text-white transition hover:text-[#FFC300]"
+                      >
+                        {lead.name}
+                      </Link>
+                    </td>
                     <td className="py-2.5 pr-3 text-white/60">{lead.phone}</td>
                     <td className="py-2.5 pr-3 text-white/70">{lead.statusLabel}</td>
                     <td className="py-2.5 pr-3 text-white/70">
@@ -250,21 +297,39 @@ export function BgosLeadsAssignmentPanel({
                     </td>
                     {canUseMoney ? (
                       <td className="py-2.5 pr-3 align-top">
-                        <div className="flex max-w-[10rem] flex-col gap-1">
-                          {lead.status === "PROPOSAL_SENT" ? (
+                        <div className="flex max-w-[12rem] flex-col gap-1">
+                          {(lead.status === LeadStatus.PROPOSAL_SENT ||
+                            lead.status === LeadStatus.NEGOTIATION) &&
+                          !(quotationTipByLead[lead.id] && quotationTipByLead[lead.id].status !== "REJECTED") ? (
                             <Link
                               href={`/bgos/money/quotation/create?leadId=${encodeURIComponent(lead.id)}`}
                               className="text-[11px] font-semibold text-[#FFC300] transition hover:text-[#FFE066]"
                             >
-                              Create quotation
+                              Create quote
                             </Link>
                           ) : null}
-                          {approvedQuotationByLead[lead.id] ? (
+                          {quotationTipByLead[lead.id] &&
+                          quotationTipByLead[lead.id].status !== "REJECTED" ? (
+                            <p className="text-[10px] text-white/45">
+                              {quotationTipByLead[lead.id].quotationNumber} ·{" "}
+                              {quotationTipByLead[lead.id].status}
+                            </p>
+                          ) : null}
+                          {quotationTipByLead[lead.id]?.status === "APPROVED" &&
+                          !invoiceTipByLead[lead.id] ? (
                             <Link
-                              href={`/bgos/money/invoices?quotationId=${encodeURIComponent(approvedQuotationByLead[lead.id])}`}
+                              href={`/bgos/money/invoices?quotationId=${encodeURIComponent(quotationTipByLead[lead.id].id)}`}
                               className="text-[11px] font-semibold text-emerald-200/90 transition hover:text-emerald-100"
                             >
                               Generate invoice
+                            </Link>
+                          ) : null}
+                          {invoiceTipByLead[lead.id] ? (
+                            <Link
+                              href={`/bgos/money/invoices/${invoiceTipByLead[lead.id].id}`}
+                              className="text-[10px] font-medium text-emerald-200/85 hover:text-emerald-100"
+                            >
+                              View invoice ({invoiceTipByLead[lead.id].paymentBucket})
                             </Link>
                           ) : null}
                           <Link

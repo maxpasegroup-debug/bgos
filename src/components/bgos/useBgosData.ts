@@ -32,6 +32,9 @@ const EMPTY_OPS: DashboardMetrics["operations"] = {
   installationQueue: 0,
   openServiceTickets: 0,
   pendingPayments: 0,
+  pendingSiteVisits: 0,
+  pendingApprovals: 0,
+  installationsInProgress: 0,
 };
 
 const EMPTY_REV: DashboardMetrics["revenueBreakdown"] = {
@@ -39,6 +42,7 @@ const EMPTY_REV: DashboardMetrics["revenueBreakdown"] = {
   pipelineValue: 0,
   expectedClosures: 0,
   pendingAmount: 0,
+  unpaidInvoiceCount: 0,
 };
 
 const EMPTY_RISKS: DashboardMetrics["risks"] = {
@@ -53,6 +57,23 @@ const EMPTY_HEALTH: DashboardMetrics["health"] = {
   teamProductivity: 0,
 };
 
+const EMPTY_HR: DashboardMetrics["hr"] = {
+  totalEmployees: 0,
+  leavesPending: 0,
+  attendancePercent: 0,
+};
+
+const EMPTY_INVENTORY: DashboardMetrics["inventory"] = {
+  products: 0,
+  lowStockItems: 0,
+  totalUnits: 0,
+};
+
+const EMPTY_PARTNER: DashboardMetrics["partner"] = {
+  totalPartnerLeads: 0,
+  totalCommissionPayable: 0,
+};
+
 function normalizeDashboard(d: DashboardPayload): DashboardPayload {
   return {
     ...d,
@@ -63,6 +84,9 @@ function normalizeDashboard(d: DashboardPayload): DashboardPayload {
     revenueBreakdown: d.revenueBreakdown ?? EMPTY_REV,
     risks: d.risks ?? EMPTY_RISKS,
     health: d.health ?? EMPTY_HEALTH,
+    hr: d.hr ?? EMPTY_HR,
+    inventory: d.inventory ?? EMPTY_INVENTORY,
+    partner: d.partner ?? EMPTY_PARTNER,
     team: Array.isArray(d.team) ? d.team : [],
     financial: normalizeFinancialOverview(d.financial),
   };

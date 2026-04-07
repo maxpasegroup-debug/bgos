@@ -1,18 +1,14 @@
 import "server-only";
 
-import {
-  DealStatus,
-  LeadStatus,
-  PaymentStatus,
-  ServiceTicketStatus,
-  TaskStatus,
-} from "@prisma/client";
+import { LeadStatus, ServiceTicketStatus, TaskStatus } from "@prisma/client";
+import { calculateRevenue } from "@/lib/financial-metrics";
 import { prisma } from "@/lib/prisma";
 
 const OPPORTUNITY_STATUSES: LeadStatus[] = [
   LeadStatus.QUALIFIED,
   LeadStatus.PROPOSAL_SENT,
   LeadStatus.NEGOTIATION,
+  LeadStatus.PROPOSAL_WON,
 ];
 
 const CLOSED: LeadStatus[] = [LeadStatus.WON, LeadStatus.LOST];
@@ -42,12 +38,16 @@ export type BgosDashboardSnapshot = {
     installationQueue: number;
     openServiceTickets: number;
     pendingPayments: number;
+    pendingSiteVisits: number;
+    pendingApprovals: number;
+    installationsInProgress: number;
   };
   revenue: {
     monthlyWon: number;
     pipelineValue: number;
     expectedClosures: number;
     pendingAmount: number;
+    unpaidInvoiceCount: number;
   };
   risks: {
     lostLeads: number;
@@ -59,17 +59,33 @@ export type BgosDashboardSnapshot = {
     conversion: number;
     teamProductivity: number;
   };
+  hr: {
+    totalEmployees: number;
+    leavesPending: number;
+    attendancePercent: number;
+  };
+  inventory: {
+    products: number;
+    lowStockItems: number;
+    totalUnits: number;
+  };
+  partner: {
+    totalPartnerLeads: number;
+    totalCommissionPayable: number;
+  };
   team: BgosTeamMemberStats[];
 };
 
 export async function buildBgosDashboardSnapshot(companyId: string): Promise<BgosDashboardSnapshot> {
   const now = new Date();
-  const monthStart = startOfLocalMonth(now);
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
 
   const openLeadWhere = {
     companyId,
     status: { notIn: CLOSED },
   };
+
+  const invoiceRevenue = await calculateRevenue(companyId);
 
   const [
     pendingFollowUps,
@@ -78,12 +94,9 @@ export async function buildBgosDashboardSnapshot(companyId: string): Promise<Bgo
     opportunityLeads,
     installationQueue,
     openServiceTickets,
-    pendingPaymentCount,
     lostLeads,
-    monthlyWonAgg,
     pipelineValueAgg,
     expectedClosures,
-    pendingAmountAgg,
     wonLeads,
     closedLost,
     tasksPending,
@@ -92,6 +105,16 @@ export async function buildBgosDashboardSnapshot(companyId: string): Promise<Bgo
     assignedLeadGroups,
     wonLeadGroups,
     pendingTaskGroups,
+    totalEmployees,
+    leavesPending,
+    todayAttendanceCount,
+    inventoryProducts,
+    inventoryStockRows,
+    partnerLeads,
+    payableCommissions,
+    pendingSiteVisits,
+    pendingApprovals,
+    installationsInProgress,
   ] = await Promise.all([
     prisma.task.count({
       where: { status: TaskStatus.PENDING, companyId },
@@ -119,18 +142,7 @@ export async function buildBgosDashboardSnapshot(companyId: string): Promise<Bgo
     prisma.serviceTicket.count({
       where: { companyId, status: ServiceTicketStatus.OPEN },
     }),
-    prisma.payment.count({
-      where: { companyId, status: PaymentStatus.PENDING },
-    }),
     prisma.lead.count({ where: { companyId, status: LeadStatus.LOST } }),
-    prisma.deal.aggregate({
-      _sum: { value: true },
-      where: {
-        status: DealStatus.WON,
-        createdAt: { gte: monthStart },
-        lead: { companyId },
-      },
-    }),
     prisma.lead.aggregate({
       _sum: { value: true },
       where: openLeadWhere,
@@ -138,12 +150,10 @@ export async function buildBgosDashboardSnapshot(companyId: string): Promise<Bgo
     prisma.lead.count({
       where: {
         companyId,
-        status: { in: [LeadStatus.PROPOSAL_SENT, LeadStatus.NEGOTIATION] },
+        status: {
+          in: [LeadStatus.PROPOSAL_SENT, LeadStatus.NEGOTIATION, LeadStatus.PROPOSAL_WON],
+        },
       },
-    }),
-    prisma.payment.aggregate({
-      _sum: { amount: true },
-      where: { companyId, status: PaymentStatus.PENDING },
     }),
     prisma.lead.count({ where: { companyId, status: LeadStatus.WON } }),
     prisma.lead.count({ where: { companyId, status: LeadStatus.LOST } }),
@@ -182,6 +192,38 @@ export async function buildBgosDashboardSnapshot(companyId: string): Promise<Bgo
         companyId,
       },
       _count: { _all: true },
+    }),
+    prisma.userCompany.count({
+      where: { companyId, user: { isActive: true } },
+    }),
+    (prisma as any).leaveRequest.count({
+      where: { companyId, status: "PENDING" },
+    }),
+    (prisma as any).attendance.findMany({
+      where: { companyId, date: todayStart, checkIn: { not: null } },
+      distinct: ["userId"],
+      select: { userId: true },
+    }),
+    (prisma as any).product.count({ where: { companyId } }),
+    (prisma as any).stock.findMany({
+      where: { companyId },
+      select: { quantity: true },
+    }),
+    (prisma as any).lead.count({
+      where: { companyId, partnerId: { not: null } },
+    }),
+    (prisma as any).commission.aggregate({
+      where: { companyId, status: "PENDING" },
+      _sum: { amount: true },
+    }),
+    (prisma as any).siteVisit.count({
+      where: { companyId, status: "SCHEDULED" },
+    }),
+    (prisma as any).approval.count({
+      where: { companyId, status: "PENDING" },
+    }),
+    (prisma as any).installation.count({
+      where: { companyId, status: "IN_PROGRESS" },
     }),
   ]);
 
@@ -240,13 +282,17 @@ export async function buildBgosDashboardSnapshot(companyId: string): Promise<Bgo
     operations: {
       installationQueue,
       openServiceTickets,
-      pendingPayments: pendingPaymentCount,
+      pendingPayments: invoiceRevenue.unpaidInvoiceCount,
+      pendingSiteVisits,
+      pendingApprovals,
+      installationsInProgress,
     },
     revenue: {
-      monthlyWon: monthlyWonAgg._sum.value ?? 0,
+      monthlyWon: invoiceRevenue.monthlyRevenue,
       pipelineValue: pipelineValueAgg._sum.value ?? 0,
       expectedClosures,
-      pendingAmount: pendingAmountAgg._sum.amount ?? 0,
+      pendingAmount: invoiceRevenue.pendingPayments,
+      unpaidInvoiceCount: invoiceRevenue.unpaidInvoiceCount,
     },
     risks: {
       lostLeads,
@@ -257,6 +303,25 @@ export async function buildBgosDashboardSnapshot(companyId: string): Promise<Bgo
       efficiency,
       conversion,
       teamProductivity,
+    },
+    hr: {
+      totalEmployees,
+      leavesPending,
+      attendancePercent:
+        totalEmployees > 0
+          ? Math.round((100 * todayAttendanceCount.length) / totalEmployees)
+          : 0,
+    },
+    inventory: {
+      products: inventoryProducts,
+      lowStockItems: inventoryStockRows.filter((r: any) => Number(r.quantity) <= 5).length,
+      totalUnits: Math.round(
+        inventoryStockRows.reduce((sum: number, r: any) => sum + Number(r.quantity || 0), 0),
+      ),
+    },
+    partner: {
+      totalPartnerLeads: partnerLeads,
+      totalCommissionPayable: Number(payableCommissions?._sum?.amount ?? 0),
     },
     team,
   };

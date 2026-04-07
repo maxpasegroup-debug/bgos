@@ -12,6 +12,7 @@ export const LEAD_PIPELINE_ORDER: LeadStatus[] = [
   LeadStatus.SITE_VISIT_COMPLETED,
   LeadStatus.PROPOSAL_SENT,
   LeadStatus.NEGOTIATION,
+  LeadStatus.PROPOSAL_WON,
   LeadStatus.WON,
   LeadStatus.LOST,
 ];
@@ -24,6 +25,7 @@ const LABELS: Record<LeadStatus, string> = {
   [LeadStatus.SITE_VISIT_COMPLETED]: "Site Visit Completed",
   [LeadStatus.PROPOSAL_SENT]: "Proposal Sent",
   [LeadStatus.NEGOTIATION]: "Negotiation",
+  [LeadStatus.PROPOSAL_WON]: "Proposal Won",
   [LeadStatus.WON]: "Won",
   [LeadStatus.LOST]: "Lost",
 };

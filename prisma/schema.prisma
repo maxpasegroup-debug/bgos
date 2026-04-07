@@ -11,12 +11,19 @@ datasource db {
 
 enum UserRole {
   ADMIN
-  TELECALLER
-  ENGINEER
-  INSTALLER
-  ACCOUNTS
-  SERVICE
   MANAGER
+  SALES_HEAD
+  SALES_EXECUTIVE
+  CHANNEL_PARTNER
+  OPERATIONS_HEAD
+  SITE_ENGINEER
+  PRO
+  INSTALLATION_TEAM
+  SERVICE_TEAM
+  INVENTORY_MANAGER
+  ACCOUNTANT
+  LCO
+  HR_MANAGER
 }
 
 enum CompanyPlan {
@@ -36,6 +43,8 @@ enum LeadStatus {
   SITE_VISIT_COMPLETED
   PROPOSAL_SENT
   NEGOTIATION
+  /** Quotation approved — booked, awaiting payment. */
+  PROPOSAL_WON
   WON
   LOST
 }
@@ -96,12 +105,23 @@ model Company {
   activityLogs    ActivityLog[]
   serviceTickets ServiceTicket[]
   automations   Automation[]
+  documents     Document[]
+  leaveRequests LeaveRequest[]
+  attendances   Attendance[]
+  salaries      Salary[]
+  products      Product[]
+  stocks        Stock[]
+  stockLogs     StockLog[]
+  channelPartners ChannelPartner[]
+  commissions    Commission[]
+  siteVisits     SiteVisit[]
+  approvals      Approval[]
 
   @@index([name])
   @@index([ownerId])
 }
 
-/// Membership: `role` is company-level (ADMIN vs EMPLOYEE); `jobRole` is operational RBAC (TELECALLER, ENGINEER, …).
+/// Membership: `role` is company-level (ADMIN vs EMPLOYEE); `jobRole` is operational RBAC (solar CRM role enum).
 model UserCompany {
   id        String   @id @default(cuid())
   userId    String
@@ -136,6 +156,11 @@ model User {
   activityLogs         ActivityLog[]
   assignedInstallations Installation[] @relation("InstallationAssignee")
   assignedServiceTickets ServiceTicket[] @relation("TicketAssignee")
+  leaveRequests          LeaveRequest[]
+  attendances            Attendance[]
+  salaries               Salary[]
+  createdChannelPartners ChannelPartner[] @relation("PartnerCreator")
+  assignedSiteVisits     SiteVisit[] @relation("SiteVisitAssignee")
 
   @@index([email])
 }
@@ -150,20 +175,29 @@ model Lead {
   value      Float?
   companyId  String
   assignedTo String?
+  partnerId  String?
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
   company  Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   assignee User?   @relation("LeadAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+  partner  ChannelPartner? @relation(fields: [partnerId], references: [id], onDelete: SetNull)
   deals       Deal[]
   tasks       Task[]
   quotations  Quotation[]
   invoices    Invoice[]
+  documents   Document[]
+  commissions Commission[]
+  siteVisits  SiteVisit[]
+  approvals   Approval[]
+  installations Installation[]
+  serviceTickets ServiceTicket[]
   siteReport  String? @db.Text
 
   @@index([companyId])
   @@index([status])
   @@index([assignedTo])
+  @@index([partnerId])
   @@index([phone])
 }
 
@@ -226,16 +260,20 @@ model Installation {
   status        String
   scheduledDate DateTime?
   companyId     String
+  leadId        String?
   assignedTo    String?
   notes         String?   @db.Text
   createdAt     DateTime  @default(now())
   completedAt   DateTime?
 
   company  Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead     Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
   assignee User?   @relation("InstallationAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
 
   @@index([companyId])
+  @@unique([companyId, leadId])
   @@index([status])
+  @@index([leadId])
   @@index([assignedTo])
 }
 
@@ -343,16 +381,215 @@ model ServiceTicket {
   description String?             @db.Text
   status      ServiceTicketStatus @default(OPEN)
   companyId   String
+  leadId      String?
   assignedTo  String?
+  issue       String?
   createdAt   DateTime            @default(now())
   resolvedAt  DateTime?
 
   company  Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead     Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
   assignee User?   @relation("TicketAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
 
   @@index([companyId])
   @@index([status])
+  @@index([leadId])
   @@index([assignedTo])
+}
+
+model SiteVisit {
+  id         String   @id @default(cuid())
+  companyId  String
+  leadId     String
+  assignedTo String
+  /// SCHEDULED | COMPLETED
+  status     String
+  report     Json?
+  createdAt  DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead    Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  assignee User   @relation("SiteVisitAssignee", fields: [assignedTo], references: [id], onDelete: Restrict)
+
+  @@unique([companyId, leadId])
+  @@index([companyId])
+  @@index([assignedTo])
+  @@index([status])
+}
+
+model Approval {
+  id        String   @id @default(cuid())
+  companyId String
+  leadId    String
+  /// PENDING | APPROVED | REJECTED
+  status    String
+  notes     String?
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead    Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, leadId])
+  @@index([companyId])
+  @@index([status])
+}
+
+/// Company file storage: agreements, approvals, site reports, customer docs.
+model Document {
+  id        String   @id @default(cuid())
+  companyId String
+  leadId    String?
+  /// AGREEMENT | APPROVAL | REPORT | OTHER
+  type      String
+  /// Relative path under the app uploads/documents directory (not a public URL).
+  fileUrl   String
+  fileName  String
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead    Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([companyId, type])
+  @@index([leadId])
+}
+
+model LeaveRequest {
+  id        String   @id @default(cuid())
+  companyId String
+  userId    String
+  fromDate  DateTime
+  toDate    DateTime
+  reason    String
+  /// PENDING | APPROVED | REJECTED
+  status    String
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([companyId, status])
+}
+
+model Attendance {
+  id        String   @id @default(cuid())
+  companyId String
+  userId    String
+  date      DateTime
+  checkIn   DateTime?
+  checkOut  DateTime?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId, date])
+  @@index([companyId])
+  @@index([userId])
+}
+
+model Salary {
+  id        String   @id @default(cuid())
+  companyId String
+  userId    String
+  amount    Float
+  month     String
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId, month])
+  @@index([companyId])
+  @@index([userId])
+}
+
+model Product {
+  id        String   @id @default(cuid())
+  companyId String
+  name      String
+  /// Panel | Inverter | Battery | Accessories
+  category  String
+  unit      String
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  stocks  Stock[]
+  logs    StockLog[]
+
+  @@index([companyId])
+  @@index([companyId, category])
+}
+
+model Stock {
+  id        String   @id @default(cuid())
+  companyId String
+  productId String
+  quantity  Float
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, productId])
+  @@index([companyId])
+}
+
+model StockLog {
+  id        String   @id @default(cuid())
+  companyId String
+  productId String
+  /// IN | OUT
+  type      String
+  quantity  Float
+  reference String
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([productId])
+  @@index([companyId, type])
+}
+
+model ChannelPartner {
+  id              String   @id @default(cuid())
+  companyId       String
+  name            String
+  phone           String
+  createdByUserId String
+  createdAt       DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  creator User @relation("PartnerCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  leads   Lead[]
+  commissions Commission[]
+
+  @@index([companyId])
+  @@index([createdByUserId])
+}
+
+model Commission {
+  id        String   @id @default(cuid())
+  companyId String
+  partnerId String
+  leadId    String
+  amount    Float
+  /// DIRECT | REFERRAL
+  type      String
+  /// PENDING | PAID
+  status    String
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  partner ChannelPartner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  lead    Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, leadId])
+  @@index([companyId])
+  @@index([partnerId])
+  @@index([status])
 }
 
 model ActivityLog {

@@ -46,7 +46,7 @@ export default function SelectCompanyPage() {
         return;
       }
       if (listJson.companies.length <= 1) {
-        const r = meJson.user?.role ?? "TELECALLER";
+        const r = meJson.user?.role ?? "SALES_EXECUTIVE";
         router.replace(getRoleHome(r));
         return;
       }
@@ -84,7 +84,7 @@ export default function SelectCompanyPage() {
       if (cj.ok === true && cj.company) {
         writeStoredCompanyBrand(cj.company);
       }
-      const r = role ?? "TELECALLER";
+      const r = role ?? "SALES_EXECUTIVE";
       window.location.href = getRoleHome(r);
     } catch {
       setErr("Network error.");

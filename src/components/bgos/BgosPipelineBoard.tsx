@@ -179,9 +179,12 @@ export function BgosPipelineBoard() {
   const [banner, setBanner] = useState<string | null>(null);
   const [users, setUsers] = useState<PublicUser[]>([]);
   const [busyLeadId, setBusyLeadId] = useState<string | null>(null);
-  const [approvedQuotationByLead, setApprovedQuotationByLead] = useState<Record<string, string>>(
-    {},
-  );
+  const [quotationTipByLead, setQuotationTipByLead] = useState<
+    Record<string, { id: string; status: string; quotationNumber: string }>
+  >({});
+  const [invoiceTipByLead, setInvoiceTipByLead] = useState<
+    Record<string, { id: string; paymentBucket: string; invoiceNumber: string }>
+  >({});
   const pipelineInitialLoad = useRef(true);
 
   const loadPipeline = useCallback(async () => {
@@ -248,27 +251,63 @@ export function BgosPipelineBoard() {
 
   useEffect(() => {
     if (!canMoney) {
-      setApprovedQuotationByLead({});
+      setQuotationTipByLead({});
+      setInvoiceTipByLead({});
       return;
     }
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch("/api/quotation/list", { credentials: "include" });
-        const data = (await res.json()) as {
+        const [qRes, iRes] = await Promise.all([
+          fetch("/api/quotation/list", { credentials: "include" }),
+          fetch("/api/invoice/list", { credentials: "include" }),
+        ]);
+        const qData = (await qRes.json()) as {
           ok?: boolean;
-          quotations?: { id: string; leadId: string | null; status: string }[];
+          quotations?: { id: string; leadId: string | null; status: string; quotationNumber: string }[];
         };
-        if (!res.ok || !data.ok || !Array.isArray(data.quotations) || cancelled) return;
-        const m: Record<string, string> = {};
-        for (const q of data.quotations) {
-          if (q.status === "APPROVED" && q.leadId && !m[q.leadId]) {
-            m[q.leadId] = q.id;
+        const iData = (await iRes.json()) as {
+          ok?: boolean;
+          invoices?: {
+            id: string;
+            leadId: string | null;
+            paymentBucket: string;
+            invoiceNumber: string;
+          }[];
+        };
+        if (cancelled) return;
+        if (!qRes.ok || !qData.ok || !Array.isArray(qData.quotations)) {
+          setQuotationTipByLead({});
+        } else {
+          const qt: Record<string, { id: string; status: string; quotationNumber: string }> = {};
+          for (const q of qData.quotations) {
+            if (q.leadId && !qt[q.leadId]) {
+              qt[q.leadId] = { id: q.id, status: q.status, quotationNumber: q.quotationNumber };
+            }
           }
+          setQuotationTipByLead(qt);
         }
-        if (!cancelled) setApprovedQuotationByLead(m);
+        if (!iRes.ok || !iData.ok || !Array.isArray(iData.invoices)) {
+          setInvoiceTipByLead({});
+        } else {
+          const inv: Record<string, { id: string; paymentBucket: string; invoiceNumber: string }> =
+            {};
+          for (const invRow of iData.invoices) {
+            if (invRow.leadId && !inv[invRow.leadId]) {
+              inv[invRow.leadId] = {
+                id: invRow.id,
+                paymentBucket: invRow.paymentBucket,
+                invoiceNumber: invRow.invoiceNumber,
+              };
+            }
+          }
+          setInvoiceTipByLead(inv);
+        }
       } catch {
-        if (!cancelled) setApprovedQuotationByLead({});
+        if (!cancelled) {
+          setQuotationTipByLead({});
+          setInvoiceTipByLead({});
+        }
       }
     })();
     return () => {
@@ -450,14 +489,26 @@ export function BgosPipelineBoard() {
                 </div>
                 <div className="flex max-h-[min(70vh,42rem)] flex-col gap-2 overflow-y-auto rounded-xl border border-white/10 bg-black/20 p-2">
                   {col.leads.length === 0 ? (
-                    <p className="px-1 py-6 text-center text-[11px] text-white/30">No leads</p>
+                    <p className="px-1 py-6 text-center text-[11px] text-white/30">
+                      No leads
+                      {col.status === LeadStatus.PROPOSAL_SENT ? (
+                        <span className="mt-2 block text-[10px] text-white/25">
+                          Start by creating a quotation for your lead.
+                        </span>
+                      ) : null}
+                    </p>
                   ) : (
                     col.leads.map((lead) => (
                       <article
                         key={lead.id}
                         className="rounded-lg border border-white/10 bg-white/[0.05] p-3 shadow-sm"
                       >
-                        <p className="font-medium leading-snug text-white">{lead.name}</p>
+                        <Link
+                          href={`/bgos/leads/${encodeURIComponent(lead.id)}`}
+                          className="font-medium leading-snug text-white transition hover:text-[#FFC300]"
+                        >
+                          {lead.name}
+                        </Link>
                         <p className="mt-1 text-[11px] text-white/55">{lead.phone}</p>
                         <p className="mt-1 text-xs font-medium tabular-nums text-[#FFC300]/90">
                           {lead.value != null && lead.value > 0
@@ -465,21 +516,53 @@ export function BgosPipelineBoard() {
                             : "—"}
                         </p>
 
-                        {canMoney && lead.status === LeadStatus.PROPOSAL_SENT ? (
+                        {canMoney &&
+                        (lead.status === LeadStatus.PROPOSAL_SENT || lead.status === LeadStatus.NEGOTIATION) &&
+                        !(quotationTipByLead[lead.id] && quotationTipByLead[lead.id].status !== "REJECTED") ? (
                           <Link
                             href={`/bgos/money/quotation/create?leadId=${encodeURIComponent(lead.id)}`}
-                            className="mt-2 inline-flex text-[11px] font-semibold text-[#FFC300] transition hover:text-[#FFE066]"
+                            className="mt-2 inline-flex min-h-[36px] items-center justify-center rounded-lg border border-[#FFC300]/40 bg-[#FFC300]/10 px-2.5 text-[11px] font-semibold text-[#FFC300] transition hover:bg-[#FFC300]/18"
                           >
-                            Create quotation →
+                            Create quote
                           </Link>
                         ) : null}
-                        {canMoney && approvedQuotationByLead[lead.id] ? (
+
+                        {canMoney &&
+                        quotationTipByLead[lead.id] &&
+                        quotationTipByLead[lead.id].status !== "REJECTED" ? (
+                          <p className="mt-2 text-[10px] text-white/50">
+                            Quote {quotationTipByLead[lead.id].quotationNumber} ·{" "}
+                            <span className="text-[#FFC300]/85">{quotationTipByLead[lead.id].status}</span>
+                          </p>
+                        ) : null}
+
+                        {canMoney &&
+                        quotationTipByLead[lead.id]?.status === "APPROVED" &&
+                        !invoiceTipByLead[lead.id] ? (
                           <Link
-                            href={`/bgos/money/invoices?quotationId=${encodeURIComponent(approvedQuotationByLead[lead.id])}`}
-                            className="mt-1 inline-flex text-[11px] font-semibold text-emerald-200/90 transition hover:text-emerald-100"
+                            href={`/bgos/money/invoices?quotationId=${encodeURIComponent(quotationTipByLead[lead.id].id)}`}
+                            className="mt-2 inline-flex min-h-[36px] items-center justify-center rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2.5 text-[11px] font-semibold text-emerald-200/95 transition hover:bg-emerald-500/15"
                           >
-                            Generate invoice →
+                            Generate invoice
                           </Link>
+                        ) : null}
+
+                        {canMoney && invoiceTipByLead[lead.id] ? (
+                          <div className="mt-2 space-y-1 rounded-lg border border-white/10 bg-black/20 px-2 py-2">
+                            <p className="text-[10px] text-white/50">
+                              Invoice ·{" "}
+                              <span className="font-medium text-white/80">
+                                {invoiceTipByLead[lead.id].invoiceNumber}
+                              </span>{" "}
+                              ({invoiceTipByLead[lead.id].paymentBucket})
+                            </p>
+                            <Link
+                              href={`/bgos/money/invoices/${invoiceTipByLead[lead.id].id}`}
+                              className="inline-flex text-[11px] font-semibold text-emerald-200/90 hover:text-emerald-100"
+                            >
+                              View invoice →
+                            </Link>
+                          </div>
                         ) : null}
 
                         <div className="mt-2 space-y-1.5 border-t border-white/10 pt-2">

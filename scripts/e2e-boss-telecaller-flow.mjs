@@ -118,7 +118,7 @@ async function main() {
         mobile: mobileDigits,
         email: empEmail,
         password,
-        role: "TELECALLER",
+        role: "SALES_EXECUTIVE",
       },
     });
     if (!res.ok || !json.ok) fail("users/create", `status ${res.status}`, json);

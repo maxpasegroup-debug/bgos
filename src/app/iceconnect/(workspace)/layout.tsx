@@ -15,10 +15,17 @@ export const metadata: Metadata = {
 
 const SEGMENT_LABEL: Record<string, string> = {
   sales: "Sales",
-  site: "Engineer",
-  install: "Installer",
-  accounts: "Accounts",
-  service: "Service",
+  "sales-head": "Sales Head",
+  partner: "Channel Partner",
+  operations: "Operations Head",
+  site: "Site Engineer",
+  pro: "PRO",
+  install: "Installation Team",
+  service: "Service Team",
+  inventory: "Inventory Manager",
+  accounts: "Accountant",
+  loan: "Loan Compliance Officer",
+  hr: "HR Manager",
 };
 
 export default async function IceconnectWorkspaceLayout({

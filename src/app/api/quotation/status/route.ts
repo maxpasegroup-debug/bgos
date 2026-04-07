@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuthWithRoles } from "@/lib/auth";
+import { syncLeadOnQuotationApproved } from "@/lib/crm-money-sync";
 import { QUOTATION_STATUSES } from "@/lib/money-items";
 import { prisma } from "@/lib/prisma";
 import { USER_ADMIN_ROLES } from "@/lib/user-company";
@@ -49,6 +50,10 @@ export async function PATCH(request: NextRequest) {
     where: { id },
     data: { status },
   });
+
+  if (status === "APPROVED" && q.leadId) {
+    await syncLeadOnQuotationApproved(session.companyId, q.leadId);
+  }
 
   return NextResponse.json({
     ok: true as const,

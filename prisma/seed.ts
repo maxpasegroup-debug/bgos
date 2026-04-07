@@ -90,11 +90,11 @@ async function main() {
     return u;
   }
 
-  const telecaller = await member("Sales TC", "9111111111", "telecaller@iceconnect.demo", UserRole.TELECALLER);
-  const engineer = await member("Field Engineer", "9222222222", "engineer@iceconnect.demo", UserRole.ENGINEER);
-  const installer = await member("Lead Installer", "9333333333", "installer@iceconnect.demo", UserRole.INSTALLER);
-  const accounts = await member("Accounts", "9444444444", "accounts@iceconnect.demo", UserRole.ACCOUNTS);
-  const service = await member("Service Desk", "9555555555", "service@iceconnect.demo", UserRole.SERVICE);
+  const telecaller = await member("Sales TC", "9111111111", "telecaller@iceconnect.demo", UserRole.SALES_EXECUTIVE);
+  const engineer = await member("Field Engineer", "9222222222", "engineer@iceconnect.demo", UserRole.SITE_ENGINEER);
+  const installer = await member("Lead Installer", "9333333333", "installer@iceconnect.demo", UserRole.INSTALLATION_TEAM);
+  const accounts = await member("Accounts", "9444444444", "accounts@iceconnect.demo", UserRole.ACCOUNTANT);
+  const service = await member("Service Desk", "9555555555", "service@iceconnect.demo", UserRole.SERVICE_TEAM);
 
   const leadsCreated = await prisma.$transaction([
     prisma.lead.create({

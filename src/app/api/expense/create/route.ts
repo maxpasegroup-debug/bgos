@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuthWithRoles } from "@/lib/auth";
+import { expenseCategorySchema } from "@/lib/expense-categories";
 import { roundMoney } from "@/lib/money-items";
 import { prisma } from "@/lib/prisma";
 import { USER_ADMIN_ROLES } from "@/lib/user-company";
@@ -9,7 +10,7 @@ import { USER_ADMIN_ROLES } from "@/lib/user-company";
 const bodySchema = z.object({
   title: z.string().trim().min(1).max(400),
   amount: z.number().finite().positive(),
-  category: z.string().trim().min(1).max(120),
+  category: expenseCategorySchema,
   date: z.string().min(1),
 });
 

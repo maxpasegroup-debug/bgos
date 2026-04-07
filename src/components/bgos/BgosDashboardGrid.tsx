@@ -25,9 +25,9 @@ import type { DashboardPayload } from "./useBgosData";
 
 const METRIC_LABELS = [
   "Total leads",
-  "Total revenue (won)",
+  "Revenue collected",
   "Installations done",
-  "Pending payments",
+  "Unpaid invoices",
 ] as const;
 
 function formatInr(n: number) {
@@ -139,11 +139,12 @@ export function BgosDashboardGrid({
       {/* 6 — Team */}
       <TeamPanel team={dashboard?.team ?? []} isAdmin={isAdmin} />
 
+      <HrSummaryPanel hr={dashboard?.hr} />
+      <InventorySummaryPanel inventory={dashboard?.inventory} />
+      <PartnerSummaryPanel partner={dashboard?.partner} />
+
       {/* 7 — Revenue */}
-      <RevenuePanel
-        breakdown={dashboard?.revenueBreakdown}
-        pendingPaymentCount={dashboard?.pendingPayments}
-      />
+      <RevenuePanel breakdown={dashboard?.revenueBreakdown} />
 
       {/* 8 — Risks */}
       <RisksPanel
@@ -448,18 +449,24 @@ function OperationsPanel({
   const q = operations?.installationQueue ?? 0;
   const svc = operations?.openServiceTickets ?? 0;
   const pend = operations?.pendingPayments ?? 0;
+  const visits = operations?.pendingSiteVisits ?? 0;
+  const approvals = operations?.pendingApprovals ?? 0;
+  const inProgress = operations?.installationsInProgress ?? 0;
 
   const modules = [
     { label: "Installation queue", value: q },
     { label: "Open service tickets", value: svc },
-    { label: "Pending payment records", value: pend },
+    { label: "Unpaid invoices", value: pend },
+    { label: "Pending site visits", value: visits },
+    { label: "Pending approvals", value: approvals },
+    { label: "Installations in progress", value: inProgress },
   ];
 
   return (
     <motion.section
       id="operations"
       variants={staggerRow}
-      className={`col-span-full grid grid-cols-1 sm:grid-cols-3 ${BGOS_GRID_GAP}`}
+      className={`col-span-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 ${BGOS_GRID_GAP}`}
       style={{ scrollMarginTop: "5.5rem" }}
     >
       {modules.map((m) => (
@@ -545,18 +552,102 @@ function TeamPanel({
   );
 }
 
+function HrSummaryPanel({ hr }: { hr: DashboardPayload["hr"] | undefined }) {
+  const rows = [
+    { label: "Total employees", value: String(hr?.totalEmployees ?? 0) },
+    { label: "Leaves pending", value: String(hr?.leavesPending ?? 0) },
+    { label: "Attendance % (today)", value: `${hr?.attendancePercent ?? 0}%` },
+  ];
+
+  return (
+    <motion.section variants={fadeUp} className="col-span-full" style={{ scrollMarginTop: "5.5rem" }}>
+      <DashboardSurface className="p-5 sm:p-6">
+        <h2 className="text-sm font-semibold text-white sm:text-base">HR summary</h2>
+        <p className="mt-1 text-xs text-white/45">
+          Workforce coverage snapshot from leave and attendance records.
+        </p>
+        <div className={`mt-4 grid grid-cols-1 sm:grid-cols-3 ${BGOS_GRID_GAP}`}>
+          {rows.map((r) => (
+            <div key={r.label} className="rounded-lg border border-white/10 bg-black/25 px-4 py-3">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-white/45">{r.label}</p>
+              <p className="mt-1 text-xl font-semibold tabular-nums text-white">{r.value}</p>
+            </div>
+          ))}
+        </div>
+      </DashboardSurface>
+    </motion.section>
+  );
+}
+
+function InventorySummaryPanel({
+  inventory,
+}: {
+  inventory: DashboardPayload["inventory"] | undefined;
+}) {
+  const rows = [
+    { label: "Products", value: String(inventory?.products ?? 0) },
+    { label: "Low stock alerts", value: String(inventory?.lowStockItems ?? 0) },
+    { label: "Total units", value: String(inventory?.totalUnits ?? 0) },
+  ];
+  return (
+    <motion.section variants={fadeUp} className="col-span-full" style={{ scrollMarginTop: "5.5rem" }}>
+      <DashboardSurface className="p-5 sm:p-6">
+        <h2 className="text-sm font-semibold text-white sm:text-base">Inventory summary</h2>
+        <p className="mt-1 text-xs text-white/45">Stock visibility and low-stock warnings for operations.</p>
+        <div className={`mt-4 grid grid-cols-1 sm:grid-cols-3 ${BGOS_GRID_GAP}`}>
+          {rows.map((r) => (
+            <div key={r.label} className="rounded-lg border border-white/10 bg-black/25 px-4 py-3">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-white/45">{r.label}</p>
+              <p className="mt-1 text-xl font-semibold tabular-nums text-white">{r.value}</p>
+            </div>
+          ))}
+        </div>
+      </DashboardSurface>
+    </motion.section>
+  );
+}
+
+function PartnerSummaryPanel({
+  partner,
+}: {
+  partner: DashboardPayload["partner"] | undefined;
+}) {
+  const rows = [
+    { label: "Total partner leads", value: String(partner?.totalPartnerLeads ?? 0) },
+    {
+      label: "Commission payable",
+      value: formatInr(partner?.totalCommissionPayable ?? 0),
+    },
+  ];
+  return (
+    <motion.section variants={fadeUp} className="col-span-full" style={{ scrollMarginTop: "5.5rem" }}>
+      <DashboardSurface className="p-5 sm:p-6">
+        <h2 className="text-sm font-semibold text-white sm:text-base">Partner summary</h2>
+        <p className="mt-1 text-xs text-white/45">Referral growth and pending commission visibility.</p>
+        <div className={`mt-4 grid grid-cols-1 sm:grid-cols-2 ${BGOS_GRID_GAP}`}>
+          {rows.map((r) => (
+            <div key={r.label} className="rounded-lg border border-white/10 bg-black/25 px-4 py-3">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-white/45">{r.label}</p>
+              <p className="mt-1 text-xl font-semibold tabular-nums text-white">{r.value}</p>
+            </div>
+          ))}
+        </div>
+      </DashboardSurface>
+    </motion.section>
+  );
+}
+
 function RevenuePanel({
   breakdown,
-  pendingPaymentCount,
 }: {
   breakdown: DashboardPayload["revenueBreakdown"] | undefined;
-  pendingPaymentCount: number | undefined;
 }) {
   const b = breakdown;
+  const unpaidN = b?.unpaidInvoiceCount ?? 0;
   const metrics = [
     {
-      label: "Revenue (MTD)",
-      sub: "Won deals closed this month",
+      label: "Collected (MTD)",
+      sub: "Invoice payments this month",
       value: formatInr(b?.monthlyWon ?? 0),
     },
     {
@@ -566,15 +657,15 @@ function RevenuePanel({
     },
     {
       label: "Late-stage leads",
-      sub: "Proposal + negotiation",
+      sub: "Proposal · negotiation · proposal won",
       value: String(b?.expectedClosures ?? 0),
     },
     {
-      label: "Pending payments",
+      label: "Outstanding",
       sub:
-        pendingPaymentCount != null
-          ? `${pendingPaymentCount} open record${pendingPaymentCount === 1 ? "" : "s"}`
-          : "Awaiting settlement",
+        unpaidN > 0
+          ? `${unpaidN} unpaid invoice${unpaidN === 1 ? "" : "s"}`
+          : "All invoices paid",
       value: formatInr(b?.pendingAmount ?? 0),
     },
   ];
@@ -608,13 +699,13 @@ function RevenuePanel({
       <motion.div variants={fadeUp}>
         <DashboardSurface className="p-6">
           <p className="text-xs font-medium uppercase tracking-wider text-white/45">
-            MTD won vs open pipeline
+            Collected this month vs open pipeline
           </p>
           <p className="text-[10px] text-white/35">Normalized to the larger of the two figures</p>
           <div className="mt-6 space-y-4">
             <div>
               <div className="mb-1 flex justify-between text-xs text-white/60">
-                <span>Month-to-date won</span>
+                <span>Invoice collections (MTD)</span>
                 <span className="tabular-nums">{formatInr(b?.monthlyWon ?? 0)}</span>
               </div>
               <div className="h-3 overflow-hidden rounded-full bg-white/[0.08]">
@@ -741,6 +832,7 @@ function NexaChatPanel({
   const reduceMotion = useReducedMotion();
   const brief = useMemo(() => buildNexaBrief(nexa, insights), [nexa, insights]);
   const [reply, setReply] = useState(brief);
+  const [actionBusy, setActionBusy] = useState<"fix" | "auto" | null>(null);
   useEffect(() => {
     setReply(brief);
   }, [brief]);
@@ -769,40 +861,65 @@ function NexaChatPanel({
       >
         <DashboardSurface tilt={false} className="!rounded-[11px] p-5 sm:p-6">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#FFC300]">
-            NEXA Control Panel
+            NEXA Control Center
           </p>
           <div className="mt-4 rounded-lg border border-white/[0.08] bg-black/30 px-4 py-3">
             <p className="text-sm text-white/85">{reply}</p>
           </div>
+          {insights.length > 0 ? (
+            <div className="mt-3 rounded-lg border border-white/[0.08] bg-black/25 p-3">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-white/45">
+                Insights
+              </p>
+              <ul className="space-y-1.5 text-xs text-white/80">
+                {insights.slice(0, 4).map((ins) => (
+                  <li key={ins.id}>- {formatInsightLine(ins)}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <p className="mb-2 mt-5 text-[10px] font-semibold uppercase tracking-wider text-white/40">
-            Quick actions
+            Suggested actions
           </p>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <button
               type="button"
-              onClick={() =>
+              disabled={actionBusy !== null}
+              onClick={async () => {
+                setActionBusy("fix");
                 setReply(
                   nexa
                     ? `Prioritize ${nexa.overdueFollowUps} overdue follow-ups first, then ${Math.max(0, nexa.pendingFollowUps - nexa.overdueFollowUps)} remaining.`
                     : "Open the pipeline section to prioritize follow-ups.",
-                )
-              }
+                );
+                setActionBusy(null);
+              }}
               className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-left text-xs font-medium text-white/85 transition-colors hover:border-[#FFC300]/35 hover:bg-white/[0.07] sm:text-sm"
             >
-              Triage follow-ups
+              {actionBusy === "fix" ? "Working..." : "Fix Now"}
             </button>
             <button
               type="button"
-              onClick={() =>
-                setReply(
-                  nexa
-                    ? `${nexa.opportunities} leads are in qualified / proposal / negotiation — align owners this week.`
-                    : "Review opportunities in the risks panel.",
-                )
-              }
+              disabled={actionBusy !== null}
+              onClick={async () => {
+                setActionBusy("auto");
+                const res = await fetch("/api/nexa/auto-handle", {
+                  method: "POST",
+                  credentials: "include",
+                });
+                if (res.ok) {
+                  const j = (await res.json()) as { created?: number };
+                  setReply(
+                    `Auto Handle completed. NEXA generated ${Number(j.created ?? 0)} action task(s).`,
+                  );
+                } else {
+                  setReply("Auto Handle could not complete. Try again shortly.");
+                }
+                setActionBusy(null);
+              }}
               className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-left text-xs font-medium text-white/85 transition-colors hover:border-[#FFC300]/35 hover:bg-white/[0.07] sm:text-sm"
             >
-              Focus opportunities
+              {actionBusy === "auto" ? "Auto handling..." : "Auto Handle"}
             </button>
           </div>
           <form

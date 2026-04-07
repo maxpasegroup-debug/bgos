@@ -113,7 +113,7 @@ export async function applyLeadPipelineUpdate(
   const targetStatus = statusChanging ? nextStatus! : existing.status;
 
   const lead = await prisma.$transaction(async (tx) => {
-    const updated = await tx.lead.update({
+    const updated: any = await tx.lead.update({
       where: { id: leadId },
       data: {
         ...(statusChanging ? { status: targetStatus } : {}),
@@ -189,6 +189,29 @@ export async function applyLeadPipelineUpdate(
       }
     }
 
+    if (statusChanging && targetStatus === LeadStatus.WON && updated.partnerId) {
+      const existingCommission = await (tx as any).commission.findFirst({
+        where: { companyId, leadId: updated.id },
+        select: { id: true },
+      });
+      if (!existingCommission) {
+        const baseValue = Number(updated.value ?? 0);
+        const commissionAmount = Math.max(0, Math.round(baseValue * 0.02 * 100) / 100);
+        if (commissionAmount > 0) {
+          await (tx as any).commission.create({
+            data: {
+              companyId,
+              partnerId: updated.partnerId,
+              leadId: updated.id,
+              amount: commissionAmount,
+              type: "DIRECT",
+              status: "PENDING",
+            },
+          });
+        }
+      }
+    }
+
     if (statusChanging) {
       await tx.task.updateMany({
         where: { leadId: updated.id, companyId, status: TaskStatus.PENDING },
@@ -211,6 +234,27 @@ export async function applyLeadPipelineUpdate(
           priority: taskPriorityAfterStatusChange(targetStatus),
         });
       }
+    }
+
+    if (statusChanging && targetStatus === LeadStatus.QUALIFIED && updated.assignedTo) {
+      await (tx as any).siteVisit.upsert({
+        where: {
+          companyId_leadId: {
+            companyId,
+            leadId: updated.id,
+          },
+        },
+        update: {
+          assignedTo: updated.assignedTo,
+          status: "SCHEDULED",
+        },
+        create: {
+          companyId,
+          leadId: updated.id,
+          assignedTo: updated.assignedTo,
+          status: "SCHEDULED",
+        },
+      });
     }
 
     if (assigneeChanging) {

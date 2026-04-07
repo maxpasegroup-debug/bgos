@@ -103,13 +103,19 @@ export type DashboardOperations = {
   installationQueue: number;
   openServiceTickets: number;
   pendingPayments: number;
+  pendingSiteVisits: number;
+  pendingApprovals: number;
+  installationsInProgress: number;
 };
 
 export type DashboardRevenueBreakdown = {
+  /** Invoice payments collected in the current calendar month. */
   monthlyWon: number;
   pipelineValue: number;
   expectedClosures: number;
+  /** Total receivable (unpaid invoice balances). */
   pendingAmount: number;
+  unpaidInvoiceCount: number;
 };
 
 export type DashboardRisks = {
@@ -124,6 +130,23 @@ export type DashboardHealth = {
   teamProductivity: number;
 };
 
+export type DashboardHrSummary = {
+  totalEmployees: number;
+  leavesPending: number;
+  attendancePercent: number;
+};
+
+export type DashboardInventorySummary = {
+  products: number;
+  lowStockItems: number;
+  totalUnits: number;
+};
+
+export type DashboardPartnerSummary = {
+  totalPartnerLeads: number;
+  totalCommissionPayable: number;
+};
+
 /** Money-layer metrics (invoices, payments, expenses) for BGOS financial overview. */
 export type DashboardMonthlyTrendPoint = {
   monthKey: string;
@@ -133,11 +156,16 @@ export type DashboardMonthlyTrendPoint = {
 
 export type DashboardFinancialOverview = {
   totalRevenue: number;
+  /** Sum of unpaid invoice balances. */
   pendingPayments: number;
+  unpaidInvoiceCount: number;
   monthlyRevenue: number;
   totalExpenses: number;
+  /** Expenses recorded in the current calendar month. */
+  currentMonthExpenses: number;
   netProfit: number;
   monthlyRevenueTrend: DashboardMonthlyTrendPoint[];
+  monthlyExpenseTrend: DashboardMonthlyTrendPoint[];
   expenseChangePercent: number | null;
 };
 
@@ -164,6 +192,9 @@ export type DashboardMetrics = {
   revenueBreakdown: DashboardRevenueBreakdown;
   risks: DashboardRisks;
   health: DashboardHealth;
+  hr: DashboardHrSummary;
+  inventory: DashboardInventorySummary;
+  partner: DashboardPartnerSummary;
   team: TeamMemberPerformance[];
   financial: DashboardFinancialOverview;
 };

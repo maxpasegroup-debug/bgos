@@ -55,6 +55,29 @@ export async function POST(request: NextRequest) {
     }
     if (!nameOut) nameOut = lead.name.trim();
     if (!phoneOut) phoneOut = lead.phone.trim();
+
+    const existingForLead = await prisma.quotation.findFirst({
+      where: {
+        companyId: session.companyId,
+        leadId,
+        status: { not: "REJECTED" },
+      },
+      select: { id: true, quotationNumber: true, status: true },
+      orderBy: { createdAt: "desc" },
+    });
+    if (existingForLead) {
+      return NextResponse.json(
+        {
+          ok: false as const,
+          error:
+            "This lead already has an active quotation. One quotation per lead — reject the old one or continue from Money.",
+          code: "DUPLICATE_QUOTATION" as const,
+          quotationId: existingForLead.id,
+          quotationNumber: existingForLead.quotationNumber,
+        },
+        { status: 409 },
+      );
+    }
   }
 
   if (!leadId && (!nameOut || !phoneOut)) {

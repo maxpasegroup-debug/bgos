@@ -25,7 +25,9 @@ export default async function BgosMoneyPage({
     }
     redirect(`/bgos/money/invoices${q.size ? `?${q}` : ""}`);
   }
-  const initialTab = typeof sp.tab === "string" ? sp.tab : null;
+  if (sp.tab === "expenses") {
+    redirect("/bgos/money/expenses");
+  }
   const initialLeadId = typeof sp.leadId === "string" ? sp.leadId : null;
   const initialQuotationId = typeof sp.quotationId === "string" ? sp.quotationId : null;
 
@@ -46,11 +48,7 @@ export default async function BgosMoneyPage({
       <Suspense
         fallback={<p className={`mx-auto max-w-5xl px-4 py-12 text-sm text-white/45 sm:px-6`}>Loading…</p>}
       >
-        <BgosMoneyPageClient
-          initialTab={initialTab}
-          initialLeadId={initialLeadId}
-          initialQuotationId={initialQuotationId}
-        />
+        <BgosMoneyPageClient initialLeadId={initialLeadId} initialQuotationId={initialQuotationId} />
       </Suspense>
     </div>
   );

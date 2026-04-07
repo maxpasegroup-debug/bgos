@@ -15,6 +15,8 @@ export type RevenueMetrics = {
   totalRevenue: number;
   /** Outstanding balance on invoices. */
   pendingPayments: number;
+  /** Invoices with a positive balance (excludes fully paid). */
+  unpaidInvoiceCount: number;
   /** Sum of `InvoicePayment` rows dated in the current calendar month. */
   monthlyRevenue: number;
   /** Last N calendar months of payment inflow (including zeros). */
@@ -32,6 +34,9 @@ export type ExpenseMetrics = {
 export type FinancialOverview = RevenueMetrics &
   ExpenseMetrics & {
     netProfit: number;
+    /** Alias for {@link ExpenseMetrics.currentMonthTotal} (dashboards). */
+    currentMonthExpenses: number;
+    monthlyExpenseTrend: MonthlyTrendPoint[];
   };
 
 function monthKey(d: Date): string {
@@ -92,9 +97,13 @@ export async function calculateRevenue(
   ]);
 
   let pendingPayments = 0;
+  let unpaidInvoiceCount = 0;
   for (const inv of invoices) {
     const due = roundMoney(inv.totalAmount - inv.paidAmount);
-    if (due > 1e-9) pendingPayments = roundMoney(pendingPayments + due);
+    if (due > 1e-9) {
+      pendingPayments = roundMoney(pendingPayments + due);
+      unpaidInvoiceCount += 1;
+    }
   }
 
   const keys: string[] = [];
@@ -119,6 +128,7 @@ export async function calculateRevenue(
   return {
     totalRevenue: roundMoney(paidAgg._sum.paidAmount ?? 0),
     pendingPayments,
+    unpaidInvoiceCount,
     monthlyRevenue: roundMoney(monthPaymentsAgg._sum.amount ?? 0),
     monthlyRevenueTrend,
   };
@@ -169,13 +179,54 @@ export async function calculateExpenses(companyId: string): Promise<ExpenseMetri
   };
 }
 
+/**
+ * Last N calendar months of expense totals (including zero months).
+ */
+export async function calculateExpenseMonthlyTrend(
+  companyId: string,
+  trendMonthCount = 6,
+): Promise<MonthlyTrendPoint[]> {
+  const now = new Date();
+  const trendStart = startOfMonth(addMonths(now, -(trendMonthCount - 1)));
+  const trendEnd = endOfMonth(now);
+
+  const rows = await prisma.expense.findMany({
+    where: { companyId, date: { gte: trendStart, lte: trendEnd } },
+    select: { amount: true, date: true },
+  });
+
+  const keys: string[] = [];
+  for (let i = 0; i < trendMonthCount; i++) {
+    keys.push(monthKey(startOfMonth(addMonths(now, -(trendMonthCount - 1 - i)))));
+  }
+  const bucket = new Map<string, number>();
+  for (const k of keys) bucket.set(k, 0);
+  for (const r of rows) {
+    const k = monthKey(r.date);
+    if (!bucket.has(k)) continue;
+    bucket.set(k, roundMoney((bucket.get(k) ?? 0) + r.amount));
+  }
+
+  return keys.map((k) => ({
+    monthKey: k,
+    label: monthLabel(k),
+    amount: roundMoney(bucket.get(k) ?? 0),
+  }));
+}
+
 /** Full boss snapshot: revenue + expenses + net profit (all-time). */
 export async function getFinancialOverview(companyId: string): Promise<FinancialOverview> {
-  const [rev, exp] = await Promise.all([calculateRevenue(companyId), calculateExpenses(companyId)]);
+  const [rev, exp, monthlyExpenseTrend] = await Promise.all([
+    calculateRevenue(companyId),
+    calculateExpenses(companyId),
+    calculateExpenseMonthlyTrend(companyId),
+  ]);
   const netProfit = roundMoney(rev.totalRevenue - exp.totalExpenses);
   return {
     ...rev,
     ...exp,
+    currentMonthExpenses: exp.currentMonthTotal,
+    monthlyExpenseTrend,
     netProfit,
   };
 }

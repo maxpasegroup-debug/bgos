@@ -14,8 +14,13 @@ export async function GET(request: NextRequest) {
   const session = await requireAuthWithRoles(request, USER_ADMIN_ROLES);
   if (session instanceof NextResponse) return session;
 
+  const leadId = request.nextUrl.searchParams.get("leadId");
+
   const rows = await prisma.invoice.findMany({
-    where: { companyId: session.companyId },
+    where: {
+      companyId: session.companyId,
+      ...(leadId ? { leadId } : {}),
+    },
     orderBy: { createdAt: "desc" },
     include: {
       lead: { select: { name: true, phone: true } },

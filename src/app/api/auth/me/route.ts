@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { jsonSuccess } from "@/lib/api-response";
 import { ACTIVE_COMPANY_COOKIE_NAME, AUTH_COOKIE_NAME } from "@/lib/auth-config";
 import { getMeSessionFromToken } from "@/lib/auth";
 import { isPlanLockedToBasic } from "@/lib/plan-production-lock";
@@ -17,8 +18,7 @@ export async function GET() {
 
   switch (session.status) {
     case "none":
-      return NextResponse.json({
-        ok: true as const,
+      return jsonSuccess({
         authenticated: false as const,
       });
     case "expired":
@@ -46,8 +46,7 @@ export async function GET() {
         where: { id: session.user.sub },
         select: { name: true },
       });
-      return NextResponse.json({
-        ok: true as const,
+      return jsonSuccess({
         authenticated: true as const,
         planLockedToBasic: isPlanLockedToBasic(),
         user: {

@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { jsonError, jsonSuccess, parseJsonBodyZod } from "@/lib/api-response";
 import { requireAuthWithRoles } from "@/lib/auth";
 import { parseItemsJson, resolveInvoiceStatus, roundMoney } from "@/lib/money-items";
 import { nextInvoiceNumber } from "@/lib/money-numbers";
@@ -15,23 +16,8 @@ export async function POST(request: NextRequest) {
   const session = await requireAuthWithRoles(request, USER_ADMIN_ROLES);
   if (session instanceof NextResponse) return session;
 
-  let json: unknown;
-  try {
-    json = await request.json();
-  } catch {
-    return NextResponse.json(
-      { ok: false as const, error: "Invalid JSON", code: "BAD_REQUEST" as const },
-      { status: 400 },
-    );
-  }
-
-  const parsed = bodySchema.safeParse(json);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { ok: false as const, error: "Invalid body", code: "VALIDATION" as const },
-      { status: 400 },
-    );
-  }
+  const parsed = await parseJsonBodyZod(request, bodySchema);
+  if (!parsed.ok) return parsed.response;
 
   const { quotationId } = parsed.data;
 
@@ -40,21 +26,11 @@ export async function POST(request: NextRequest) {
   });
 
   if (!quotation) {
-    return NextResponse.json(
-      { ok: false as const, error: "Quotation not found", code: "NOT_FOUND" as const },
-      { status: 404 },
-    );
+    return jsonError(404, "NOT_FOUND", "Quotation not found");
   }
 
   if (quotation.status !== "APPROVED") {
-    return NextResponse.json(
-      {
-        ok: false as const,
-        error: "Quotation must be APPROVED before creating an invoice",
-        code: "INVALID_STATE" as const,
-      },
-      { status: 409 },
-    );
+    return jsonError(409, "INVALID_STATE", "Quotation must be APPROVED before creating an invoice");
   }
 
   const dup = await prisma.invoice.findFirst({
@@ -62,24 +38,15 @@ export async function POST(request: NextRequest) {
     select: { id: true, invoiceNumber: true },
   });
   if (dup) {
-    return NextResponse.json(
-      {
-        ok: false as const,
-        error: "Invoice already exists for this quotation",
-        code: "DUPLICATE" as const,
-        invoiceId: dup.id,
-        invoiceNumber: dup.invoiceNumber,
-      },
-      { status: 409 },
-    );
+    return jsonError(409, "DUPLICATE", "Invoice already exists for this quotation", {
+      invoiceId: dup.id,
+      invoiceNumber: dup.invoiceNumber,
+    });
   }
 
   const items = parseItemsJson(quotation.items);
   if (!items) {
-    return NextResponse.json(
-      { ok: false as const, error: "Invalid quotation line items", code: "DATA" as const },
-      { status: 500 },
-    );
+    return jsonError(500, "DATA", "Invalid quotation line items");
   }
 
   const invoiceNumber = await nextInvoiceNumber(session.companyId);
@@ -110,8 +77,7 @@ export async function POST(request: NextRequest) {
     dueDate: inv.dueDate,
   });
 
-  return NextResponse.json({
-    ok: true as const,
+  return jsonSuccess({
     invoice: {
       id: inv.id,
       companyId: inv.companyId,

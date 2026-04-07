@@ -8,7 +8,7 @@ import { requireIceconnectRole } from "@/lib/iceconnect-route-guard";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
-  const session = await requireIceconnectRole(request, [UserRole.ACCOUNTS]);
+  const session = await requireIceconnectRole(request, [UserRole.ACCOUNTANT]);
   if (session instanceof NextResponse) return session;
 
   const parsed = parseIceconnectListQuery(request, 200);

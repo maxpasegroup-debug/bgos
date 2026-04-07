@@ -17,7 +17,7 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const session = await requireIceconnectRole(request, [UserRole.ACCOUNTS]);
+  const session = await requireIceconnectRole(request, [UserRole.ACCOUNTANT]);
   if (session instanceof NextResponse) return session;
 
   const body = await parseJsonBodyZod(request, bodySchema);

@@ -20,6 +20,9 @@
 # production
 /build
 
+# user uploads (documents)
+/uploads
+
 # misc
 .DS_Store
 *.pem

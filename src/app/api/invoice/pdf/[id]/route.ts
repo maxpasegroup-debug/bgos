@@ -2,8 +2,9 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { requireAuthWithRoles } from "@/lib/auth";
 import { companyCurrentApiSelect, type CompanyCurrentApiRow } from "@/lib/company-db-select";
+import { resolveInvoiceCustomer } from "@/lib/invoice-customer";
 import { parseItemsJson, resolveInvoiceStatus } from "@/lib/money-items";
-import { buildInvoicePdf } from "@/lib/pdf-money";
+import { buildInvoicePdf, pdfAttachmentFilename } from "@/lib/pdf-money";
 import { prisma } from "@/lib/prisma";
 import { USER_ADMIN_ROLES } from "@/lib/user-company";
 
@@ -18,6 +19,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const [inv, company] = await Promise.all([
     prisma.invoice.findFirst({
       where: { id, companyId: session.companyId },
+      include: {
+        lead: { select: { name: true, phone: true } },
+        quotation: { select: { customerName: true, customerPhone: true } },
+      },
     }),
     prisma.company.findUnique({
       where: { id: session.companyId },
@@ -48,6 +53,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
     dueDate: inv.dueDate,
   });
 
+  const { customerName, customerPhone } = resolveInvoiceCustomer(inv);
+
   const pdf = await buildInvoicePdf({
     company,
     docNumber: inv.invoiceNumber,
@@ -57,9 +64,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
     totalAmount: inv.totalAmount,
     paidAmount: inv.paidAmount,
     status: displayStatus,
+    customerName,
+    customerPhone,
+    customerAddress: null,
   });
 
-  const filename = `${inv.invoiceNumber.replace(/[/\\?%*:|"<>]/g, "-")}.pdf`;
+  const filename = pdfAttachmentFilename("invoice", inv.invoiceNumber);
   return new NextResponse(new Uint8Array(pdf), {
     status: 200,
     headers: {

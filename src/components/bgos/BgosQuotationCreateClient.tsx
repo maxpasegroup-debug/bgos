@@ -231,8 +231,19 @@ export function BgosQuotationCreateClient({ initialLeadId }: { initialLeadId: st
           status,
         }),
       });
-      const data = (await res.json()) as { ok?: boolean; error?: string };
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        code?: string;
+        quotationId?: string;
+      };
       if (!res.ok || !data.ok) {
+        if (data.code === "DUPLICATE_QUOTATION" && effectiveLeadId && typeof data.quotationId === "string") {
+          setFormError(
+            `${typeof data.error === "string" ? data.error : "Active quotation exists."} Open the lead or Money → Quotations to continue.`,
+          );
+          return;
+        }
         setFormError(typeof data.error === "string" ? data.error : "Could not save quotation");
         return;
       }

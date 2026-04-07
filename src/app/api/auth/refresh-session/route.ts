@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { jsonSuccess } from "@/lib/api-response";
 import { requireActiveCompanyMembership } from "@/lib/auth";
 import { MintSessionTokenError, mintSessionAccessToken } from "@/lib/mint-session-token";
 import { handleApiError } from "@/lib/route-error";
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
       email: session.email,
       activeCompanyId: session.companyId,
     });
-    const res = NextResponse.json({ ok: true as const });
+    const res = jsonSuccess({ refreshed: true });
     setSessionCookie(res, token);
     return res;
   } catch (e) {

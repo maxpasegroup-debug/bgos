@@ -9,6 +9,7 @@ const navItems = [
   { id: "home", label: "Home", href: "/bgos", icon: HomeIcon },
   { id: "sales", label: "Sales", href: "/bgos/sales", icon: SalesIcon },
   { id: "operations", label: "Operations", href: "/bgos/operations", icon: OpsIcon },
+  { id: "documents", label: "Documents", href: "/bgos/documents", icon: DocsIcon },
   { id: "team", label: "Team", href: "/bgos/team", icon: TeamIcon },
   { id: "revenue", label: "Revenue", href: "/bgos/revenue", icon: RevenueIcon },
   { id: "risks", label: "Risks", href: "/bgos/risks", icon: RisksIcon },
@@ -131,6 +132,27 @@ function OpsIcon({ className }: { className?: string }) {
         strokeLinejoin="round"
         strokeWidth={1.75}
         d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+      />
+    </svg>
+  );
+}
+
+function DocsIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" aria-hidden>
+      <path
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.75}
+        d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+      />
+      <path
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.75}
+        d="M13 3v6h6"
       />
     </svg>
   );

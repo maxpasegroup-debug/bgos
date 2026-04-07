@@ -12,7 +12,7 @@ const bodySchema = z.object({
 });
 
 export async function PATCH(request: NextRequest) {
-  const session = await requireIceconnectRole(request, [UserRole.TELECALLER]);
+  const session = await requireIceconnectRole(request, [UserRole.SALES_EXECUTIVE]);
   if (session instanceof NextResponse) return session;
 
   let json: unknown;

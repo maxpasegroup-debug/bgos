@@ -2,6 +2,7 @@ import { LeadStatus } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { jsonError, jsonSuccess, parseJsonBodyZod } from "@/lib/api-response";
 import { requireAuthWithCompany } from "@/lib/auth";
 import { ACTIVITY_TYPES, logActivity } from "@/lib/activity-log";
 import { LEAD_ACTIVITY, logLeadActivity } from "@/lib/lead-activity";
@@ -17,31 +18,17 @@ const bodySchema = z.object({
   phone: z.string().trim().min(1).max(32),
   value: z.number().nonnegative().optional(),
   assignedToUserId: z.string().optional(),
+  partnerId: z.string().cuid().optional(),
 });
 
 export async function POST(request: NextRequest) {
   const session = await requireAuthWithCompany(request);
   if (session instanceof NextResponse) return session;
 
-  let json: unknown;
-  try {
-    json = await request.json();
-  } catch {
-    return NextResponse.json(
-      { ok: false as const, error: "Invalid JSON body", code: "BAD_REQUEST" },
-      { status: 400 },
-    );
-  }
+  const parsed = await parseJsonBodyZod(request, bodySchema);
+  if (!parsed.ok) return parsed.response;
 
-  const parsed = bodySchema.safeParse(json);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { ok: false as const, error: parsed.error.flatten(), code: "VALIDATION_ERROR" },
-      { status: 400 },
-    );
-  }
-
-  const { name, phone, value, assignedToUserId } = parsed.data;
+  const { name, phone, value, assignedToUserId, partnerId } = parsed.data;
   const companyId = session.companyId;
   const actorId = session.sub;
 
@@ -49,12 +36,19 @@ export async function POST(request: NextRequest) {
   if (assignedToUserId !== undefined) {
     const assignee = await findUserInCompany(assignedToUserId, companyId);
     if (!assignee) {
-      return NextResponse.json(
-        { ok: false as const, error: "Assignee not found in your company", code: "NOT_FOUND" },
-        { status: 404 },
-      );
+      return jsonError(404, "NOT_FOUND", "Assignee not found in your company");
     }
     assigneeId = assignee.id;
+  }
+
+  if (partnerId) {
+    const partner = await (prisma as any).channelPartner.findFirst({
+      where: { id: partnerId, companyId },
+      select: { id: true },
+    });
+    if (!partner) {
+      return jsonError(404, "NOT_FOUND", "Partner not found in your company");
+    }
   }
 
   const lead = await prisma.$transaction(async (tx) => {
@@ -65,6 +59,7 @@ export async function POST(request: NextRequest) {
         value: value ?? null,
         companyId,
         assignedTo: assigneeId,
+        ...(partnerId ? { partnerId } : {}),
         status: LeadStatus.NEW,
       },
       include: {
@@ -122,8 +117,5 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  return NextResponse.json(
-    { ok: true as const, lead: serializeLead(lead) },
-    { status: 201 },
-  );
+  return jsonSuccess({ lead: serializeLead(lead) }, 201);
 }

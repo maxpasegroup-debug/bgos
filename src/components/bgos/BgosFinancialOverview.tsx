@@ -17,6 +17,10 @@ function formatInr(n: number) {
 
 export function BgosFinancialOverview({ financial }: { financial: DashboardFinancialOverview }) {
   const maxTrend = Math.max(1, ...financial.monthlyRevenueTrend.map((t) => t.amount));
+  const maxExpenseTrend = Math.max(
+    1,
+    ...financial.monthlyExpenseTrend.map((t) => t.amount),
+  );
 
   const showPendingAlert = financial.pendingPayments > 1e-9;
   const expPct = financial.expenseChangePercent;
@@ -37,12 +41,35 @@ export function BgosFinancialOverview({ financial }: { financial: DashboardFinan
           </p>
         </div>
         <Link
-          href="/bgos/money"
+          href="/bgos/money/expenses"
           className="mt-2 text-xs font-medium text-[#FFC300] transition hover:text-[#FFE066] sm:mt-0"
         >
-          Open money →
+          Expenses →
         </Link>
       </div>
+
+      <DashboardSurface
+        tilt={false}
+        className="border-white/12 !bg-gradient-to-br from-amber-950/40 to-black/40 p-4 ring-1 ring-amber-500/20 sm:p-5"
+      >
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-200/75">
+          Spend this month
+        </p>
+        <p className="mt-1 text-lg font-semibold tabular-nums text-white sm:text-xl">
+          You spent{" "}
+          <span className="text-amber-200">{formatInr(financial.currentMonthExpenses)}</span> this
+          month
+        </p>
+        <p className="mt-2 text-[10px] text-white/40">
+          <Link href="/bgos/money/expenses" className="font-medium text-[#FFC300] hover:text-[#FFE066]">
+            View breakdown and charts
+          </Link>{" "}
+          ·{" "}
+          <Link href="/bgos/money" className="text-white/50 hover:text-white/70">
+            Money home
+          </Link>
+        </p>
+      </DashboardSurface>
 
       {(showPendingAlert || showExpenseUpAlert) && (
         <div className="flex flex-col gap-2">
@@ -52,7 +79,11 @@ export function BgosFinancialOverview({ financial }: { financial: DashboardFinan
               role="status"
             >
               <span className="font-semibold text-red-200">Outstanding receivables: </span>
-              {formatInr(financial.pendingPayments)} pending from customers
+              {formatInr(financial.pendingPayments)} across{" "}
+              <span className="tabular-nums font-medium">
+                {financial.unpaidInvoiceCount}
+              </span>{" "}
+              unpaid invoice{financial.unpaidInvoiceCount === 1 ? "" : "s"}
             </div>
           ) : null}
           {showExpenseUpAlert ? (
@@ -105,7 +136,10 @@ export function BgosFinancialOverview({ financial }: { financial: DashboardFinan
           <p className="mt-2 text-xl font-semibold tabular-nums text-white sm:text-2xl">
             {formatInr(financial.totalExpenses)}
           </p>
-          <p className="mt-1 text-[10px] text-white/35">Recorded expenses (all time)</p>
+          <p className="mt-1 text-[10px] text-white/35">
+            All time · This month{" "}
+            <span className="tabular-nums text-white/55">{formatInr(financial.currentMonthExpenses)}</span>
+          </p>
         </DashboardSurface>
 
         <DashboardSurface className="border-emerald-500/30 !bg-emerald-950/25 p-4 sm:p-5 ring-1 ring-emerald-500/15">
@@ -136,6 +170,32 @@ export function BgosFinancialOverview({ financial }: { financial: DashboardFinan
                 <div className="flex w-full flex-1 items-end justify-center">
                   <div
                     className="w-full max-w-[3rem] rounded-t-md bg-gradient-to-t from-[#FF3B3B]/70 to-[#FFC300]/80"
+                    style={{ height: `${Math.max(8, h)}%` }}
+                    title={`${pt.label}: ${formatInr(pt.amount)}`}
+                  />
+                </div>
+                <span className="truncate text-center text-[9px] font-medium text-white/50 sm:text-[10px]">
+                  {pt.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </DashboardSurface>
+
+      <DashboardSurface tilt={false} className="p-4 sm:p-6">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-white/45">
+          Monthly expense trend
+        </p>
+        <p className="mt-0.5 text-[10px] text-white/35">Recorded expenses by month</p>
+        <div className="mt-6 flex h-36 items-end gap-2 sm:gap-3">
+          {financial.monthlyExpenseTrend.map((pt) => {
+            const h = Math.round((pt.amount / maxExpenseTrend) * 100);
+            return (
+              <div key={pt.monthKey} className="flex min-w-0 flex-1 flex-col items-center gap-2">
+                <div className="flex w-full flex-1 items-end justify-center">
+                  <div
+                    className="w-full max-w-[3rem] rounded-t-md bg-gradient-to-t from-red-500/45 to-amber-500/75"
                     style={{ height: `${Math.max(8, h)}%` }}
                     title={`${pt.label}: ${formatInr(pt.amount)}`}
                   />

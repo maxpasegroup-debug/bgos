@@ -2,12 +2,25 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import type { z, ZodTypeAny } from "zod";
 
+export type ApiSuccessBody<T> = {
+  success: true;
+  ok: true;
+  data: T;
+};
+
 export type ApiErrorBody = {
+  success: false;
   ok: false;
+  message: string;
   error: string;
   code: string;
   details?: unknown;
 };
+
+export function jsonSuccess<T>(data: T, status = 200): NextResponse<ApiSuccessBody<T>> {
+  const expanded = typeof data === "object" && data !== null ? (data as Record<string, unknown>) : {};
+  return NextResponse.json({ success: true, ok: true, data, ...expanded }, { status });
+}
 
 export function jsonError(
   status: number,
@@ -15,7 +28,7 @@ export function jsonError(
   message: string,
   details?: unknown,
 ): NextResponse<ApiErrorBody> {
-  const body: ApiErrorBody = { ok: false, error: message, code };
+  const body: ApiErrorBody = { success: false, ok: false, message, error: message, code };
   if (details !== undefined) body.details = details;
   return NextResponse.json(body, { status });
 }

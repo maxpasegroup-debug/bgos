@@ -5,17 +5,36 @@ import { useState } from "react";
 import { useBgosDashboardContext } from "./BgosDataProvider";
 
 const ROLE_OPTIONS: UserRole[] = [
-  UserRole.TELECALLER,
-  UserRole.ENGINEER,
-  UserRole.INSTALLER,
-  UserRole.ACCOUNTS,
-  UserRole.SERVICE,
-  UserRole.MANAGER,
-  UserRole.ADMIN,
+  UserRole.SALES_HEAD,
+  UserRole.SALES_EXECUTIVE,
+  UserRole.CHANNEL_PARTNER,
+  UserRole.OPERATIONS_HEAD,
+  UserRole.SITE_ENGINEER,
+  UserRole.PRO,
+  UserRole.INSTALLATION_TEAM,
+  UserRole.SERVICE_TEAM,
+  UserRole.INVENTORY_MANAGER,
+  UserRole.ACCOUNTANT,
+  UserRole.LCO,
+  UserRole.HR_MANAGER,
 ];
 
 function roleLabel(r: UserRole) {
-  return r.charAt(0) + r.slice(1).toLowerCase().replace(/_/g, " ");
+  const labels: Partial<Record<UserRole, string>> = {
+    SALES_HEAD: "Sales Head",
+    SALES_EXECUTIVE: "Sales Executive",
+    CHANNEL_PARTNER: "Channel Partner",
+    OPERATIONS_HEAD: "Operations Head",
+    SITE_ENGINEER: "Site Engineer",
+    PRO: "PRO (Approvals / KSEB)",
+    INSTALLATION_TEAM: "Installation Team",
+    SERVICE_TEAM: "Service Team",
+    INVENTORY_MANAGER: "Inventory Manager",
+    ACCOUNTANT: "Accountant",
+    LCO: "Loan Compliance Officer",
+    HR_MANAGER: "HR Manager",
+  };
+  return labels[r] ?? (r.charAt(0) + r.slice(1).toLowerCase().replace(/_/g, " "));
 }
 
 export function BgosAddEmployeeForm() {
@@ -24,7 +43,7 @@ export function BgosAddEmployeeForm() {
   const [mobile, setMobile] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<UserRole>(UserRole.TELECALLER);
+  const [role, setRole] = useState<UserRole>(UserRole.SALES_EXECUTIVE);
   const [msg, setMsg] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -52,7 +71,7 @@ export function BgosAddEmployeeForm() {
       setMobile("");
       setEmail("");
       setPassword("");
-      setRole(UserRole.TELECALLER);
+      setRole(UserRole.SALES_EXECUTIVE);
       setMsg("Employee added. Dashboard will refresh.");
       refetch();
     } catch {

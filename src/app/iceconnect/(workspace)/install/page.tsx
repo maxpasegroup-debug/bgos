@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getAuthUserFromHeaders } from "@/lib/auth";
-import { IceconnectInstallerDashboard } from "@/components/iceconnect/IceconnectInstallerDashboard";
+import { IceconnectOperationsDashboard } from "@/components/iceconnect/IceconnectOperationsDashboard";
 import { canAccessIceconnectDashboard, getRoleHome } from "@/lib/role-routing";
 
 export default async function IceconnectInstallPage() {
@@ -9,5 +9,5 @@ export default async function IceconnectInstallPage() {
   if (!canAccessIceconnectDashboard("install", user.role)) {
     redirect(getRoleHome(user.role));
   }
-  return <IceconnectInstallerDashboard />;
+  return <IceconnectOperationsDashboard module="install" />;
 }
