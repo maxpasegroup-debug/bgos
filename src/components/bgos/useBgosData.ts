@@ -3,7 +3,12 @@
 import { CompanyPlan, UserRole } from "@prisma/client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { normalizeFinancialOverview } from "@/lib/dashboard-client-defaults";
-import type { DashboardMetrics } from "@/types";
+import type {
+  DashboardAnalytics,
+  DashboardAnalyticsRangeMeta,
+  DashboardMetrics,
+  SalesBoosterPro,
+} from "@/types";
 
 export type DashboardPayload = DashboardMetrics;
 
@@ -11,6 +16,11 @@ async function readDashboardErrorMessage(res: Response): Promise<string> {
   try {
     const j = (await res.json()) as { error?: string; code?: string };
     if (typeof j.error === "string" && j.error.trim()) return j.error;
+    if (j.code === "TRIAL_EXPIRED") {
+      return typeof j.error === "string" && j.error.trim()
+        ? j.error
+        : "Your free trial has expired. Upgrade to continue.";
+    }
     if (j.code === "UNAUTHORIZED") return "Session expired — sign in again.";
     if (j.code === "FORBIDDEN") return "You do not have access to this dashboard.";
   } catch {
@@ -74,9 +84,40 @@ const EMPTY_PARTNER: DashboardMetrics["partner"] = {
   totalCommissionPayable: 0,
 };
 
+const EMPTY_ANALYTICS: DashboardAnalytics = {
+  revenue: 0,
+  leads: 0,
+  conversionPercent: 0,
+  expenses: 0,
+  trend: [],
+};
+
+const EMPTY_ANALYTICS_RANGE: DashboardAnalyticsRangeMeta = {
+  preset: "this_month",
+  from: "",
+  to: "",
+  label: "This Month",
+};
+
+function normalizeSalesBooster(sb: DashboardPayload["salesBooster"]): DashboardPayload["salesBooster"] {
+  if (!sb || sb.plan === "BASIC" || !sb.featuresUnlocked) return sb;
+  const pro = sb as SalesBoosterPro;
+  return {
+    ...pro,
+    onLeadCreated: pro.onLeadCreated ?? "both",
+    followUpScheduleEnabled: pro.followUpScheduleEnabled ?? true,
+    scheduledBoosterTaskCount: pro.scheduledBoosterTaskCount ?? 0,
+  };
+}
+
 function normalizeDashboard(d: DashboardPayload): DashboardPayload {
   return {
     ...d,
+    automationCenter:
+      d.automationCenter === null || d.automationCenter === undefined
+        ? null
+        : d.automationCenter,
+    salesBooster: normalizeSalesBooster(d.salesBooster),
     insights: Array.isArray(d.insights) ? d.insights : [],
     pipeline: Array.isArray(d.pipeline) ? d.pipeline : [],
     nexa: d.nexa ?? EMPTY_NEXA,
@@ -89,10 +130,16 @@ function normalizeDashboard(d: DashboardPayload): DashboardPayload {
     partner: d.partner ?? EMPTY_PARTNER,
     team: Array.isArray(d.team) ? d.team : [],
     financial: normalizeFinancialOverview(d.financial),
+    analytics: d.analytics ?? EMPTY_ANALYTICS,
+    analyticsRange: d.analyticsRange ?? EMPTY_ANALYTICS_RANGE,
   };
 }
 
-export function useBgosData(pollMs = 4000) {
+export function useBgosData(
+  pollMs = 4000,
+  analyticsRangePreset: string = "this_month",
+  onPlanProRequired?: () => void,
+) {
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [companyPlan, setCompanyPlan] = useState<CompanyPlan | null>(null);
@@ -101,6 +148,8 @@ export function useBgosData(pollMs = 4000) {
     () => process.env.NODE_ENV === "production",
   );
   const [sessionRole, setSessionRole] = useState<UserRole | null>(null);
+  /** Active Basic company trial ended (JWT and/or DB); mutations should be blocked in UI. */
+  const [basicTrialExpired, setBasicTrialExpired] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
   /** Bumped after each successful `/api/dashboard` load so pipeline / lists stay in sync. */
   const [syncGeneration, setSyncGeneration] = useState(0);
@@ -118,13 +167,23 @@ export function useBgosData(pollMs = 4000) {
         (j: {
           authenticated?: boolean;
           planLockedToBasic?: boolean;
+          basicTrialExpired?: boolean;
           user?: { companyPlan?: CompanyPlan; role?: UserRole };
         } | null) => {
           if (j?.authenticated === true) {
             setPlanLockedToBasic(j.planLockedToBasic === true);
+            setBasicTrialExpired(j.basicTrialExpired === true);
+          } else {
+            setBasicTrialExpired(false);
           }
           const p = j?.user?.companyPlan;
-          if (p === CompanyPlan.BASIC || p === CompanyPlan.PRO) setCompanyPlan(p);
+          if (
+            p === CompanyPlan.BASIC ||
+            p === CompanyPlan.PRO ||
+            p === CompanyPlan.ENTERPRISE
+          ) {
+            setCompanyPlan(p);
+          }
           if (j?.user?.role) setSessionRole(j.user.role);
         },
       )
@@ -136,13 +195,55 @@ export function useBgosData(pollMs = 4000) {
 
     const load = async () => {
       try {
-        const res = await fetch("/api/dashboard", { credentials: "include" });
+        const dashUrl = `/api/dashboard?range=${encodeURIComponent(analyticsRangePreset)}`;
+        const res = await fetch(dashUrl, { credentials: "include" });
+        const text = await res.text();
         if (!res.ok) {
-          const msg = await readDashboardErrorMessage(res);
-          if (!cancelled && !okOnce.current) setError(msg);
+          if (res.status === 403) {
+            try {
+              const j = JSON.parse(text) as { code?: string; error?: string };
+              if (j.code === "PLAN_PRO_REQUIRED") {
+                onPlanProRequired?.();
+                if (!cancelled) setError(null);
+                return;
+              }
+              if (!cancelled && !okOnce.current) {
+                if (j.code === "TRIAL_EXPIRED") {
+                  setError(
+                    typeof j.error === "string" && j.error.trim()
+                      ? j.error
+                      : "Your free trial has expired. Upgrade to continue.",
+                  );
+                } else {
+                  setError(
+                    typeof j.error === "string" && j.error.trim()
+                      ? j.error
+                      : "This feature requires a Pro plan.",
+                  );
+                }
+              }
+            } catch {
+              if (!cancelled && !okOnce.current) setError("Could not load live data.");
+            }
+            return;
+          }
+          if (!cancelled && !okOnce.current) {
+            try {
+              const j = JSON.parse(text) as { error?: string; code?: string };
+              if (typeof j.error === "string" && j.error.trim()) {
+                setError(j.error);
+              } else if (j.code === "UNAUTHORIZED" || res.status === 401) {
+                setError("Session expired — sign in again.");
+              } else {
+                setError("Could not load live data.");
+              }
+            } catch {
+              setError(res.status === 401 ? "Session expired — sign in again." : "Could not load live data.");
+            }
+          }
           return;
         }
-        const d = (await res.json()) as DashboardPayload;
+        const d = JSON.parse(text) as DashboardPayload;
         const salesBooster =
           d.salesBooster ??
           ({
@@ -151,8 +252,20 @@ export function useBgosData(pollMs = 4000) {
             companyName: "",
           } as const);
         if (!cancelled) {
-          if (salesBooster.plan === CompanyPlan.BASIC || salesBooster.plan === CompanyPlan.PRO) {
-            setCompanyPlan(salesBooster.plan);
+          if (
+            salesBooster.plan === "BASIC" ||
+            salesBooster.plan === "PRO" ||
+            salesBooster.plan === "ENTERPRISE"
+          ) {
+            if (salesBooster.plan !== "BASIC") {
+              setCompanyPlan(
+                salesBooster.plan === "ENTERPRISE"
+                  ? CompanyPlan.ENTERPRISE
+                  : CompanyPlan.PRO,
+              );
+            } else {
+              setCompanyPlan(CompanyPlan.BASIC);
+            }
           }
           setDashboard(
             normalizeDashboard({
@@ -177,9 +290,11 @@ export function useBgosData(pollMs = 4000) {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [pollMs, reloadToken]);
+  }, [pollMs, reloadToken, analyticsRangePreset, onPlanProRequired]);
 
   const isLoading = dashboard === null && error === null;
+
+  const trialReadOnly = basicTrialExpired;
 
   return {
     dashboard,
@@ -187,6 +302,8 @@ export function useBgosData(pollMs = 4000) {
     companyPlan,
     planLockedToBasic,
     sessionRole,
+    basicTrialExpired,
+    trialReadOnly,
     refetch,
     isLoading,
     syncGeneration,

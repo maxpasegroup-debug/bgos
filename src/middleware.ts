@@ -25,6 +25,12 @@ import {
   type HostTenant,
 } from "@/lib/host-routing";
 import { getRoleHome, roleCanAccessPath } from "@/lib/role-routing";
+import {
+  jwtSaysBasicTrialExpired,
+  trialExpiredAllowsApiRequest,
+  TRIAL_EXPIRED_API_MESSAGE,
+} from "@/lib/trial-middleware";
+import { jwtCompanyPlanFromUnknown, jwtPlanIsProPlus } from "@/lib/plan-tier";
 
 function normalizePathname(pathname: string): string {
   if (pathname.length > 1 && pathname.endsWith("/")) {
@@ -67,6 +73,7 @@ function skipsMiddlewareAuth(pathname: string, method: string): boolean {
     return true;
   }
   if (pathname === "/api/auth/refresh-session" && method === "POST") return true;
+  if (pathname === "/api/payment/webhook" && method === "POST") return true;
   return false;
 }
 
@@ -396,13 +403,36 @@ export async function middleware(request: NextRequest) {
   }
 
   // Active company's plan (JWT membership row for activeCompanyId cookie). Not per-user.
-  // See `pathnameRequiresProPlan` — automation + sales-booster (except upgrade allowlist).
   const companyPlanRaw = requestHeaders.get(AUTH_HEADER_COMPANY_PLAN) ?? "BASIC";
   const companyPlan = isPlanLockedToBasic() ? "BASIC" : companyPlanRaw;
+
+  const activeCompanyCookie = request.cookies.get(ACTIVE_COMPANY_COOKIE_NAME)?.value;
+  const basicTrialExpiredJwt =
+    hasCompanyContext &&
+    !needsCompany &&
+    jwtSaysBasicTrialExpired(verified.payload, activeCompanyCookie);
+
+  if (
+    pathname.startsWith("/api") &&
+    basicTrialExpiredJwt &&
+    !trialExpiredAllowsApiRequest(normalizedPath, method)
+  ) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: TRIAL_EXPIRED_API_MESSAGE,
+        code: "TRIAL_EXPIRED",
+      },
+      { status: 403 },
+    );
+  }
+
+  // See `pathnameRequiresProPlan` — automation + sales-booster (except upgrade allowlist).
+  const planTier = jwtCompanyPlanFromUnknown(companyPlan);
   if (
     pathname.startsWith("/api") &&
     pathnameRequiresProPlan(pathname) &&
-    companyPlan !== "PRO"
+    !jwtPlanIsProPlus(planTier)
   ) {
     return NextResponse.json(
       {

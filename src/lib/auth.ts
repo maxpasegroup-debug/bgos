@@ -62,14 +62,21 @@ function payloadToUser(decoded: Record<string, unknown>): AuthUser | null {
   const planLit = companyPlanFromJwtClaim(decoded.companyPlan);
   const companyPlan = isPlanLockedToBasic()
     ? CompanyPlan.BASIC
-    : planLit === "PRO"
-      ? CompanyPlan.PRO
-      : CompanyPlan.BASIC;
+    : planLit === "ENTERPRISE"
+      ? CompanyPlan.ENTERPRISE
+      : planLit === "PRO"
+        ? CompanyPlan.PRO
+        : CompanyPlan.BASIC;
   const workspaceReady = decoded.workspaceReady !== false;
   const rawM = parseJwtMemberships(decoded);
   const memberships = rawM?.map((m) => ({
     companyId: m.companyId,
-    plan: m.plan === "PRO" ? CompanyPlan.PRO : CompanyPlan.BASIC,
+    plan:
+      m.plan === "ENTERPRISE"
+        ? CompanyPlan.ENTERPRISE
+        : m.plan === "PRO"
+          ? CompanyPlan.PRO
+          : CompanyPlan.BASIC,
     jobRole: m.jobRole as UserRole,
   }));
   return {
@@ -131,9 +138,13 @@ export function getAuthUser(request: NextRequest | Request): AuthUser | null {
         ...tokenUser,
         companyId: hCompany,
         companyPlan:
-          hPlan === "PRO" && !isPlanLockedToBasic()
-            ? CompanyPlan.PRO
-            : CompanyPlan.BASIC,
+          isPlanLockedToBasic()
+            ? CompanyPlan.BASIC
+            : hPlan === "ENTERPRISE"
+              ? CompanyPlan.ENTERPRISE
+              : hPlan === "PRO"
+                ? CompanyPlan.PRO
+                : CompanyPlan.BASIC,
         role: (hRole as UserRole) ?? tokenUser.role,
         workspaceReady: hWr !== "0",
       };
@@ -159,9 +170,11 @@ export async function getAuthUserFromHeaders(): Promise<AuthUser | null> {
   if (!needsCompany && !companyId) return null;
   const companyPlan = isPlanLockedToBasic()
     ? CompanyPlan.BASIC
-    : planHeader === "PRO"
-      ? CompanyPlan.PRO
-      : CompanyPlan.BASIC;
+    : planHeader === "ENTERPRISE"
+      ? CompanyPlan.ENTERPRISE
+      : planHeader === "PRO"
+        ? CompanyPlan.PRO
+        : CompanyPlan.BASIC;
   const workspaceReady = needsCompany ? false : h.get(AUTH_HEADER_WORKSPACE_READY) !== "0";
   return {
     sub,

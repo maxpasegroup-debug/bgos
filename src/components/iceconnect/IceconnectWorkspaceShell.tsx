@@ -9,10 +9,11 @@ import {
 } from "@/contexts/company-branding-context";
 
 const ROLE_LABEL: Record<string, string> = {
-  ADMIN: "Admin",
+  ADMIN: "Boss",
   MANAGER: "Manager",
   SALES_HEAD: "Sales Head",
   SALES_EXECUTIVE: "Sales Executive",
+  TELECALLER: "Telecaller",
   CHANNEL_PARTNER: "Channel Partner",
   OPERATIONS_HEAD: "Operations Head",
   SITE_ENGINEER: "Site Engineer",

@@ -19,10 +19,10 @@ export function BgosShineButton({
 
   const base =
     variant === "red"
-      ? "min-h-[44px] rounded-xl bg-gradient-to-r from-[#FF3B3B] to-[#e62e2e] px-6 py-3 text-sm font-semibold text-white shadow-[0_0_25px_rgba(255,59,59,0.22)]"
+      ? "min-h-[44px] rounded-2xl bg-gradient-to-r from-[#FF3B3B] to-[#e62e2e] px-6 py-3 text-sm font-semibold text-white shadow-[0_0_32px_-6px_rgba(255,59,59,0.45),inset_0_1px_0_0_rgba(255,255,255,0.12)]"
       : variant === "yellow"
-        ? "min-h-[44px] rounded-xl bg-gradient-to-r from-[#FFC300] to-[#e6b008] px-6 py-3 text-sm font-semibold text-[#0B0F19] shadow-lg shadow-[#FFC300]/12"
-        : "min-h-[44px] rounded-xl bg-gradient-to-r from-[#FF3B3B] to-[#FFC300] px-6 py-3 text-sm font-semibold text-[#0B0F19] shadow-[0_0_25px_rgba(255,59,59,0.2)]";
+        ? "min-h-[44px] rounded-2xl bg-gradient-to-r from-[#FFC300] to-[#e6b008] px-6 py-3 text-sm font-semibold text-[#0B0F19] shadow-[0_0_28px_-6px_rgba(255,195,0,0.35),inset_0_1px_0_0_rgba(255,255,255,0.25)]"
+        : "min-h-[44px] rounded-2xl bg-gradient-to-r from-[#FF3B3B] to-[#FFC300] px-6 py-3 text-sm font-semibold text-[#0B0F19] shadow-[0_0_32px_-6px_rgba(255,59,59,0.28),0_0_24px_-8px_rgba(255,195,0,0.2),inset_0_1px_0_0_rgba(255,255,255,0.2)]";
 
   return (
     <motion.button

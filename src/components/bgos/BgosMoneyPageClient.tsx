@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DashboardSurface } from "@/components/dashboard/DashboardSurface";
+import { useBgosDashboardContext } from "@/components/bgos/BgosDataProvider";
 
 type QuotationRow = {
   id: string;
@@ -39,6 +40,7 @@ export function BgosMoneyPageClient({
   initialLeadId: string | null;
   initialQuotationId: string | null;
 }) {
+  const { trialReadOnly } = useBgosDashboardContext();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -91,6 +93,10 @@ export function BgosMoneyPageClient({
   }, [searchParams, loadQuotations]);
 
   async function patchQuotationStatus(id: string, status: string) {
+    if (trialReadOnly) {
+      setLoadErr("Your free trial has expired. Upgrade to change quotations.");
+      return;
+    }
     setBusy(true);
     try {
       const res = await fetch("/api/quotation/status", {
@@ -99,9 +105,15 @@ export function BgosMoneyPageClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, status }),
       });
-      const data = (await res.json()) as { ok?: boolean };
+      const data = (await res.json()) as { ok?: boolean; error?: string; code?: string };
       if (!res.ok || !data.ok) {
-        setLoadErr("Could not update status");
+        setLoadErr(
+          data.code === "TRIAL_EXPIRED"
+            ? typeof data.error === "string" && data.error.trim()
+              ? data.error
+              : "Your free trial has expired. Upgrade to continue."
+            : "Could not update status",
+        );
         return;
       }
       await loadQuotations();
@@ -111,6 +123,10 @@ export function BgosMoneyPageClient({
   }
 
   async function createInvoiceFromQuotation(quotationId: string) {
+    if (trialReadOnly) {
+      setLoadErr("Your free trial has expired. Upgrade to create invoices.");
+      return;
+    }
     setBusy(true);
     setLoadErr(null);
     try {
@@ -120,9 +136,17 @@ export function BgosMoneyPageClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ quotationId }),
       });
-      const data = (await res.json()) as { ok?: boolean; error?: string };
+      const data = (await res.json()) as { ok?: boolean; error?: string; code?: string };
       if (!res.ok || !data.ok) {
-        setLoadErr(typeof data.error === "string" ? data.error : "Invoice create failed");
+        setLoadErr(
+          data.code === "TRIAL_EXPIRED"
+            ? typeof data.error === "string" && data.error.trim()
+              ? data.error
+              : "Your free trial has expired. Upgrade to continue."
+            : typeof data.error === "string"
+              ? data.error
+              : "Invoice create failed",
+        );
         return;
       }
       router.push(`/bgos/money/invoices?quotationId=${encodeURIComponent(quotationId)}`);
@@ -218,12 +242,21 @@ export function BgosMoneyPageClient({
                 Use the builder for customer details, line items, and draft vs sent. CRM links pre-fill the lead.
               </p>
             </div>
-            <Link
-              href={quotationCreateHref}
-              className={`${btnPrimary} inline-flex min-h-[44px] items-center justify-center px-5 text-sm`}
-            >
-              New quotation
-            </Link>
+            {trialReadOnly ? (
+              <span
+                className={`${btnPrimary} inline-flex min-h-[44px] cursor-not-allowed items-center justify-center px-5 text-sm opacity-45`}
+                title="Your trial has expired"
+              >
+                New quotation
+              </span>
+            ) : (
+              <Link
+                href={quotationCreateHref}
+                className={`${btnPrimary} inline-flex min-h-[44px] items-center justify-center px-5 text-sm`}
+              >
+                New quotation
+              </Link>
+            )}
           </div>
         </DashboardSurface>
 
@@ -254,7 +287,7 @@ export function BgosMoneyPageClient({
                       <select
                         className={`${inputClass} mt-0.5 min-w-[10rem]`}
                         value={q.status}
-                        disabled={busy}
+                        disabled={busy || trialReadOnly}
                         onChange={(e) => void patchQuotationStatus(q.id, e.target.value)}
                       >
                         {(["DRAFT", "SENT", "APPROVED", "REJECTED"] as const).map((s) => (
@@ -272,7 +305,7 @@ export function BgosMoneyPageClient({
                         <button
                           type="button"
                           className={btnPrimary}
-                          disabled={busy}
+                          disabled={busy || trialReadOnly}
                           onClick={() => void createInvoiceFromQuotation(q.id)}
                         >
                           Generate invoice

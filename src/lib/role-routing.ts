@@ -7,6 +7,7 @@ export const ROLE_HOME: Readonly<Record<string, string>> = {
   ADMIN: "/bgos",
   MANAGER: "/bgos",
   SALES_EXECUTIVE: "/iceconnect/sales",
+  TELECALLER: "/iceconnect/sales",
   SALES_HEAD: "/iceconnect/sales-head",
   CHANNEL_PARTNER: "/iceconnect/partner",
   OPERATIONS_HEAD: "/iceconnect/operations",
@@ -20,13 +21,34 @@ export const ROLE_HOME: Readonly<Record<string, string>> = {
   HR_MANAGER: "/iceconnect/hr",
 };
 
+/** Roles that may use the company document vault (BGOS + `/iceconnect/documents` + `/api/document/*`). */
+export const DOCUMENT_VAULT_ROLES_LIST = [
+  "ADMIN",
+  "MANAGER",
+  "SALES_HEAD",
+  "SALES_EXECUTIVE",
+  "TELECALLER",
+  "CHANNEL_PARTNER",
+  "OPERATIONS_HEAD",
+  "SITE_ENGINEER",
+  "PRO",
+  "INSTALLATION_TEAM",
+  "SERVICE_TEAM",
+  "INVENTORY_MANAGER",
+  "ACCOUNTANT",
+  "LCO",
+  "HR_MANAGER",
+] as const;
+
+export const DOCUMENT_VAULT_ROLES = new Set<string>(DOCUMENT_VAULT_ROLES_LIST);
+
 const PRIVILEGED = new Set<string>(["ADMIN", "MANAGER"]);
 
 type RouteRule = { prefix: string; roles: Set<string> };
 
 const PAGE_RULES: RouteRule[] = [
   { prefix: "/bgos", roles: new Set(["ADMIN", "MANAGER"]) },
-  { prefix: "/iceconnect/sales", roles: new Set(["SALES_EXECUTIVE", "ADMIN", "MANAGER"]) },
+  { prefix: "/iceconnect/sales", roles: new Set(["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER"]) },
   { prefix: "/iceconnect/sales-head", roles: new Set(["SALES_HEAD", "ADMIN", "MANAGER"]) },
   { prefix: "/iceconnect/partner", roles: new Set(["CHANNEL_PARTNER", "ADMIN", "MANAGER"]) },
   { prefix: "/iceconnect/operations", roles: new Set(["OPERATIONS_HEAD", "ADMIN", "MANAGER"]) },
@@ -38,6 +60,7 @@ const PAGE_RULES: RouteRule[] = [
   { prefix: "/iceconnect/accounts", roles: new Set(["ACCOUNTANT", "ADMIN", "MANAGER"]) },
   { prefix: "/iceconnect/loan", roles: new Set(["LCO", "ADMIN", "MANAGER"]) },
   { prefix: "/iceconnect/hr", roles: new Set(["HR_MANAGER", "ADMIN", "MANAGER"]) },
+  { prefix: "/iceconnect/documents", roles: DOCUMENT_VAULT_ROLES },
 ];
 
 const API_RULES: RouteRule[] = [
@@ -49,7 +72,7 @@ const API_RULES: RouteRule[] = [
   { prefix: "/api/invoice", roles: new Set(["ADMIN", "MANAGER"]) },
   { prefix: "/api/payment", roles: new Set(["ADMIN", "MANAGER"]) },
   { prefix: "/api/expense", roles: new Set(["ADMIN", "MANAGER"]) },
-  { prefix: "/api/document", roles: new Set(["ADMIN", "MANAGER"]) },
+  { prefix: "/api/document", roles: DOCUMENT_VAULT_ROLES },
   {
     prefix: "/api/inventory",
     roles: new Set([
@@ -62,7 +85,14 @@ const API_RULES: RouteRule[] = [
   },
   {
     prefix: "/api/partner",
-    roles: new Set(["ADMIN", "MANAGER", "CHANNEL_PARTNER", "SALES_HEAD", "SALES_EXECUTIVE"]),
+    roles: new Set([
+      "ADMIN",
+      "MANAGER",
+      "CHANNEL_PARTNER",
+      "SALES_HEAD",
+      "SALES_EXECUTIVE",
+      "TELECALLER",
+    ]),
   },
   {
     prefix: "/api/commission",
@@ -88,6 +118,7 @@ const API_RULES: RouteRule[] = [
       "HR_MANAGER",
       "SALES_HEAD",
       "SALES_EXECUTIVE",
+      "TELECALLER",
       "CHANNEL_PARTNER",
       "OPERATIONS_HEAD",
       "SITE_ENGINEER",
@@ -107,6 +138,7 @@ const API_RULES: RouteRule[] = [
       "HR_MANAGER",
       "SALES_HEAD",
       "SALES_EXECUTIVE",
+      "TELECALLER",
       "CHANNEL_PARTNER",
       "OPERATIONS_HEAD",
       "SITE_ENGINEER",
@@ -118,14 +150,20 @@ const API_RULES: RouteRule[] = [
       "LCO",
     ]),
   },
-  { prefix: "/api/users", roles: new Set(["ADMIN"]) },
-  { prefix: "/api/leads", roles: new Set(["SALES_EXECUTIVE", "SALES_HEAD", "ADMIN", "MANAGER"]) },
-  { prefix: "/api/tasks", roles: new Set(["SALES_EXECUTIVE", "SALES_HEAD", "ADMIN", "MANAGER"]) },
+  {
+    prefix: "/api/leads",
+    roles: new Set(["SALES_EXECUTIVE", "TELECALLER", "SALES_HEAD", "ADMIN", "MANAGER"]),
+  },
+  {
+    prefix: "/api/tasks",
+    roles: new Set(["SALES_EXECUTIVE", "TELECALLER", "SALES_HEAD", "ADMIN", "MANAGER"]),
+  },
   {
     prefix: "/api/iceconnect",
     roles: new Set([
       "SALES_HEAD",
       "SALES_EXECUTIVE",
+      "TELECALLER",
       "CHANNEL_PARTNER",
       "OPERATIONS_HEAD",
       "SITE_ENGINEER",
@@ -139,6 +177,10 @@ const API_RULES: RouteRule[] = [
       "ADMIN",
       "MANAGER",
     ]),
+  },
+  {
+    prefix: "/api/users",
+    roles: new Set(["ADMIN", "MANAGER"]),
   },
 ];
 
@@ -193,7 +235,7 @@ export function postLoginDestination(role: string, from: string | null): string 
 
 /** Path segment after `/iceconnect/` → roles allowed on that dashboard. */
 export const ICECONNECT_DASHBOARD_ROLES: Record<string, readonly string[]> = {
-  sales: ["SALES_EXECUTIVE", "ADMIN", "MANAGER"],
+  sales: ["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER"],
   "sales-head": ["SALES_HEAD", "ADMIN", "MANAGER"],
   partner: ["CHANNEL_PARTNER", "ADMIN", "MANAGER"],
   operations: ["OPERATIONS_HEAD", "ADMIN", "MANAGER"],
@@ -205,6 +247,7 @@ export const ICECONNECT_DASHBOARD_ROLES: Record<string, readonly string[]> = {
   accounts: ["ACCOUNTANT", "ADMIN", "MANAGER"],
   loan: ["LCO", "ADMIN", "MANAGER"],
   hr: ["HR_MANAGER", "ADMIN", "MANAGER"],
+  documents: [...DOCUMENT_VAULT_ROLES_LIST],
 };
 
 export function canAccessIceconnectDashboard(segment: string, role: string): boolean {

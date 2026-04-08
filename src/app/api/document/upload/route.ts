@@ -75,9 +75,9 @@ export async function POST(request: NextRequest) {
   }
 
   const displayName = fileRaw.name?.trim() || "document";
-  let relativePath: string;
+  let storageKey: string;
   try {
-    ({ relativePath } = await saveCompanyDocument(session.companyId, fileRaw));
+    ({ storageKey } = await saveCompanyDocument(session.companyId, fileRaw));
   } catch {
     return NextResponse.json(
       { ok: false as const, error: "Could not save file", code: "STORAGE" as const },
@@ -91,8 +91,13 @@ export async function POST(request: NextRequest) {
         companyId: session.companyId,
         leadId,
         type: typeParsed.data,
-        fileUrl: relativePath,
+        fileUrl: storageKey,
         fileName: displayName.slice(0, 500),
+        uploadedByUserId: session.sub,
+        uploadedByRole: session.role,
+      },
+      include: {
+        uploader: { select: { id: true, name: true } },
       },
     });
     return NextResponse.json({
@@ -100,7 +105,7 @@ export async function POST(request: NextRequest) {
       document: serializeDocument(row),
     });
   } catch {
-    await deleteStoredDocumentFile(relativePath);
+    await deleteStoredDocumentFile(storageKey);
     return NextResponse.json(
       { ok: false as const, error: "Could not save record", code: "DB_ERROR" as const },
       { status: 500 },

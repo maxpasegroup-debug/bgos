@@ -50,33 +50,41 @@ function safeBasename(original: string): string {
 }
 
 /**
- * Returns relative path segments: `{companyId}/{random}-{hash6}-{safeName}` under uploads/documents.
+ * S3-ready object key: `{companyId}/documents/{yyyy}/{mm}/{timestamp}-{rand}-{hash}-{safeName}`.
+ * Use the same string as `Document.fileUrl` for local disk or as the S3 `Key` when you wire `DOCUMENT_STORAGE_DRIVER=s3`.
  */
 export async function saveCompanyDocument(
   companyId: string,
   file: File,
-): Promise<{ relativePath: string; storedBytes: number }> {
+): Promise<{ storageKey: string; storedBytes: number }> {
   const buf = Buffer.from(await file.arrayBuffer());
   const hash = createHash("sha256").update(buf).digest("hex").slice(0, 10);
   const rand = randomBytes(6).toString("hex");
   const safe = safeBasename(file.name);
   const fileName = `${Date.now()}-${rand}-${hash}-${safe}`;
 
-  const dir = path.join(uploadsDocumentsRoot(), companyId);
-  await mkdir(dir, { recursive: true });
+  const safeCompany = companyId.replace(/[/\\]/g, "");
+  const now = new Date();
+  const y = String(now.getUTCFullYear());
+  const m = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const storageKey = `${safeCompany}/documents/${y}/${m}/${fileName}`;
 
-  const abs = path.join(dir, fileName);
+  const absDir = path.join(uploadsDocumentsRoot(), ...storageKey.split("/").slice(0, -1));
+  await mkdir(absDir, { recursive: true });
+
+  const abs = path.join(uploadsDocumentsRoot(), ...storageKey.split("/"));
   await writeFile(abs, buf);
 
   return {
-    relativePath: `${companyId.replace(/[/\\]/g, "")}/${fileName}`,
+    storageKey,
     storedBytes: buf.length,
   };
 }
 
-export function absoluteDocumentPath(relativePath: string): string {
+/** @deprecated use storage key from `saveCompanyDocument` */
+export function absoluteDocumentPath(storageKey: string): string {
   const root = uploadsDocumentsRoot();
-  const normalized = relativePath.replace(/\\/g, "/").replace(/^\/+/, "");
+  const normalized = storageKey.replace(/\\/g, "/").replace(/^\/+/, "");
   if (
     !normalized ||
     normalized.includes("..") ||
@@ -91,9 +99,9 @@ export function absoluteDocumentPath(relativePath: string): string {
   return resolved;
 }
 
-export async function deleteStoredDocumentFile(relativePath: string): Promise<void> {
+export async function deleteStoredDocumentFile(storageKey: string): Promise<void> {
   try {
-    await unlink(absoluteDocumentPath(relativePath));
+    await unlink(absoluteDocumentPath(storageKey));
   } catch {
     // ignore missing file
   }

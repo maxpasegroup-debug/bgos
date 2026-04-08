@@ -5,7 +5,7 @@ import Link from "next/link";
 import { DashboardSurface } from "@/components/dashboard/DashboardSurface";
 import type { DashboardFinancialOverview } from "@/types";
 import { fadeUp } from "./motion";
-import { BGOS_GRID_GAP } from "./layoutTokens";
+import { BGOS_GRID_GAP, BGOS_SECTION_GAP, BGOS_STACK_GAP } from "./layoutTokens";
 
 function formatInr(n: number) {
   return new Intl.NumberFormat("en-IN", {
@@ -30,15 +30,18 @@ export function BgosFinancialOverview({ financial }: { financial: DashboardFinan
     <motion.section
       id="finance"
       variants={fadeUp}
-      className="col-span-full space-y-4"
+      className={`col-span-full ${BGOS_STACK_GAP} ${BGOS_SECTION_GAP}`}
       style={{ scrollMarginTop: "5.5rem" }}
     >
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-sm font-semibold text-white sm:text-base">Financial overview</h2>
-          <p className="mt-0.5 text-xs text-white/45">
-            Invoice collections, receivables, and expenses — updates with your dashboard refresh.
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
+            Finance
           </p>
+          <h2 className="mt-1 text-base font-semibold tracking-tight text-white sm:text-lg">
+            Overview
+          </h2>
+          <p className="mt-1 text-xs text-white/45">Collections, receivables, and expenses.</p>
         </div>
         <Link
           href="/bgos/money/expenses"

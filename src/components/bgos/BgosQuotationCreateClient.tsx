@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 import { DashboardSurface } from "@/components/dashboard/DashboardSurface";
+import { useBgosDashboardContext } from "@/components/bgos/BgosDataProvider";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
 import { roundMoney } from "@/lib/money-items";
 
@@ -39,6 +40,7 @@ const sectionTitle = "text-base font-semibold text-white sm:text-lg";
 const sectionSub = "mt-1 text-sm text-white/45";
 
 export function BgosQuotationCreateClient({ initialLeadId }: { initialLeadId: string | null }) {
+  const { trialReadOnly } = useBgosDashboardContext();
   const router = useRouter();
   const searchParams = useSearchParams();
   const formId = useId();
@@ -212,6 +214,10 @@ export function BgosQuotationCreateClient({ initialLeadId }: { initialLeadId: st
   }
 
   async function submit(status: "DRAFT" | "SENT") {
+    if (trialReadOnly) {
+      setFormError("Your free trial has expired. Upgrade to create quotations.");
+      return;
+    }
     const parsed = validateForSubmit();
     if (!parsed) return;
 
@@ -241,6 +247,14 @@ export function BgosQuotationCreateClient({ initialLeadId }: { initialLeadId: st
         if (data.code === "DUPLICATE_QUOTATION" && effectiveLeadId && typeof data.quotationId === "string") {
           setFormError(
             `${typeof data.error === "string" ? data.error : "Active quotation exists."} Open the lead or Money → Quotations to continue.`,
+          );
+          return;
+        }
+        if (data.code === "TRIAL_EXPIRED") {
+          setFormError(
+            typeof data.error === "string" && data.error.trim()
+              ? data.error
+              : "Your free trial has expired. Upgrade to continue.",
           );
           return;
         }
@@ -461,14 +475,14 @@ export function BgosQuotationCreateClient({ initialLeadId }: { initialLeadId: st
           </Link>
           <button
             type="submit"
-            disabled={busy || leadLoading}
+            disabled={busy || leadLoading || trialReadOnly}
             className="inline-flex min-h-[48px] items-center justify-center rounded-xl border border-white/15 bg-white/[0.06] px-6 text-sm font-semibold text-white transition hover:border-[#FFC300]/35 disabled:opacity-50"
           >
             {busy ? "Saving…" : "Save as draft"}
           </button>
           <button
             type="button"
-            disabled={busy || leadLoading}
+            disabled={busy || leadLoading || trialReadOnly}
             onClick={() => void submit("SENT")}
             className="inline-flex min-h-[48px] items-center justify-center rounded-xl border border-[#FFC300]/45 bg-[#FFC300]/18 px-6 text-sm font-bold text-[#FFC300] shadow-[0_0_24px_rgba(255,195,0,0.12)] transition hover:bg-[#FFC300]/24 disabled:opacity-50"
           >

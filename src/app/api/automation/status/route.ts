@@ -2,12 +2,12 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prismaKnownErrorResponse } from "@/lib/api-response";
 import { requireAuthWithCompany } from "@/lib/auth";
-import { requireLiveProPlan } from "@/lib/plan-access";
+import { companyPlanToJwt, requireLiveProPlan } from "@/lib/plan-access";
 import { handleApiError } from "@/lib/route-error";
 
 /**
- * Pro-only automation surface. Middleware blocks Basic JWTs; this handler confirms
- * {@link Company.plan} is still Pro (downgrades apply without waiting for re-login).
+ * Pro+ automation surface (PRO or ENTERPRISE). Middleware blocks Basic; this handler
+ * confirms {@link Company.plan} still qualifies (downgrades apply without re-login).
  */
 export async function GET(request: NextRequest) {
   const user = await requireAuthWithCompany(request);
@@ -24,9 +24,10 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     ok: true as const,
-    plan: "PRO" as const,
+    plan: companyPlanToJwt(user.companyPlan),
     automation: "simulated_active",
     channels: ["whatsapp_simulation"],
-    message: "Automation endpoints are available on Pro (simulated in this build).",
+    message:
+      "Automation endpoints are available on Pro+; channel automations require Enterprise (simulated in this build).",
   });
 }

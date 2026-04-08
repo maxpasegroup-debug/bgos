@@ -3,7 +3,10 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { DashboardSurface } from "@/components/dashboard/DashboardSurface";
-import { postSalesBoosterUpgradeRequest } from "@/lib/sales-booster-client";
+import {
+  patchSalesBoosterConfig,
+  postSalesBoosterUpgradeRequest,
+} from "@/lib/sales-booster-client";
 import type { SalesBoosterPayload, SalesBoosterPro } from "@/types";
 import { BgosShineButton } from "./BgosShineButton";
 import { easePremium, fadeUp } from "./motion";
@@ -28,6 +31,17 @@ function triggerBadgeClass(trigger: SalesBoosterPro["autoFollowUps"][number]["tr
   }
 }
 
+function onLeadCreatedLabel(mode: SalesBoosterPro["onLeadCreated"]) {
+  switch (mode) {
+    case "assign":
+      return "Assign to employee";
+    case "whatsapp":
+      return "WhatsApp (sim)";
+    default:
+      return "Assign + WhatsApp";
+  }
+}
+
 function triggerLabel(trigger: SalesBoosterPro["autoFollowUps"][number]["trigger"]) {
   switch (trigger) {
     case "overdue_task":
@@ -46,9 +60,14 @@ const UPGRADE_EMAIL = process.env.NEXT_PUBLIC_BGOS_UPGRADE_EMAIL?.trim();
 export function SalesBoosterModule({
   salesBooster,
   hasDashboard,
+  canConfigure = false,
+  onSettingsSaved,
 }: {
   salesBooster: SalesBoosterPayload | undefined;
   hasDashboard: boolean;
+  /** ADMIN / MANAGER — can PATCH `/api/sales-booster/config`. */
+  canConfigure?: boolean;
+  onSettingsSaved?: () => void;
 }) {
   const reduceMotion = useReducedMotion();
   const [automationOn, setAutomationOn] = useState(true);
@@ -56,6 +75,8 @@ export function SalesBoosterModule({
   const [upgradeNote, setUpgradeNote] = useState("");
   const [upgradeBusy, setUpgradeBusy] = useState(false);
   const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
+  const [settingsBusy, setSettingsBusy] = useState(false);
+  const [settingsMsg, setSettingsMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!salesBooster?.featuresUnlocked || !automationOn) return;
@@ -231,6 +252,77 @@ export function SalesBoosterModule({
               Auto triggers, prioritization, and next actions from your live leads. WhatsApp column is
               a simulation only — no external messages are sent.
             </p>
+            {canConfigure ? (
+              <div className="mt-3 rounded-xl border border-white/10 bg-black/30 p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-[#FFC300]/90">
+                  New lead automation
+                </p>
+                <p className="mt-1 text-[10px] text-white/40">
+                  Fires when a lead is created. Assign runs only if no teammate was chosen on the form
+                  (load-balanced). Reminder tasks use titles starting with “Sales Booster:” — duplicates
+                  are skipped.
+                </p>
+                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                  <label className="block min-w-[12rem] flex-1 text-[10px] font-medium uppercase tracking-wider text-white/45">
+                    On create
+                    <select
+                      disabled={settingsBusy}
+                      value={booster.onLeadCreated}
+                      onChange={(e) => {
+                        const onLeadCreated = e.target.value as SalesBoosterPro["onLeadCreated"];
+                        setSettingsMsg(null);
+                        setSettingsBusy(true);
+                        void patchSalesBoosterConfig({ onLeadCreated }).then((r) => {
+                          setSettingsBusy(false);
+                          if (r.ok) onSettingsSaved?.();
+                          else setSettingsMsg(r.message ?? "Could not save.");
+                        });
+                      }}
+                      className="mt-1 w-full rounded-lg border border-white/12 bg-black/40 px-3 py-2 text-sm text-white outline-none focus:border-[#FFC300]/40"
+                    >
+                      <option value="assign">{onLeadCreatedLabel("assign")}</option>
+                      <option value="whatsapp">{onLeadCreatedLabel("whatsapp")}</option>
+                      <option value="both">{onLeadCreatedLabel("both")}</option>
+                    </select>
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 text-xs text-white/75">
+                    <input
+                      type="checkbox"
+                      disabled={settingsBusy}
+                      checked={booster.followUpScheduleEnabled}
+                      onChange={(e) => {
+                        const followUpScheduleEnabled = e.target.checked;
+                        setSettingsMsg(null);
+                        setSettingsBusy(true);
+                        void patchSalesBoosterConfig({ followUpScheduleEnabled }).then((r) => {
+                          setSettingsBusy(false);
+                          if (r.ok) onSettingsSaved?.();
+                          else setSettingsMsg(r.message ?? "Could not save.");
+                        });
+                      }}
+                      className="h-4 w-4 rounded border-white/20 bg-black/40 text-[#FFC300] focus:ring-[#FFC300]/30"
+                    />
+                    {"Day 1, 3 & 5 reminder tasks"}
+                  </label>
+                </div>
+                <p className="mt-2 text-[10px] text-white/45">
+                  <span className="font-medium text-white/60">{booster.scheduledBoosterTaskCount}</span>{" "}
+                  pending Sales Booster reminders company-wide (visible in task lists and dashboard
+                  counts).
+                </p>
+                {settingsMsg ? (
+                  <p className="mt-2 text-xs text-amber-200/90" role="status">
+                    {settingsMsg}
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <p className="mt-2 text-[10px] text-white/40">
+                New leads: {onLeadCreatedLabel(booster.onLeadCreated)}
+                {booster.followUpScheduleEnabled ? " · Reminders on" : " · Reminders off"}
+                {` · ${booster.scheduledBoosterTaskCount} booster task(s) open`}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <span className="text-[10px] font-medium uppercase tracking-wider text-white/40">

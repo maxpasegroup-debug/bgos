@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { DashboardSurface } from "@/components/dashboard/DashboardSurface";
+import { useBgosDashboardContext } from "@/components/bgos/BgosDataProvider";
 import {
   formatInrMoney,
   statusBadgeClass,
@@ -17,6 +18,7 @@ const btnGhost =
   "inline-flex min-h-[40px] items-center justify-center rounded-xl border border-white/12 px-4 text-xs font-semibold text-white/90 transition hover:border-[#FFC300]/35";
 
 export function BgosInvoiceListClient({ initialQuotationId }: { initialQuotationId: string | null }) {
+  const { trialReadOnly } = useBgosDashboardContext();
   const searchParams = useSearchParams();
   const quotationIdFromUrl = searchParams.get("quotationId") ?? initialQuotationId ?? "";
 
@@ -53,6 +55,10 @@ export function BgosInvoiceListClient({ initialQuotationId }: { initialQuotation
   }, [load]);
 
   async function generateFromQuotation(qid: string) {
+    if (trialReadOnly) {
+      setError("Your free trial has expired. Upgrade to create invoices.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -62,9 +68,17 @@ export function BgosInvoiceListClient({ initialQuotationId }: { initialQuotation
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ quotationId: qid }),
       });
-      const data = (await res.json()) as { ok?: boolean; error?: string };
+      const data = (await res.json()) as { ok?: boolean; error?: string; code?: string };
       if (!res.ok || !data.ok) {
-        setError(typeof data.error === "string" ? data.error : "Could not create invoice");
+        setError(
+          data.code === "TRIAL_EXPIRED"
+            ? typeof data.error === "string" && data.error.trim()
+              ? data.error
+              : "Your free trial has expired. Upgrade to continue."
+            : typeof data.error === "string"
+              ? data.error
+              : "Could not create invoice",
+        );
         return;
       }
       await load();
@@ -88,7 +102,7 @@ export function BgosInvoiceListClient({ initialQuotationId }: { initialQuotation
           </p>
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || trialReadOnly}
             className={`${btnPrimary} mt-3`}
             onClick={() => void generateFromQuotation(quotationIdFromUrl)}
           >

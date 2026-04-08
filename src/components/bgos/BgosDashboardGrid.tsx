@@ -4,17 +4,28 @@ import { UserRole } from "@prisma/client";
 import { motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+
+const MotionLink = motion(Link);
 import { DashboardSurface } from "@/components/dashboard/DashboardSurface";
 import { BgosAddEmployeeForm } from "./BgosAddEmployeeForm";
+import { BgosAnalyticsTrendChart } from "./BgosAnalyticsTrendChart";
 import { BgosFinancialOverview } from "./BgosFinancialOverview";
 import { BgosLeadsAssignmentPanel } from "./BgosLeadsAssignmentPanel";
 import { BgosPipelineBoard } from "./BgosPipelineBoard";
 import { useBgosDashboardContext } from "./BgosDataProvider";
 import { BgosShineButton } from "./BgosShineButton";
+import { AutomationCenterPanel } from "./AutomationCenterPanel";
 import { SalesBoosterModule } from "./SalesBoosterModule";
-import { BGOS_GRID_GAP, BGOS_MAIN_PAD } from "./layoutTokens";
+import { BGOS_GRID_GAP, BGOS_MAIN_PAD, BGOS_SECTION_GAP, BGOS_STACK_GAP } from "./layoutTokens";
 import { easePremium, fadeUp, sectionReveal, staggerRow } from "./motion";
 import { emptyFinancialOverview } from "@/lib/dashboard-client-defaults";
+import {
+  DASHBOARD_RANGE_BASIC_FREE,
+  DASHBOARD_RANGE_LABELS,
+  DASHBOARD_RANGE_PRESETS,
+  type DashboardRangePreset,
+} from "@/lib/dashboard-range";
+import { ProFeatureLock } from "./ProFeatureLock";
 import type {
   DashboardHealth,
   NexaInsight,
@@ -23,12 +34,17 @@ import type {
 } from "@/types";
 import type { DashboardPayload } from "./useBgosData";
 
-const METRIC_LABELS = [
-  "Total leads",
-  "Revenue collected",
-  "Installations done",
-  "Unpaid invoices",
-] as const;
+const filterSelectClass =
+  "mt-1 w-full max-w-xs rounded-2xl border border-white/[0.10] bg-white/[0.05] px-3 py-2.5 text-sm text-white shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] outline-none backdrop-blur-sm transition focus:border-[#FFC300]/40 focus:ring-1 focus:ring-[#FFC300]/20 sm:max-w-none sm:min-w-[200px]";
+
+const premiumGhost =
+  "inline-flex min-h-[44px] items-center justify-center rounded-2xl border border-white/[0.10] bg-white/[0.04] px-5 text-sm font-medium text-white/90 shadow-[0_0_28px_-8px_rgba(0,0,0,0.55),inset_0_1px_0_0_rgba(255,255,255,0.05)] backdrop-blur-sm outline-none transition-colors hover:border-[#FFC300]/32 hover:bg-white/[0.07] hover:shadow-[0_0_32px_-6px_rgba(255,195,0,0.12)]";
+
+const premiumGold =
+  "inline-flex min-h-[44px] items-center justify-center rounded-2xl border border-[#FFC300]/28 bg-[#FFC300]/[0.09] px-5 text-sm font-semibold text-[#FFE08A] shadow-[0_0_28px_-8px_rgba(255,195,0,0.18),inset_0_1px_0_0_rgba(255,255,255,0.06)] backdrop-blur-sm outline-none transition-colors hover:border-[#FFC300]/45 hover:bg-[#FFC300]/14";
+
+const premiumMoney =
+  "inline-flex min-h-[44px] items-center justify-center rounded-2xl border border-emerald-400/25 bg-emerald-500/[0.08] px-5 text-sm font-semibold text-emerald-100/95 shadow-[0_0_28px_-8px_rgba(16,185,129,0.14),inset_0_1px_0_0_rgba(255,255,255,0.05)] backdrop-blur-sm outline-none transition-colors hover:border-emerald-400/40 hover:bg-emerald-500/12";
 
 function formatInr(n: number) {
   return new Intl.NumberFormat("en-IN", {
@@ -38,6 +54,15 @@ function formatInr(n: number) {
   }).format(n);
 }
 
+function formatRoleLabel(role: string): string {
+  if (role === "ADMIN") return "Boss";
+  return role
+    .toLowerCase()
+    .split("_")
+    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
 export function BgosDashboardGrid({
   dashboard,
   metricsUnavailable,
@@ -45,57 +70,159 @@ export function BgosDashboardGrid({
   dashboard: DashboardPayload | null;
   metricsUnavailable: boolean;
 }) {
-  const { sessionRole, planLockedToBasic } = useBgosDashboardContext();
+  const {
+    sessionRole,
+    planLockedToBasic,
+    hasProPlan,
+    trialReadOnly,
+    analyticsRangePreset,
+    setAnalyticsRangePreset,
+    refetch,
+  } = useBgosDashboardContext();
   const isAdmin = sessionRole === UserRole.ADMIN;
+  const canConfigureSalesBooster =
+    sessionRole === UserRole.ADMIN || sessionRole === UserRole.MANAGER;
 
   const metrics = useMemo(() => {
-    if (!dashboard) return null;
+    if (!dashboard?.analytics) return null;
+    const a = dashboard.analytics;
+    const period = dashboard.analyticsRange?.label ?? "";
     return [
-      { label: METRIC_LABELS[0], value: String(dashboard.leads) },
-      { label: METRIC_LABELS[1], value: formatInr(dashboard.revenue) },
-      { label: METRIC_LABELS[2], value: String(dashboard.installations) },
-      { label: METRIC_LABELS[3], value: String(dashboard.pendingPayments) },
+      { label: "Revenue", hint: period, value: formatInr(a.revenue) },
+      { label: "New leads", hint: period, value: String(a.leads) },
+      { label: "Conversion", hint: "Won vs closed in period", value: `${a.conversionPercent}%` },
+      { label: "Expenses", hint: period, value: formatInr(a.expenses) },
     ];
   }, [dashboard]);
 
   const displayMetrics =
     metrics ??
     (metricsUnavailable
-      ? METRIC_LABELS.map((label) => ({ label, value: "—" }))
+      ? [
+          { label: "Revenue", hint: "", value: "—" },
+          { label: "New leads", hint: "", value: "—" },
+          { label: "Conversion", hint: "", value: "—" },
+          { label: "Expenses", hint: "", value: "—" },
+        ]
       : null);
 
   return (
     <motion.div
-      className={`grid grid-cols-1 pb-12 pt-4 md:grid-cols-2 lg:grid-cols-3 ${BGOS_GRID_GAP} ${BGOS_MAIN_PAD}`}
+      className={`grid grid-cols-1 pb-16 pt-6 md:grid-cols-2 lg:grid-cols-3 ${BGOS_GRID_GAP} ${BGOS_MAIN_PAD}`}
       variants={sectionReveal}
       initial="hidden"
       animate="show"
     >
-      {/* 1 — Top metrics */}
+      {/* 1 — Analytics filter + top metrics */}
       <motion.section
         id="overview"
         variants={fadeUp}
-        className={`col-span-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 ${BGOS_GRID_GAP}`}
+        className={`col-span-full ${BGOS_STACK_GAP} ${BGOS_SECTION_GAP}`}
         style={{ scrollMarginTop: "5.5rem" }}
       >
-        {metricsUnavailable ? (
-          <p className="col-span-full text-sm text-[#FF3B3B]/85" role="alert">
-            Metrics unavailable — check database connection.
-          </p>
-        ) : null}
-        {displayMetrics?.map((m) => (
-          <motion.div key={m.label} variants={fadeUp}>
-            <DashboardSurface className="p-5 sm:p-6">
-              <p className="text-2xl font-semibold tabular-nums tracking-tight text-white shadow-[0_0_24px_rgba(255,59,59,0.08)] sm:text-3xl lg:text-4xl">
-                {m.value}
+        <DashboardSurface tilt={false} className="p-5 sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
+                Analytics
               </p>
-              <p className="mt-2 text-[10px] font-medium uppercase tracking-wider text-white/45 sm:text-xs">
-                {m.label}
-              </p>
+              <h2 className="mt-1 text-base font-semibold tracking-tight text-white sm:text-lg">
+                Reporting period
+              </h2>
+            </div>
+            <label className="block shrink-0 sm:max-w-xs sm:flex-1">
+              <span className="sr-only">Date range</span>
+              <select
+                className={filterSelectClass}
+                value={analyticsRangePreset}
+                onChange={(e) => setAnalyticsRangePreset(e.target.value as DashboardRangePreset)}
+              >
+                {DASHBOARD_RANGE_PRESETS.filter((p) =>
+                  hasProPlan ? true : (DASHBOARD_RANGE_BASIC_FREE as readonly string[]).includes(p),
+                ).map((p) => (
+                  <option key={p} value={p}>
+                    {DASHBOARD_RANGE_LABELS[p]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </DashboardSurface>
+
+        <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 ${BGOS_GRID_GAP}`}>
+          {metricsUnavailable ? (
+            <p className="col-span-full text-sm text-[#FF3B3B]/85" role="alert">
+              Metrics unavailable — check database connection.
+            </p>
+          ) : null}
+          {displayMetrics?.map((m) => (
+            <motion.div key={m.label} variants={fadeUp}>
+              <DashboardSurface className="p-5 sm:p-6">
+                <p className="text-2xl font-semibold tabular-nums tracking-tight text-white sm:text-3xl lg:text-[2rem] lg:leading-tight">
+                  {m.value}
+                </p>
+                <p className="mt-3 text-[11px] font-medium uppercase tracking-wide text-white/48">
+                  {m.label}
+                </p>
+                {m.hint ? (
+                  <p className="mt-1.5 text-xs text-white/38">{m.hint}</p>
+                ) : null}
+              </DashboardSurface>
+            </motion.div>
+          ))}
+        </div>
+
+        <ProFeatureLock
+          locked={!hasProPlan}
+          title="Advanced analytics"
+          description="Trend charts, multi-period reporting, and historical benchmarks."
+          className={dashboard?.analytics?.trend?.length && !metricsUnavailable ? "" : "min-h-[12rem]"}
+        >
+          {dashboard && !metricsUnavailable ? (
+            <p className="text-center text-xs text-white/40">
+              All-time:{" "}
+              <span className="text-white/50">{dashboard.leads} leads</span>
+              {" · "}
+              <span className="text-white/50">{formatInr(dashboard.revenue)}</span> collected
+              {" · "}
+              <span className="text-white/50">{dashboard.installations}</span> installations
+              {" · "}
+              <span className="text-white/50">{dashboard.financial.unpaidInvoiceCount}</span> unpaid
+              invoices
+            </p>
+          ) : null}
+          {dashboard?.analytics?.trend && !metricsUnavailable ? (
+            <motion.div variants={fadeUp}>
+              <BgosAnalyticsTrendChart
+                data={dashboard.analytics.trend}
+                periodLabel={dashboard.analyticsRange.label}
+              />
+            </motion.div>
+          ) : hasProPlan || metricsUnavailable ? null : (
+            <DashboardSurface tilt={false} className="p-6">
+              <div className="h-36 rounded-xl bg-white/[0.04]" />
             </DashboardSurface>
-          </motion.div>
-        ))}
+          )}
+        </ProFeatureLock>
       </motion.section>
+
+      {!hasProPlan && !planLockedToBasic ? (
+        <motion.section variants={fadeUp} className={`col-span-full ${BGOS_SECTION_GAP}`}>
+          <DashboardSurface tilt={false} className="border border-emerald-500/25 bg-gradient-to-r from-emerald-500/[0.08] to-transparent px-4 py-3.5 sm:px-6">
+            <p className="text-sm leading-relaxed text-white/88">
+              <span className="font-semibold text-emerald-200/95">Self-running basics.</span>{" "}
+              New leads automatically get a follow-up task in your queue.{" "}
+              <Link
+                href="/bgos/pricing"
+                className="font-medium text-[#FFC300] underline-offset-2 hover:text-[#ffcd33] hover:underline"
+              >
+                Upgrade to Pro
+              </Link>{" "}
+              for Nexa insights, Sales Booster, and full workflow automation.
+            </p>
+          </DashboardSurface>
+        </motion.section>
+      ) : null}
 
       <BgosFinancialOverview
         financial={dashboard?.financial ?? emptyFinancialOverview()}
@@ -103,17 +230,33 @@ export function BgosDashboardGrid({
 
       <DashboardControlsStrip
         isAdmin={isAdmin}
+        trialReadOnly={trialReadOnly}
         canCompanySettings={
           sessionRole === UserRole.ADMIN || sessionRole === UserRole.MANAGER
         }
         canMoney={sessionRole === UserRole.ADMIN || sessionRole === UserRole.MANAGER}
       />
 
+      {hasProPlan && !planLockedToBasic ? (
+        <AutomationCenterPanel
+          automation={dashboard?.automationCenter}
+          canConfigure={canConfigureSalesBooster && !trialReadOnly}
+          onSettingsSaved={() => refetch()}
+        />
+      ) : null}
+
       {/* 2 — NEXA priority + health */}
-      <NexaPriorityPanel
-        nexa={dashboard?.nexa}
-        insights={dashboard?.insights ?? []}
-      />
+      <ProFeatureLock
+        locked={!hasProPlan}
+        title="Nexa automation"
+        description="Live priority signals, AI insights, and recommended next actions."
+        className="col-span-full"
+      >
+        <NexaPriorityPanel
+          nexa={dashboard?.nexa}
+          insights={dashboard?.insights ?? []}
+        />
+      </ProFeatureLock>
       <BusinessHealthPanel health={dashboard?.health} />
 
       {/* 3 — Pipeline Kanban */}
@@ -127,10 +270,35 @@ export function BgosDashboardGrid({
 
       {/* 4 — Sales booster (hidden when deployment locks plan to BASIC) */}
       {!planLockedToBasic ? (
-        <SalesBoosterModule
-          salesBooster={dashboard?.salesBooster}
-          hasDashboard={dashboard !== null}
-        />
+        hasProPlan ? (
+          <SalesBoosterModule
+            salesBooster={dashboard?.salesBooster}
+            hasDashboard={dashboard !== null}
+            canConfigure={canConfigureSalesBooster && !trialReadOnly}
+            onSettingsSaved={() => refetch()}
+          />
+        ) : (
+          <motion.section
+            id="sales-booster"
+            variants={fadeUp}
+            className="col-span-full"
+            style={{ scrollMarginTop: "5.5rem" }}
+          >
+            <ProFeatureLock
+              locked
+              title="Sales Booster"
+              description="Simulated automations, lead prioritization, and follow-up intelligence."
+            >
+              <DashboardSurface className="p-6 sm:p-7">
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="h-24 rounded-xl bg-white/[0.05]" />
+                  <div className="h-24 rounded-xl bg-white/[0.05]" />
+                  <div className="h-24 rounded-xl bg-white/[0.05]" />
+                </div>
+              </DashboardSurface>
+            </ProFeatureLock>
+          </motion.section>
+        )
       ) : null}
 
       {/* 5 — Operations */}
@@ -154,75 +322,110 @@ export function BgosDashboardGrid({
       />
 
       {/* 9 — NEXA chat */}
-      <NexaChatPanel nexa={dashboard?.nexa} insights={dashboard?.insights ?? []} />
+      <ProFeatureLock
+        locked={!hasProPlan}
+        title="Nexa automation"
+        description="Chat with Nexa and run guided automations on your live pipeline."
+        className="col-span-full"
+      >
+        <NexaChatPanel nexa={dashboard?.nexa} insights={dashboard?.insights ?? []} />
+      </ProFeatureLock>
     </motion.div>
   );
 }
 
 function DashboardControlsStrip({
   isAdmin,
+  trialReadOnly,
   canCompanySettings,
   canMoney,
 }: {
   isAdmin: boolean;
+  trialReadOnly: boolean;
   canCompanySettings: boolean;
   canMoney: boolean;
 }) {
+  const reduceMotion = useReducedMotion();
+  const tap = reduceMotion ? undefined : { scale: 0.98 };
+  const hoverScale = reduceMotion ? undefined : { scale: 1.02 };
+
   return (
     <motion.section
       variants={fadeUp}
-      className="col-span-full"
+      className={`col-span-full ${BGOS_SECTION_GAP} sticky top-14 z-20 -mx-0 border-b border-white/[0.06] bg-[#0B0F19]/80 py-1 backdrop-blur-xl`}
       style={{ scrollMarginTop: "5.5rem" }}
     >
-      <DashboardSurface tilt={false} className="p-4 sm:p-5">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-white/45">
+      <DashboardSurface tilt={false} className="p-5 sm:p-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
+          Actions
+        </p>
+        <h2 className="mt-1 text-base font-semibold tracking-tight text-white sm:text-lg">
           Control panel
         </h2>
-        <p className="mt-1 text-xs text-white/35">
-          Live metrics refresh automatically while this tab stays open.
-        </p>
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <a
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+          <motion.a
             href="#team"
-            className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/15 bg-white/[0.06] px-4 text-sm font-medium text-white transition hover:border-[#FFC300]/40"
+            className={premiumGhost}
+            whileHover={hoverScale}
+            whileTap={tap}
+            transition={{ duration: 0.22, ease: easePremium }}
           >
-            View team performance
-          </a>
+            Team performance
+          </motion.a>
           {isAdmin ? (
-            <a
-              href="#add-employee"
-              className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[#FFC300]/35 bg-[#FFC300]/10 px-4 text-sm font-semibold text-[#FFC300] transition hover:bg-[#FFC300]/15"
-            >
-              Add employee
-            </a>
+            trialReadOnly ? (
+              <span
+                className={`${premiumGold} cursor-not-allowed opacity-45`}
+                title="Your trial has expired — upgrade to add employees"
+              >
+                Add employee
+              </span>
+            ) : (
+              <motion.a
+                href="#add-employee"
+                className={premiumGold}
+                whileHover={hoverScale}
+                whileTap={tap}
+                transition={{ duration: 0.22, ease: easePremium }}
+              >
+                Add employee
+              </motion.a>
+            )
           ) : null}
-          <Link
+          <MotionLink
             href="/bgos/nexa"
-            className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/15 bg-white/[0.06] px-4 text-sm font-medium text-white/90 transition hover:border-[#FFC300]/40"
+            className={premiumGhost}
+            whileHover={hoverScale}
+            whileTap={tap}
+            transition={{ duration: 0.22, ease: easePremium }}
           >
-            Nexa focus view
-          </Link>
+            Nexa focus
+          </MotionLink>
           {canCompanySettings ? (
-            <Link
+            <MotionLink
               href="/bgos/settings"
-              className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/15 bg-white/[0.06] px-4 text-sm font-medium text-white/90 transition hover:border-[#FFC300]/40"
+              className={premiumGhost}
+              whileHover={hoverScale}
+              whileTap={tap}
+              transition={{ duration: 0.22, ease: easePremium }}
             >
               Company settings
-            </Link>
+            </MotionLink>
           ) : null}
           {canMoney ? (
-            <Link
+            <MotionLink
               href="/bgos/money"
-              className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-4 text-sm font-semibold text-emerald-200/90 transition hover:border-emerald-400/45"
+              className={premiumMoney}
+              whileHover={hoverScale}
+              whileTap={tap}
+              transition={{ duration: 0.22, ease: easePremium }}
             >
-              Money / billing
-            </Link>
+              Money & billing
+            </MotionLink>
           ) : null}
         </div>
         {!isAdmin ? (
-          <p className="mt-3 text-xs text-white/40">
-            Only a company admin can add employees from this panel.
-          </p>
+          <p className="mt-4 text-xs text-white/38">Admins can invite employees from here.</p>
         ) : null}
       </DashboardSurface>
     </motion.section>
@@ -275,7 +478,7 @@ function NexaPriorityPanel({
   return (
     <motion.section
       variants={fadeUp}
-      className="col-span-full lg:col-span-2"
+      className={`col-span-full ${BGOS_SECTION_GAP}`}
       style={{ scrollMarginTop: "5.5rem" }}
     >
       <motion.div
@@ -293,7 +496,7 @@ function NexaPriorityPanel({
         }
         transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
       >
-        <DashboardSurface className="relative overflow-hidden !rounded-[11px] p-6 sm:p-8">
+        <DashboardSurface className="relative !rounded-[11px] p-6 sm:p-8">
           <div
             className="pointer-events-none absolute inset-0 opacity-35"
             aria-hidden
@@ -403,13 +606,18 @@ function BusinessHealthPanel({ health }: { health: DashboardHealth | undefined }
   ];
 
   return (
-    <motion.section variants={fadeUp} style={{ scrollMarginTop: "5.5rem" }}>
-      <DashboardSurface className="p-6 sm:p-7">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-white/45">
+    <motion.section
+      variants={fadeUp}
+      className={`col-span-full ${BGOS_SECTION_GAP}`}
+      style={{ scrollMarginTop: "5.5rem" }}
+    >
+      <DashboardSurface className="p-5 sm:p-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">Health</p>
+        <h2 className="mt-1 text-base font-semibold tracking-tight text-white sm:text-lg">
           Business health
         </h2>
-        <p className="mt-1 text-[10px] text-white/35">Computed from live tasks, leads, and outcomes.</p>
-        <div className="mt-5 space-y-5">
+        <p className="mt-1 text-xs text-white/45">Live tasks, leads, and outcomes.</p>
+        <div className="mt-6 space-y-5">
           {rows.map((row, i) => (
             <div key={row.label}>
               <div className="mb-1.5 flex justify-between gap-2 text-sm">
@@ -466,7 +674,7 @@ function OperationsPanel({
     <motion.section
       id="operations"
       variants={staggerRow}
-      className={`col-span-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 ${BGOS_GRID_GAP}`}
+      className={`col-span-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 ${BGOS_GRID_GAP} ${BGOS_SECTION_GAP}`}
       style={{ scrollMarginTop: "5.5rem" }}
     >
       {modules.map((m) => (
@@ -494,17 +702,19 @@ function TeamPanel({
     <motion.section
       id="team"
       variants={staggerRow}
-      className={`col-span-full space-y-6 ${BGOS_GRID_GAP}`}
+      className={`col-span-full ${BGOS_STACK_GAP} ${BGOS_SECTION_GAP}`}
       style={{ scrollMarginTop: "5.5rem" }}
     >
       <motion.div variants={fadeUp}>
         <DashboardSurface className="overflow-x-auto p-5 sm:p-6">
-          <h2 className="text-sm font-semibold text-white sm:text-base" id="team-performance">
-            Team performance
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">Team</p>
+          <h2
+            className="mt-1 text-base font-semibold tracking-tight text-white sm:text-lg"
+            id="team-performance"
+          >
+            Performance
           </h2>
-          <p className="mt-1 text-xs text-white/45">
-            Assigned leads, wins, and pending tasks per person — updates with the rest of the dashboard.
-          </p>
+          <p className="mt-1 text-xs text-white/45">Leads, wins, and pending tasks by person.</p>
           {team.length === 0 ? (
             <p className="mt-4 text-sm text-white/45">No active users in this company.</p>
           ) : (
@@ -525,7 +735,7 @@ function TeamPanel({
                       <span className="font-medium text-white">{m.name}</span>
                       <span className="mt-0.5 block text-xs text-white/40">{m.email}</span>
                     </td>
-                    <td className="py-2.5 pr-4 text-white/60">{m.role}</td>
+                    <td className="py-2.5 pr-4 text-white/60">{formatRoleLabel(m.role)}</td>
                     <td className="py-2.5 pr-4 tabular-nums">{m.assignedLeads}</td>
                     <td className="py-2.5 pr-4 tabular-nums text-emerald-200/90">{m.wonLeads}</td>
                     <td className="py-2.5 tabular-nums text-amber-200/90">{m.pendingTasks}</td>
@@ -540,10 +750,11 @@ function TeamPanel({
       {isAdmin ? (
         <motion.div variants={fadeUp} id="add-employee">
           <DashboardSurface className="p-5 sm:p-6">
-            <h2 className="text-sm font-semibold text-white sm:text-base">Add employee</h2>
-            <p className="mt-1 text-xs text-white/45">
-              Creates a login for your company. Share credentials securely with the new hire.
-            </p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">HR</p>
+            <h2 className="mt-1 text-base font-semibold tracking-tight text-white sm:text-lg">
+              Add employee
+            </h2>
+            <p className="mt-1 text-xs text-white/45">New company login — share credentials securely.</p>
             <BgosAddEmployeeForm />
           </DashboardSurface>
         </motion.div>
@@ -560,7 +771,7 @@ function HrSummaryPanel({ hr }: { hr: DashboardPayload["hr"] | undefined }) {
   ];
 
   return (
-    <motion.section variants={fadeUp} className="col-span-full" style={{ scrollMarginTop: "5.5rem" }}>
+    <motion.section variants={fadeUp} className={`col-span-full ${BGOS_SECTION_GAP}`} style={{ scrollMarginTop: "5.5rem" }}>
       <DashboardSurface className="p-5 sm:p-6">
         <h2 className="text-sm font-semibold text-white sm:text-base">HR summary</h2>
         <p className="mt-1 text-xs text-white/45">
@@ -590,7 +801,7 @@ function InventorySummaryPanel({
     { label: "Total units", value: String(inventory?.totalUnits ?? 0) },
   ];
   return (
-    <motion.section variants={fadeUp} className="col-span-full" style={{ scrollMarginTop: "5.5rem" }}>
+    <motion.section variants={fadeUp} className={`col-span-full ${BGOS_SECTION_GAP}`} style={{ scrollMarginTop: "5.5rem" }}>
       <DashboardSurface className="p-5 sm:p-6">
         <h2 className="text-sm font-semibold text-white sm:text-base">Inventory summary</h2>
         <p className="mt-1 text-xs text-white/45">Stock visibility and low-stock warnings for operations.</p>
@@ -620,7 +831,7 @@ function PartnerSummaryPanel({
     },
   ];
   return (
-    <motion.section variants={fadeUp} className="col-span-full" style={{ scrollMarginTop: "5.5rem" }}>
+    <motion.section variants={fadeUp} className={`col-span-full ${BGOS_SECTION_GAP}`} style={{ scrollMarginTop: "5.5rem" }}>
       <DashboardSurface className="p-5 sm:p-6">
         <h2 className="text-sm font-semibold text-white sm:text-base">Partner summary</h2>
         <p className="mt-1 text-xs text-white/45">Referral growth and pending commission visibility.</p>
@@ -678,7 +889,7 @@ function RevenuePanel({
     <motion.section
       id="revenue"
       variants={staggerRow}
-      className={`col-span-full space-y-6`}
+      className={`col-span-full ${BGOS_STACK_GAP} ${BGOS_SECTION_GAP}`}
       style={{ scrollMarginTop: "5.5rem" }}
     >
       <div className={`grid grid-cols-2 lg:grid-cols-4 ${BGOS_GRID_GAP}`}>
@@ -760,7 +971,7 @@ function RisksPanel({
     <motion.section
       id="risks"
       variants={fadeUp}
-      className={`col-span-full grid grid-cols-1 md:grid-cols-2 ${BGOS_GRID_GAP}`}
+      className={`col-span-full grid grid-cols-1 md:grid-cols-2 ${BGOS_GRID_GAP} ${BGOS_SECTION_GAP}`}
       style={{ scrollMarginTop: "5.5rem" }}
     >
       <DashboardSurface className="border-red-500/30 !bg-red-500/[0.05] p-6 ring-1 ring-red-500/15">
@@ -841,7 +1052,7 @@ function NexaChatPanel({
     <motion.section
       id="nexa"
       variants={fadeUp}
-      className="col-span-full"
+      className={`col-span-full ${BGOS_SECTION_GAP}`}
       style={{ scrollMarginTop: "5.5rem" }}
     >
       <motion.div

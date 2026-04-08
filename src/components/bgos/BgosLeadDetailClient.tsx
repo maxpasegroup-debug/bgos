@@ -6,6 +6,7 @@ import { LeadStatus } from "@prisma/client";
 import { DashboardSurface } from "@/components/dashboard/DashboardSurface";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
 import { BgosDocumentsClient } from "@/components/bgos/BgosDocumentsClient";
+import { useBgosDashboardContext } from "@/components/bgos/BgosDataProvider";
 import type { InvoiceApiRow } from "@/components/bgos/money-invoice-shared";
 
 type LeadPayload = {
@@ -32,6 +33,7 @@ const btnGhost =
   "inline-flex min-h-[40px] items-center justify-center rounded-xl border border-white/12 px-4 text-xs font-semibold text-white/90 transition hover:border-[#FFC300]/35";
 
 export function BgosLeadDetailClient({ leadId }: { leadId: string }) {
+  const { trialReadOnly } = useBgosDashboardContext();
   const [lead, setLead] = useState<LeadPayload | null>(null);
   const [quotations, setQuotations] = useState<QuotationRow[]>([]);
   const [invoices, setInvoices] = useState<InvoiceApiRow[]>([]);
@@ -76,6 +78,10 @@ export function BgosLeadDetailClient({ leadId }: { leadId: string }) {
   const latestInvoice = invoices[0] ?? null;
 
   async function generateInvoice() {
+    if (trialReadOnly) {
+      setError("Your free trial has expired. Upgrade to create invoices.");
+      return;
+    }
     if (!activeQuotation || activeQuotation.status !== "APPROVED") return;
     setBusy(true);
     setError(null);
@@ -96,6 +102,14 @@ export function BgosLeadDetailClient({ leadId }: { leadId: string }) {
       if (!res.ok || !data.ok) {
         if (data.code === "DUPLICATE" && typeof data.invoiceId === "string") {
           window.location.href = `/bgos/money/invoices/${data.invoiceId}`;
+          return;
+        }
+        if (data.code === "TRIAL_EXPIRED") {
+          setError(
+            typeof data.error === "string" && data.error.trim()
+              ? data.error
+              : "Your free trial has expired. Upgrade to continue.",
+          );
           return;
         }
         setError(typeof data.error === "string" ? data.error : "Could not create invoice");
@@ -172,12 +186,21 @@ export function BgosLeadDetailClient({ leadId }: { leadId: string }) {
           ) : null}
 
           {showCreateQuotation ? (
-            <Link
-              href={`/bgos/money/quotation/create?leadId=${encodeURIComponent(lead.id)}`}
-              className={btnPrimary}
-            >
-              Create quotation
-            </Link>
+            trialReadOnly ? (
+              <span
+                className={`${btnPrimary} cursor-not-allowed opacity-45`}
+                title="Your trial has expired"
+              >
+                Create quotation
+              </span>
+            ) : (
+              <Link
+                href={`/bgos/money/quotation/create?leadId=${encodeURIComponent(lead.id)}`}
+                className={btnPrimary}
+              >
+                Create quotation
+              </Link>
+            )
           ) : null}
 
           {showQuotationBlock ? (
@@ -208,7 +231,12 @@ export function BgosLeadDetailClient({ leadId }: { leadId: string }) {
           ) : null}
 
           {showGenerateInvoice ? (
-            <button type="button" disabled={busy} className={btnPrimary} onClick={() => void generateInvoice()}>
+            <button
+              type="button"
+              disabled={busy || trialReadOnly}
+              className={btnPrimary}
+              onClick={() => void generateInvoice()}
+            >
               {busy ? "Working…" : "Generate invoice"}
             </button>
           ) : null}

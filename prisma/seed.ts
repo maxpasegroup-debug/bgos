@@ -90,7 +90,7 @@ async function main() {
     return u;
   }
 
-  const telecaller = await member("Sales TC", "9111111111", "telecaller@iceconnect.demo", UserRole.SALES_EXECUTIVE);
+  const telecaller = await member("Sales TC", "9111111111", "telecaller@iceconnect.demo", UserRole.TELECALLER);
   const engineer = await member("Field Engineer", "9222222222", "engineer@iceconnect.demo", UserRole.SITE_ENGINEER);
   const installer = await member("Lead Installer", "9333333333", "installer@iceconnect.demo", UserRole.INSTALLATION_TEAM);
   const accounts = await member("Accounts", "9444444444", "accounts@iceconnect.demo", UserRole.ACCOUNTANT);
@@ -104,6 +104,7 @@ async function main() {
         status: LeadStatus.NEW,
         value: 100000,
         companyId: company.id,
+        createdByUserId: boss.id,
         assignedTo: telecaller.id,
       },
     }),
@@ -114,6 +115,7 @@ async function main() {
         status: LeadStatus.QUALIFIED,
         value: 200000,
         companyId: company.id,
+        createdByUserId: boss.id,
         assignedTo: telecaller.id,
       },
     }),
@@ -124,6 +126,7 @@ async function main() {
         status: LeadStatus.PROPOSAL_SENT,
         value: 300000,
         companyId: company.id,
+        createdByUserId: boss.id,
         assignedTo: telecaller.id,
       },
     }),
@@ -134,6 +137,7 @@ async function main() {
         status: LeadStatus.SITE_VISIT_SCHEDULED,
         value: 180000,
         companyId: company.id,
+        createdByUserId: boss.id,
         assignedTo: engineer.id,
       },
     }),

@@ -7,6 +7,7 @@ export type JwtMembershipRow = {
   companyId: string;
   plan: CompanyPlan;
   jobRole: UserRole;
+  trialEndsAt: string | null;
 };
 
 /**
@@ -15,12 +16,13 @@ export type JwtMembershipRow = {
 export async function loadMembershipsForJwt(userId: string): Promise<JwtMembershipRow[]> {
   const rows = await prisma.userCompany.findMany({
     where: { userId },
-    include: { company: { select: { plan: true } } },
+    include: { company: { select: { plan: true, trialEndDate: true } } },
     orderBy: { createdAt: "asc" },
   });
   return rows.map((r) => ({
     companyId: r.companyId,
     plan: r.company.plan,
     jobRole: r.jobRole,
+    trialEndsAt: r.company.trialEndDate?.toISOString() ?? null,
   }));
 }

@@ -1,8 +1,9 @@
+import { randomBytes } from "node:crypto";
 import { Prisma, UserRole } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { prismaKnownErrorResponse } from "@/lib/api-response";
+import { jsonError, parseJsonBodyZod, prismaKnownErrorResponse } from "@/lib/api-response";
 import { requireAuthWithRoles } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
 import { handleApiError } from "@/lib/route-error";
@@ -12,42 +13,78 @@ import {
   toPublicUser,
   USER_ADMIN_ROLES,
 } from "@/lib/user-company";
+import { isCompanyBasicTrialExpired, trialExpiredJsonResponse } from "@/lib/trial";
 
-const createBodySchema = z.object({
-  name: z.string().trim().min(1).max(200),
-  mobile: z.string().trim().min(1).max(32),
-  email: z.string().trim().email(),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  role: z.nativeEnum(UserRole),
-});
+/** Roles the Add Employee form may assign (field staff bound to the boss company). */
+const ASSIGNABLE_EMPLOYEE_ROLES: ReadonlySet<UserRole> = new Set([
+  UserRole.SALES_HEAD,
+  UserRole.SALES_EXECUTIVE,
+  UserRole.TELECALLER,
+  UserRole.OPERATIONS_HEAD,
+  UserRole.SITE_ENGINEER,
+  UserRole.INSTALLATION_TEAM,
+  UserRole.ACCOUNTANT,
+  UserRole.HR_MANAGER,
+]);
+
+function syntheticEmailFromMobile(mobile: string): string {
+  const digits = mobile.replace(/\D/g, "").slice(-10) || "0000000000";
+  const salt = randomBytes(4).toString("hex");
+  return `employee.${digits}.${salt}@bgos-employee.invalid`;
+}
+
+const createBodySchema = z
+  .object({
+    name: z.string().trim().min(1, "Name is required").max(200, "Name is too long"),
+    mobile: z
+      .string()
+      .trim()
+      .min(1, "Mobile is required")
+      .max(32, "Mobile is too long"),
+    email: z.string().trim().optional(),
+    password: z.string().min(8, "Password must be at least 8 characters"),
+    role: z.nativeEnum(UserRole),
+  })
+  .superRefine((data, ctx) => {
+    const digits = data.mobile.replace(/\D/g, "");
+    if (digits.length < 10 || digits.length > 15) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["mobile"],
+        message: "Enter a valid mobile number (10–15 digits)",
+      });
+    }
+    if (!ASSIGNABLE_EMPLOYEE_ROLES.has(data.role)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["role"],
+        message: "Choose a valid employee role",
+      });
+    }
+    const em = data.email?.trim();
+    if (em && em.length > 0 && !z.string().email().safeParse(em).success) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["email"],
+        message: "Enter a valid email or leave blank",
+      });
+    }
+  });
 
 export async function POST(request: NextRequest) {
   const session = await requireAuthWithRoles(request, USER_ADMIN_ROLES);
   if (session instanceof NextResponse) return session;
 
-  let json: unknown;
-  try {
-    json = await request.json();
-  } catch {
-    return NextResponse.json(
-      { ok: false as const, error: "Invalid JSON body", code: "BAD_REQUEST" },
-      { status: 400 },
-    );
+  if (await isCompanyBasicTrialExpired(session.companyId)) {
+    return trialExpiredJsonResponse();
   }
 
-  const parsed = createBodySchema.safeParse(json);
-  if (!parsed.success) {
-    return NextResponse.json(
-      {
-        ok: false as const,
-        error: parsed.error.flatten(),
-        code: "VALIDATION_ERROR",
-      },
-      { status: 400 },
-    );
-  }
+  const parsed = await parseJsonBodyZod(request, createBodySchema);
+  if (!parsed.ok) return parsed.response;
 
-  const { name, mobile, email, password, role } = parsed.data;
+  const { name, mobile, password, role } = parsed.data;
+  const emailRaw = parsed.data.email?.trim();
+  const email = emailRaw && emailRaw.length > 0 ? emailRaw.toLowerCase() : syntheticEmailFromMobile(mobile);
   const passwordHash = await hashPassword(password);
 
   try {
@@ -56,7 +93,7 @@ export async function POST(request: NextRequest) {
         data: {
           name,
           mobile,
-          email: email.toLowerCase(),
+          email,
           password: passwordHash,
           isActive: true,
           workspaceActivatedAt: new Date(),
@@ -79,9 +116,10 @@ export async function POST(request: NextRequest) {
     );
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-      return NextResponse.json(
-        { ok: false as const, error: "Email or mobile is already registered", code: "DUPLICATE_EMAIL" },
-        { status: 409 },
+      return jsonError(
+        409,
+        "DUPLICATE_EMAIL",
+        "That email or mobile is already registered. Use another or reset the existing account.",
       );
     }
     const p = prismaKnownErrorResponse(e);

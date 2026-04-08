@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DashboardSurface } from "@/components/dashboard/DashboardSurface";
+import { useBgosDashboardContext } from "@/components/bgos/BgosDataProvider";
 import {
   formatInrMoney,
   progressTone,
@@ -51,6 +52,7 @@ const inputClass =
   "mt-1.5 w-full rounded-xl border border-white/12 bg-black/45 px-3 py-2.5 text-sm text-white outline-none transition focus:border-[#FFC300]/45";
 
 export function BgosInvoiceDetailClient({ invoiceId }: { invoiceId: string }) {
+  const { trialReadOnly } = useBgosDashboardContext();
   const [invoice, setInvoice] = useState<InvoiceDetailApi | null>(null);
   const [company, setCompany] = useState<CompanyProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -109,6 +111,10 @@ export function BgosInvoiceDetailClient({ invoiceId }: { invoiceId: string }) {
   async function addPayment(e: React.FormEvent) {
     e.preventDefault();
     if (!invoice) return;
+    if (trialReadOnly) {
+      setPayError("Your free trial has expired. Upgrade to record payments.");
+      return;
+    }
     setPayBusy(true);
     setPayError(null);
     const amount = Number(payAmount);
@@ -152,6 +158,12 @@ export function BgosInvoiceDetailClient({ invoiceId }: { invoiceId: string }) {
       if (!res.ok || !data.ok) {
         if (data.code === "OVERPAY" && typeof data.maxAmount === "number") {
           setPayError(`Overpayment blocked. Maximum: ${formatInrMoney(data.maxAmount)}.`);
+        } else if (data.code === "TRIAL_EXPIRED") {
+          setPayError(
+            typeof data.error === "string" && data.error.trim()
+              ? data.error
+              : "Your free trial has expired. Upgrade to continue.",
+          );
         } else {
           setPayError(typeof data.error === "string" ? data.error : "Payment failed");
         }
@@ -193,6 +205,7 @@ export function BgosInvoiceDetailClient({ invoiceId }: { invoiceId: string }) {
   }
 
   const canPay = invoice.workflowStatus !== "DRAFT" && balance > 1e-9;
+  const allowPayForm = canPay && !trialReadOnly;
 
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6">
@@ -335,6 +348,11 @@ export function BgosInvoiceDetailClient({ invoiceId }: { invoiceId: string }) {
             </p>
           ) : null}
 
+          {trialReadOnly && canPay ? (
+            <p className="mt-4 text-sm text-amber-200/90">
+              Your trial has expired — viewing only. Upgrade to record payments.
+            </p>
+          ) : null}
           {!canPay ? (
             <p className="mt-4 text-sm text-white/45">
               {invoice.workflowStatus === "DRAFT"
@@ -351,6 +369,7 @@ export function BgosInvoiceDetailClient({ invoiceId }: { invoiceId: string }) {
                   max={maxPay}
                   step="0.01"
                   className={inputClass}
+                  disabled={!allowPayForm}
                   value={payAmount}
                   onChange={(e) => setPayAmount(e.target.value)}
                   required
@@ -360,6 +379,7 @@ export function BgosInvoiceDetailClient({ invoiceId }: { invoiceId: string }) {
                 <span className="text-[11px] font-medium text-white/50">Method</span>
                 <select
                   className={`${inputClass} cursor-pointer`}
+                  disabled={!allowPayForm}
                   value={payMethod}
                   onChange={(e) => setPayMethod(e.target.value)}
                 >
@@ -373,6 +393,7 @@ export function BgosInvoiceDetailClient({ invoiceId }: { invoiceId: string }) {
                 <input
                   type="date"
                   className={inputClass}
+                  disabled={!allowPayForm}
                   value={payDate}
                   onChange={(e) => setPayDate(e.target.value)}
                   required
@@ -380,7 +401,7 @@ export function BgosInvoiceDetailClient({ invoiceId }: { invoiceId: string }) {
               </label>
               <button
                 type="submit"
-                disabled={payBusy}
+                disabled={payBusy || !allowPayForm}
                 className="sm:col-span-2 inline-flex min-h-[48px] items-center justify-center rounded-xl border border-[#FFC300]/45 bg-[#FFC300]/18 text-sm font-bold text-[#FFC300] transition hover:bg-[#FFC300]/24 disabled:opacity-50"
               >
                 {payBusy ? "Saving…" : "Add payment"}

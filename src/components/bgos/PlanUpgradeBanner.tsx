@@ -4,10 +4,12 @@ import Link from "next/link";
 import { CompanyPlan } from "@prisma/client";
 import { useState } from "react";
 import { postSalesBoosterUpgradeRequest } from "@/lib/sales-booster-client";
+import { useOpenPlanUpgrade } from "./BgosUpgradeModalContext";
 
 const UPGRADE_EMAIL = process.env.NEXT_PUBLIC_BGOS_UPGRADE_EMAIL?.trim();
 
 export function PlanUpgradeBanner({ plan }: { plan: CompanyPlan | null }) {
+  const openPricing = useOpenPlanUpgrade();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -47,9 +49,16 @@ export function PlanUpgradeBanner({ plan }: { plan: CompanyPlan | null }) {
         <div className="flex shrink-0 flex-wrap items-center gap-2 sm:gap-3">
           <button
             type="button"
+            onClick={() => openPricing()}
+            className="rounded-lg bg-[#FFC300] px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-black shadow-[0_0_20px_-4px_rgba(255,195,0,0.5)] transition hover:bg-[#ffcd33]"
+          >
+            Upgrade
+          </button>
+          <button
+            type="button"
             disabled={busy}
             onClick={() => void onQuickRequest()}
-            className="rounded-lg bg-[#FFC300]/90 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-black transition hover:bg-[#FFC300] disabled:opacity-50"
+            className="rounded-lg border border-[#FFC300]/40 bg-transparent px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-[#FFC300] transition hover:border-[#FFC300]/60 hover:bg-[#FFC300]/10 disabled:opacity-50"
           >
             {busy ? "Sending…" : "Request Pro"}
           </button>

@@ -10,6 +10,7 @@ import {
   zodValidationErrorResponse,
 } from "@/lib/api-response";
 import { handleApiError } from "@/lib/route-error";
+import { isPro } from "@/lib/plan-access";
 import { isPlanLockedToBasic } from "@/lib/plan-production-lock";
 import { prisma } from "@/lib/prisma";
 
@@ -38,11 +39,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (user.companyPlan === CompanyPlan.PRO) {
+  if (isPro(user.companyPlan)) {
     return NextResponse.json(
       {
         ok: false as const,
-        error: "Your workspace is already on Pro.",
+        error: "Your workspace is already on a paid plan.",
         code: "ALREADY_PRO",
       },
       { status: 400 },
@@ -62,11 +63,11 @@ export async function POST(request: NextRequest) {
     select: { plan: true, name: true },
   });
 
-  if (!company || company.plan === CompanyPlan.PRO) {
+  if (!company || isPro(company.plan)) {
     return NextResponse.json(
       {
         ok: false as const,
-        error: "Company is already on Pro.",
+        error: "Company is already on a paid plan.",
         code: "ALREADY_PRO",
       },
       { status: 400 },

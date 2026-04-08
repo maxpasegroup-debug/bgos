@@ -1,10 +1,12 @@
 import "server-only";
 
-import { LeadStatus, TaskStatus } from "@prisma/client";
+import { CompanyPlan, LeadStatus, TaskStatus } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import { ACTIVITY_TYPES, logActivity } from "@/lib/activity-log";
 import { createLogger } from "@/lib/logger";
+import { isAutomationCenterEnabled } from "@/lib/automation-center";
 import { isPlanLockedToBasic } from "@/lib/plan-production-lock";
+import { isEnterprise, isPro } from "@/lib/plan-access";
 import { prisma } from "@/lib/prisma";
 import { taskPriorityFromTitle } from "@/lib/task-engine";
 
@@ -35,6 +37,14 @@ export async function runAutomationExecution(
   trigger: string,
   context: { lead: LeadAutomationContext },
 ): Promise<void> {
+  if (!(await isAutomationCenterEnabled(companyId))) return;
+
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { plan: true },
+  });
+  if (!company || !isPro(company.plan)) return;
+
   const automations = await prisma.automation.findMany({
     where: { companyId, trigger },
   });
@@ -45,7 +55,7 @@ export async function runAutomationExecution(
 
   for (const auto of automations) {
     try {
-      await executeAutomationRow(auto, lead);
+      await executeAutomationRow(auto, lead, company.plan);
     } catch (e) {
       log.error(`Automation "${auto.name}" (${auto.id}) failed`, e, {
         companyId,
@@ -64,6 +74,7 @@ export async function executeAutomationRow(
     companyId: string;
   },
   lead: LeadAutomationContext,
+  companyPlan: CompanyPlan,
 ): Promise<void> {
   const cfg =
     auto.config && typeof auto.config === "object" && !Array.isArray(auto.config)
@@ -72,7 +83,7 @@ export async function executeAutomationRow(
 
   switch (auto.action) {
     case "SEND_WHATSAPP": {
-      if (isPlanLockedToBasic()) return;
+      if (isPlanLockedToBasic() || !isEnterprise(companyPlan)) return;
       const raw = cfg.message;
       const message =
         typeof raw === "string" ? applyLeadTemplate(raw, lead) : `[Automation] ${auto.name}`;
@@ -139,6 +150,14 @@ export async function runStageEnteredAutomations(
   stage: LeadStatus,
   lead: LeadAutomationContext,
 ): Promise<void> {
+  if (!(await isAutomationCenterEnabled(companyId))) return;
+
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { plan: true },
+  });
+  if (!company || !isPro(company.plan)) return;
+
   const automations = await prisma.automation.findMany({
     where: { companyId, trigger: "STAGE_ENTERED" },
   });
@@ -152,7 +171,7 @@ export async function runStageEnteredAutomations(
         : {};
     if (cfg.stage !== stage) continue;
     try {
-      await executeAutomationRow(auto, lead);
+      await executeAutomationRow(auto, lead, company.plan);
     } catch (e) {
       log.error(`Automation "${auto.name}" (${auto.id}) failed`, e, {
         companyId,

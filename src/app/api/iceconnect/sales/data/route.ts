@@ -15,7 +15,10 @@ const include = {
 } as const;
 
 export async function GET(request: NextRequest) {
-  const session = await requireIceconnectRole(request, [UserRole.SALES_EXECUTIVE]);
+  const session = await requireIceconnectRole(request, [
+    UserRole.SALES_EXECUTIVE,
+    UserRole.TELECALLER,
+  ]);
   if (session instanceof NextResponse) return session;
 
   const companyId = session.companyId;

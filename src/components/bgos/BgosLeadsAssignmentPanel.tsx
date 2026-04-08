@@ -38,7 +38,7 @@ export function BgosLeadsAssignmentPanel({
   isAdmin: boolean;
   canUseMoney: boolean;
 }) {
-  const { refetch, syncGeneration } = useBgosDashboardContext();
+  const { refetch, syncGeneration, trialReadOnly } = useBgosDashboardContext();
   const [leads, setLeads] = useState<SerializedLead[]>([]);
   const [users, setUsers] = useState<PublicUser[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -173,6 +173,11 @@ export function BgosLeadsAssignmentPanel({
   }, [canUseMoney, syncGeneration]);
 
   async function handleAssignChange(lead: SerializedLead, rawValue: string) {
+    if (trialReadOnly) {
+      setLoadError("Your free trial has expired. Upgrade to assign leads.");
+      window.setTimeout(() => setLoadError(null), 5000);
+      return;
+    }
     if (!isAdmin) return;
     const assignedToUserId = rawValue === "" ? null : rawValue;
     if (assignedToUserId === lead.assignedTo) return;
@@ -213,11 +218,20 @@ export function BgosLeadsAssignmentPanel({
         ok?: boolean;
         lead?: SerializedLead;
         error?: string;
+        code?: string;
       };
 
       if (!res.ok || !data.ok) {
         setLeads(prevLeads);
-        setLoadError(typeof data.error === "string" ? data.error : "Assignment failed");
+        setLoadError(
+          data.code === "TRIAL_EXPIRED"
+            ? typeof data.error === "string" && data.error.trim()
+              ? data.error
+              : "Your free trial has expired. Upgrade to continue."
+            : typeof data.error === "string"
+              ? data.error
+              : "Assignment failed",
+        );
         window.setTimeout(() => setLoadError(null), 5000);
         return;
       }
@@ -298,7 +312,8 @@ export function BgosLeadsAssignmentPanel({
                     {canUseMoney ? (
                       <td className="py-2.5 pr-3 align-top">
                         <div className="flex max-w-[12rem] flex-col gap-1">
-                          {(lead.status === LeadStatus.PROPOSAL_SENT ||
+                          {!trialReadOnly &&
+                          (lead.status === LeadStatus.PROPOSAL_SENT ||
                             lead.status === LeadStatus.NEGOTIATION) &&
                           !(quotationTipByLead[lead.id] && quotationTipByLead[lead.id].status !== "REJECTED") ? (
                             <Link
@@ -315,7 +330,8 @@ export function BgosLeadsAssignmentPanel({
                               {quotationTipByLead[lead.id].status}
                             </p>
                           ) : null}
-                          {quotationTipByLead[lead.id]?.status === "APPROVED" &&
+                          {!trialReadOnly &&
+                          quotationTipByLead[lead.id]?.status === "APPROVED" &&
                           !invoiceTipByLead[lead.id] ? (
                             <Link
                               href={`/bgos/money/invoices?quotationId=${encodeURIComponent(quotationTipByLead[lead.id].id)}`}
@@ -350,7 +366,7 @@ export function BgosLeadsAssignmentPanel({
                           id={`assign-${lead.id}`}
                           className={selectClass}
                           value={lead.assignedTo ?? ""}
-                          disabled={assigningId === lead.id}
+                          disabled={assigningId === lead.id || trialReadOnly}
                           onChange={(e) => void handleAssignChange(lead, e.target.value)}
                         >
                           <option value="">Unassigned</option>

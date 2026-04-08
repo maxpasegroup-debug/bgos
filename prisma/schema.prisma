@@ -14,6 +14,8 @@ enum UserRole {
   MANAGER
   SALES_HEAD
   SALES_EXECUTIVE
+  /** Field sales / dialling — same workspace capabilities as sales executive. */
+  TELECALLER
   CHANNEL_PARTNER
   OPERATIONS_HEAD
   SITE_ENGINEER
@@ -29,6 +31,7 @@ enum UserRole {
 enum CompanyPlan {
   BASIC
   PRO
+  ENTERPRISE
 }
 
 enum CompanyIndustry {
@@ -73,9 +76,16 @@ model Company {
   id         String          @id @default(cuid())
   name       String
   industry   CompanyIndustry @default(SOLAR)
+  /** Subscription tier; remains {@link CompanyPlan} in DB (not a free-form string). */
   plan       CompanyPlan     @default(BASIC)
   ownerId    String
   createdAt  DateTime        @default(now())
+
+  /** Clock start for the 15-day BASIC trial; null = pre-trial schema / grandfathered. */
+  trialStartDate DateTime?
+  /** Exclusive wall-clock end: expired when `now >= trialEndDate` for BASIC. */
+  trialEndDate   DateTime?
+  isTrialActive  Boolean   @default(true)
 
   logoUrl         String?
   primaryColor    String?
@@ -121,6 +131,17 @@ model Company {
   @@index([ownerId])
 }
 
+/// Processed billing webhook deliveries (e.g. Stripe `evt_*`) — prevents double-applying upgrades.
+model BillingWebhookEvent {
+  id         String   @id @default(cuid())
+  provider   String   @default("stripe")
+  externalId String   @unique
+  eventType  String
+  receivedAt DateTime @default(now())
+
+  @@index([receivedAt])
+}
+
 /// Membership: `role` is company-level (ADMIN vs EMPLOYEE); `jobRole` is operational RBAC (solar CRM role enum).
 model UserCompany {
   id        String   @id @default(cuid())
@@ -152,6 +173,7 @@ model User {
   companiesOwned       Company[]        @relation("OwnedCompany")
   memberships          UserCompany[]
   assignedLeads        Lead[]         @relation("LeadAssignee")
+  leadsCreated         Lead[]         @relation("LeadCreator")
   tasks                Task[]
   activityLogs         ActivityLog[]
   assignedInstallations Installation[] @relation("InstallationAssignee")
@@ -161,6 +183,7 @@ model User {
   salaries               Salary[]
   createdChannelPartners ChannelPartner[] @relation("PartnerCreator")
   assignedSiteVisits     SiteVisit[] @relation("SiteVisitAssignee")
+  documentsUploaded      Document[]
 
   @@index([email])
 }
@@ -173,14 +196,17 @@ model Lead {
   source     String?
   status     LeadStatus  @default(NEW)
   value      Float?
-  companyId  String
-  assignedTo String?
-  partnerId  String?
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  companyId       String
+  assignedTo      String?
+  /** User who created the lead in BGOS (audit / “boss vs team” views). */
+  createdByUserId String?
+  partnerId       String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
   company  Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   assignee User?   @relation("LeadAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+  creator  User?   @relation("LeadCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
   partner  ChannelPartner? @relation(fields: [partnerId], references: [id], onDelete: SetNull)
   deals       Deal[]
   tasks       Task[]
@@ -197,6 +223,7 @@ model Lead {
   @@index([companyId])
   @@index([status])
   @@index([assignedTo])
+  @@index([createdByUserId])
   @@index([partnerId])
   @@index([phone])
 }
@@ -441,16 +468,22 @@ model Document {
   leadId    String?
   /// AGREEMENT | APPROVAL | REPORT | OTHER
   type      String
-  /// Relative path under the app uploads/documents directory (not a public URL).
+  /// Storage key: `{companyId}/documents/{yyyy}/{mm}/{unique}-{safeName}` (local disk or S3 object key).
   fileUrl   String
   fileName  String
   createdAt DateTime @default(now())
+  /// Who uploaded (nullable for legacy rows before audit columns).
+  uploadedByUserId String?
+  /// `UserRole` at upload time (membership can change later).
+  uploadedByRole   String?
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   lead    Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  uploader User?  @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
 
   @@index([companyId])
   @@index([companyId, type])
+  @@index([companyId, uploadedByUserId])
   @@index([leadId])
 }
 

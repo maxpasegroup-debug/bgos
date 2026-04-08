@@ -170,7 +170,12 @@ const cardSelectClass =
   "w-full rounded-md border border-white/10 bg-black/45 px-2 py-1.5 text-[11px] text-white outline-none focus:border-[#FFC300]/40 disabled:opacity-50";
 
 export function BgosPipelineBoard() {
-  const { refetch: refetchDashboard, sessionRole, syncGeneration } = useBgosDashboardContext();
+  const {
+    refetch: refetchDashboard,
+    sessionRole,
+    syncGeneration,
+    trialReadOnly,
+  } = useBgosDashboardContext();
   const isAdmin = sessionRole === UserRole.ADMIN;
   const canMoney = sessionRole === UserRole.ADMIN || sessionRole === UserRole.MANAGER;
 
@@ -326,7 +331,7 @@ export function BgosPipelineBoard() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    let data: { ok?: boolean; lead?: unknown; error?: string } = {};
+    let data: { ok?: boolean; lead?: unknown; error?: string; code?: string } = {};
     try {
       data = (await res.json()) as typeof data;
     } catch {
@@ -336,6 +341,11 @@ export function BgosPipelineBoard() {
   }
 
   async function onStageAdvance(lead: PipelineLeadCard, to: LeadStatus) {
+    if (trialReadOnly) {
+      setBanner("Your free trial has expired. Upgrade to change pipeline stages.");
+      window.setTimeout(() => setBanner(null), 6000);
+      return;
+    }
     if (to === lead.status) return;
     const prev = stages;
     setBusyLeadId(lead.id);
@@ -345,9 +355,13 @@ export function BgosPipelineBoard() {
       if (!res.ok || !data.ok) {
         setStages(prev);
         setBanner(
-          typeof data.error === "string" && data.error.trim()
-            ? data.error
-            : "Could not update stage.",
+          data.code === "TRIAL_EXPIRED"
+            ? typeof data.error === "string" && data.error.trim()
+              ? data.error
+              : "Your free trial has expired. Upgrade to continue."
+            : typeof data.error === "string" && data.error.trim()
+              ? data.error
+              : "Could not update stage.",
         );
         window.setTimeout(() => setBanner(null), 6000);
         return;
@@ -374,6 +388,11 @@ export function BgosPipelineBoard() {
   }
 
   async function onAssignChange(lead: PipelineLeadCard, raw: string) {
+    if (trialReadOnly) {
+      setBanner("Your free trial has expired. Upgrade to assign leads.");
+      window.setTimeout(() => setBanner(null), 6000);
+      return;
+    }
     if (!isAdmin) return;
     const assignedToUserId = raw === "" ? null : raw;
     if (assignedToUserId === lead.assignedTo) return;
@@ -401,9 +420,13 @@ export function BgosPipelineBoard() {
       if (!res.ok || !data.ok) {
         setStages(prev);
         setBanner(
-          typeof data.error === "string" && data.error.trim()
-            ? data.error
-            : "Could not update assignment.",
+          data.code === "TRIAL_EXPIRED"
+            ? typeof data.error === "string" && data.error.trim()
+              ? data.error
+              : "Your free trial has expired. Upgrade to continue."
+            : typeof data.error === "string" && data.error.trim()
+              ? data.error
+              : "Could not update assignment.",
         );
         window.setTimeout(() => setBanner(null), 6000);
         return;
@@ -517,6 +540,7 @@ export function BgosPipelineBoard() {
                         </p>
 
                         {canMoney &&
+                        !trialReadOnly &&
                         (lead.status === LeadStatus.PROPOSAL_SENT || lead.status === LeadStatus.NEGOTIATION) &&
                         !(quotationTipByLead[lead.id] && quotationTipByLead[lead.id].status !== "REJECTED") ? (
                           <Link
@@ -537,6 +561,7 @@ export function BgosPipelineBoard() {
                         ) : null}
 
                         {canMoney &&
+                        !trialReadOnly &&
                         quotationTipByLead[lead.id]?.status === "APPROVED" &&
                         !invoiceTipByLead[lead.id] ? (
                           <Link
@@ -576,7 +601,7 @@ export function BgosPipelineBoard() {
                               <select
                                 key={`${lead.id}-${lead.status}-stage`}
                                 defaultValue=""
-                                disabled={busyLeadId === lead.id}
+                                disabled={busyLeadId === lead.id || trialReadOnly}
                                 className={`${cardSelectClass} mt-0.5`}
                                 aria-label={`Move ${lead.name} to stage`}
                                 onChange={(e) => {
@@ -605,7 +630,7 @@ export function BgosPipelineBoard() {
                               <select
                                 key={`${lead.id}-${lead.assignedTo ?? "u"}-as`}
                                 value={lead.assignedTo ?? ""}
-                                disabled={busyLeadId === lead.id}
+                                disabled={busyLeadId === lead.id || trialReadOnly}
                                 className={`${cardSelectClass} mt-0.5`}
                                 aria-label={`Assign ${lead.name}`}
                                 onChange={(e) => void onAssignChange(lead, e.target.value)}

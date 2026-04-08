@@ -16,6 +16,8 @@
     "db:seed": "prisma db seed",
     "launch:preflight": "node scripts/preflight-launch.mjs",
     "e2e:flow": "node scripts/e2e-boss-telecaller-flow.mjs",
+    "e2e:validate": "node scripts/e2e-full-validation.mjs",
+    "e2e:automation": "node scripts/e2e-automation-journey.mjs",
     "e2e:multibusiness": "node scripts/e2e-multibusiness-onboarding.mjs"
   },
   "dependencies": {
@@ -30,6 +32,7 @@
     "react-dom": "19.2.4",
     "recharts": "^3.8.1",
     "server-only": "^0.0.1",
+    "stripe": "^18.5.0",
     "zod": "^4.3.6"
   },
   "prisma": {

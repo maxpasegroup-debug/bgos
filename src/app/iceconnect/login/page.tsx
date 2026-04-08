@@ -9,16 +9,26 @@ import { resolveAfterLoginNavigation } from "@/lib/cross-domain-login";
 
 const formSchema = z
   .object({
-    identifier: z.string().trim().min(1, "Enter mobile number or email"),
+    identifier: z.string().trim().min(1, "Enter your mobile number or email"),
     password: z.string().min(1, "Enter password"),
   })
   .superRefine((data, ctx) => {
-    if (!data.identifier.includes("@")) return;
-    if (!z.string().email().safeParse(data.identifier).success) {
+    if (data.identifier.includes("@")) {
+      if (!z.string().email().safeParse(data.identifier).success) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["identifier"],
+          message: "Enter a valid email",
+        });
+      }
+      return;
+    }
+    const digits = data.identifier.replace(/\D/g, "");
+    if (digits.length < 10 || digits.length > 15) {
       ctx.addIssue({
         code: "custom",
         path: ["identifier"],
-        message: "Enter a valid email",
+        message: "Enter a valid mobile number (10–15 digits)",
       });
     }
   });
@@ -233,7 +243,10 @@ function IceconnectLoginForm() {
               ICECONNECT
             </h1>
             <p className="mt-1 text-center text-sm font-medium text-gray-600">
-              Access your work dashboard
+              Sign in with mobile and password from your company
+            </p>
+            <p className="mt-0.5 text-center text-xs text-gray-500">
+              You can use email instead if your account has one
             </p>
             <p className="mt-1 text-center text-xs text-gray-400">
               Powered by BGOS • Secure • Intelligent
@@ -243,14 +256,14 @@ function IceconnectLoginForm() {
           <form className="mt-8 space-y-4" onSubmit={onSubmit} noValidate>
             <div>
               <label htmlFor="ice-identifier" className="sr-only">
-                Mobile or email
+                Mobile number or email
               </label>
               <input
                 id="ice-identifier"
                 name="identifier"
                 type="text"
-                autoComplete="username"
-                placeholder="Mobile or email"
+                autoComplete="tel"
+                placeholder="Mobile number"
                 value={identifier}
                 onChange={(e) => {
                   setIdentifier(e.target.value);

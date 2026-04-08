@@ -7,6 +7,7 @@ import type { ComponentType } from "react";
 
 const navItems = [
   { id: "home", label: "Home", href: "/bgos", icon: HomeIcon },
+  { id: "pricing", label: "Pricing", href: "/bgos/pricing", icon: PricingIcon },
   { id: "sales", label: "Sales", href: "/bgos/sales", icon: SalesIcon },
   { id: "operations", label: "Operations", href: "/bgos/operations", icon: OpsIcon },
   { id: "documents", label: "Documents", href: "/bgos/documents", icon: DocsIcon },
@@ -111,6 +112,20 @@ function SalesIcon({ className }: { className?: string }) {
         strokeLinejoin="round"
         strokeWidth={1.75}
         d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+      />
+    </svg>
+  );
+}
+
+function PricingIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" aria-hidden>
+      <path
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.75}
+        d="M3 10h18M7 15h1m4 0h1m-7 4h12a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
       />
     </svg>
   );

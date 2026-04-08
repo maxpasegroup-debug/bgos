@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { useBgosDashboardContext } from "./BgosDataProvider";
 
@@ -42,7 +42,7 @@ export function BgosAddLeadModal({
   open: boolean;
   onClose: () => void;
 }) {
-  const { refetch } = useBgosDashboardContext();
+  const { refetch, trialReadOnly } = useBgosDashboardContext();
   const titleId = useId();
   const nameInputRef = useRef<HTMLInputElement>(null);
 
@@ -51,6 +51,7 @@ export function BgosAddLeadModal({
   const [valueStr, setValueStr] = useState("");
   const [assignedToUserId, setAssignedToUserId] = useState("");
   const [users, setUsers] = useState<PublicUser[]>([]);
+  const [currentUser, setCurrentUser] = useState<{ id: string; role: string } | null>(null);
   const [usersNote, setUsersNote] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -58,22 +59,50 @@ export function BgosAddLeadModal({
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const loadUsers = useCallback(async () => {
+  const assignDefaultLabel =
+    currentUser?.role === "ADMIN" ? "My Leads (Boss)" : "My leads";
+
+  const assigneeChoices = useMemo(() => {
+    if (!currentUser?.id) return users.filter((u) => u.isActive);
+    return users.filter((u) => u.isActive && u.id !== currentUser.id);
+  }, [users, currentUser?.id]);
+
+  const loadSessionAndUsers = useCallback(async () => {
     setLoadingUsers(true);
     setUsersNote(null);
     try {
-      const res = await fetch("/api/users", { credentials: "include" });
-      const data = (await res.json()) as {
+      const [meRes, usersRes] = await Promise.all([
+        fetch("/api/auth/me", { credentials: "include" }),
+        fetch("/api/users", { credentials: "include" }),
+      ]);
+
+      let meId: string | null = null;
+      let meRole: string | null = null;
+      try {
+        const meJson = (await meRes.json()) as {
+          authenticated?: boolean;
+          user?: { id: string; role: string };
+        };
+        if (meRes.ok && meJson.authenticated && meJson.user) {
+          meId = meJson.user.id;
+          meRole = meJson.user.role;
+        }
+      } catch {
+        /* ignore */
+      }
+      setCurrentUser(meId && meRole ? { id: meId, role: meRole } : null);
+
+      const data = (await usersRes.json()) as {
         ok?: boolean;
         users?: PublicUser[];
         error?: string;
       };
-      if (!res.ok) {
+      if (!usersRes.ok) {
         setUsers([]);
         setUsersNote(
           typeof data.error === "string"
             ? data.error
-            : "Team list unavailable — lead will be assigned to you.",
+            : "Team list unavailable — assignment defaults to you.",
         );
         return;
       }
@@ -81,7 +110,8 @@ export function BgosAddLeadModal({
       setUsers(list);
     } catch {
       setUsers([]);
-      setUsersNote("Could not load team — lead will be assigned to you.");
+      setCurrentUser(null);
+      setUsersNote("Could not load team — assignment defaults to you.");
     } finally {
       setLoadingUsers(false);
     }
@@ -89,13 +119,15 @@ export function BgosAddLeadModal({
 
   useEffect(() => {
     if (!open) return;
-    void loadUsers();
+    setCurrentUser(null);
+    void loadSessionAndUsers();
     setFieldErrors({});
     setSubmitError(null);
     setSuccess(null);
+    setAssignedToUserId("");
     const t = window.setTimeout(() => nameInputRef.current?.focus(), 50);
     return () => window.clearTimeout(t);
-  }, [open, loadUsers]);
+  }, [open, loadSessionAndUsers]);
 
   useEffect(() => {
     if (!open) return;
@@ -117,6 +149,10 @@ export function BgosAddLeadModal({
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (trialReadOnly) {
+      setSubmitError("Your free trial has expired. Upgrade to continue.");
+      return;
+    }
     setFieldErrors({});
     setSubmitError(null);
     setSuccess(null);
@@ -178,6 +214,14 @@ export function BgosAddLeadModal({
       };
 
       if (!res.ok) {
+        if (data.code === "TRIAL_EXPIRED") {
+          setSubmitError(
+            typeof data.error === "string" && data.error.trim()
+              ? data.error
+              : "Your free trial has expired. Upgrade to continue.",
+          );
+          return;
+        }
         if (data.code === "VALIDATION_ERROR" && data.error && typeof data.error === "object") {
           setSubmitError("Check the form and try again.");
         } else {
@@ -214,149 +258,151 @@ export function BgosAddLeadModal({
   }
 
   return (
-    <>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto overflow-x-hidden p-5 sm:p-6"
+      role="presentation"
+    >
       <div
-        className="fixed inset-0 z-50 bg-black/65 backdrop-blur-sm"
+        className="fixed inset-0 bg-black/65 backdrop-blur-sm"
         aria-hidden
         onClick={onClose}
       />
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
-        role="presentation"
-        onClick={onClose}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative z-10 my-auto w-full max-w-[500px] max-h-[min(90dvh,calc(100vh-1.5rem))] overflow-y-auto overscroll-contain rounded-2xl border border-white/10 bg-[#0f141d] p-6 shadow-2xl sm:p-8"
+        onClick={(e) => e.stopPropagation()}
       >
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby={titleId}
-          className="relative w-full max-w-md rounded-2xl border border-white/10 bg-[#0f141d] p-6 shadow-2xl"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <h2 id={titleId} className="text-lg font-semibold text-white">
-            Add lead
-          </h2>
-          <p className="mt-1 text-xs text-white/45">
-            New leads start in <span className="text-white/70">New</span> and get a follow-up task.
+        <h2 id={titleId} className="text-lg font-semibold text-white">
+          Add lead
+        </h2>
+        <p className="mt-1 text-xs text-white/45">
+          New leads start in <span className="text-white/70">New</span> and get a follow-up task.
+        </p>
+        {trialReadOnly ? (
+          <p className="mt-3 rounded-lg border border-amber-500/35 bg-amber-950/35 px-3 py-2 text-xs text-amber-100/90">
+            Your trial has expired. Upgrade to add leads.
           </p>
+        ) : null}
 
-          <form className="mt-5 space-y-4" onSubmit={(e) => void onSubmit(e)} noValidate>
-            <div>
-              <label htmlFor="add-lead-name" className="text-[10px] font-semibold uppercase tracking-wider text-white/45">
-                Name <span className="text-[#FF3B3B]">*</span>
-              </label>
-              <input
-                ref={nameInputRef}
-                id="add-lead-name"
-                name="name"
-                autoComplete="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className={inputClass}
-                aria-invalid={Boolean(fieldErrors.name)}
-                aria-describedby={fieldErrors.name ? "add-lead-name-err" : undefined}
-              />
-              {fieldErrors.name ? (
-                <p id="add-lead-name-err" className="mt-1 text-xs text-red-300" role="alert">
-                  {fieldErrors.name}
-                </p>
-              ) : null}
-            </div>
-
-            <div>
-              <label htmlFor="add-lead-phone" className="text-[10px] font-semibold uppercase tracking-wider text-white/45">
-                Phone <span className="text-[#FF3B3B]">*</span>
-              </label>
-              <input
-                id="add-lead-phone"
-                name="phone"
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                placeholder="e.g. 9876543210 or +91 98765 43210"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className={inputClass}
-                aria-invalid={Boolean(fieldErrors.phone)}
-              />
-              {fieldErrors.phone ? (
-                <p className="mt-1 text-xs text-red-300" role="alert">
-                  {fieldErrors.phone}
-                </p>
-              ) : null}
-            </div>
-
-            <div>
-              <label htmlFor="add-lead-value" className="text-[10px] font-semibold uppercase tracking-wider text-white/45">
-                Deal value (₹, optional)
-              </label>
-              <input
-                id="add-lead-value"
-                name="value"
-                inputMode="decimal"
-                placeholder="e.g. 250000"
-                value={valueStr}
-                onChange={(e) => setValueStr(e.target.value)}
-                className={inputClass}
-              />
-              {fieldErrors.valueStr ? (
-                <p className="mt-1 text-xs text-red-300" role="alert">
-                  {fieldErrors.valueStr}
-                </p>
-              ) : null}
-            </div>
-
-            <div>
-              <label htmlFor="add-lead-assign" className="text-[10px] font-semibold uppercase tracking-wider text-white/45">
-                Assign to
-              </label>
-              <select
-                id="add-lead-assign"
-                name="assignedToUserId"
-                value={assignedToUserId}
-                onChange={(e) => setAssignedToUserId(e.target.value)}
-                disabled={loadingUsers}
-                className={inputClass}
-              >
-                <option value="">You (default)</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name} · {u.role}
-                  </option>
-                ))}
-              </select>
-              {usersNote ? (
-                <p className="mt-1 text-xs text-amber-200/80">{usersNote}</p>
-              ) : null}
-            </div>
-
-            {submitError ? (
-              <p className="text-sm text-red-300" role="alert">
-                {submitError}
+        <form className="mt-5 space-y-4 pb-1" onSubmit={(e) => void onSubmit(e)} noValidate>
+          <div>
+            <label htmlFor="add-lead-name" className="text-[10px] font-semibold uppercase tracking-wider text-white/45">
+              Name <span className="text-[#FF3B3B]">*</span>
+            </label>
+            <input
+              ref={nameInputRef}
+              id="add-lead-name"
+              name="name"
+              autoComplete="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={inputClass}
+              aria-invalid={Boolean(fieldErrors.name)}
+              aria-describedby={fieldErrors.name ? "add-lead-name-err" : undefined}
+            />
+            {fieldErrors.name ? (
+              <p id="add-lead-name-err" className="mt-1 text-xs text-red-300" role="alert">
+                {fieldErrors.name}
               </p>
             ) : null}
+          </div>
 
-            <div className="flex flex-wrap gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  resetForm();
-                  onClose();
-                }}
-                className="rounded-xl border border-white/15 px-4 py-2.5 text-sm font-medium text-white/80 transition hover:border-white/25"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="rounded-xl bg-[#FFC300]/90 px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-[#FFC300] disabled:opacity-50"
-              >
-                {submitting ? "Saving…" : "Create lead"}
-              </button>
-            </div>
-          </form>
-        </div>
+          <div>
+            <label htmlFor="add-lead-phone" className="text-[10px] font-semibold uppercase tracking-wider text-white/45">
+              Phone <span className="text-[#FF3B3B]">*</span>
+            </label>
+            <input
+              id="add-lead-phone"
+              name="phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              placeholder="e.g. 9876543210 or +91 98765 43210"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className={inputClass}
+              aria-invalid={Boolean(fieldErrors.phone)}
+            />
+            {fieldErrors.phone ? (
+              <p className="mt-1 text-xs text-red-300" role="alert">
+                {fieldErrors.phone}
+              </p>
+            ) : null}
+          </div>
+
+          <div>
+            <label htmlFor="add-lead-value" className="text-[10px] font-semibold uppercase tracking-wider text-white/45">
+              Deal value (₹, optional)
+            </label>
+            <input
+              id="add-lead-value"
+              name="value"
+              inputMode="decimal"
+              placeholder="e.g. 250000"
+              value={valueStr}
+              onChange={(e) => setValueStr(e.target.value)}
+              className={inputClass}
+            />
+            {fieldErrors.valueStr ? (
+              <p className="mt-1 text-xs text-red-300" role="alert">
+                {fieldErrors.valueStr}
+              </p>
+            ) : null}
+          </div>
+
+          <div>
+            <label htmlFor="add-lead-assign" className="text-[10px] font-semibold uppercase tracking-wider text-white/45">
+              Assign to
+            </label>
+            <select
+              id="add-lead-assign"
+              name="assignedToUserId"
+              value={assignedToUserId}
+              onChange={(e) => setAssignedToUserId(e.target.value)}
+              disabled={loadingUsers}
+              className={inputClass}
+            >
+              <option value="">{loadingUsers ? "Loading…" : assignDefaultLabel}</option>
+              {assigneeChoices.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name.trim() || u.email}
+                </option>
+              ))}
+            </select>
+            {usersNote ? (
+              <p className="mt-1 text-xs text-amber-200/80">{usersNote}</p>
+            ) : null}
+          </div>
+
+          {submitError ? (
+            <p className="text-sm text-red-300" role="alert">
+              {submitError}
+            </p>
+          ) : null}
+
+          <div className="flex flex-wrap gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                resetForm();
+                onClose();
+              }}
+              className="rounded-xl border border-white/15 px-4 py-2.5 text-sm font-medium text-white/80 transition hover:border-white/25"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting || trialReadOnly}
+              className="rounded-xl bg-[#FFC300]/90 px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-[#FFC300] disabled:opacity-50"
+            >
+              {submitting ? "Saving…" : "Create lead"}
+            </button>
+          </div>
+        </form>
       </div>
-    </>
+    </div>
   );
 }

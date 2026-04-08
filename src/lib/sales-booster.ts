@@ -2,8 +2,11 @@ import "server-only";
 
 import { CompanyPlan, LeadStatus, TaskStatus } from "@prisma/client";
 import { forwardLeadStatuses, leadStatusLabel } from "@/lib/lead-pipeline";
+import { isPro } from "@/lib/plan-access";
 import { isPlanLockedToBasic } from "@/lib/plan-production-lock";
 import { prisma } from "@/lib/prisma";
+import { parseSalesBoosterFromDashboardConfig } from "@/lib/sales-booster-config";
+import { SB_TASK_PREFIX } from "@/lib/sales-booster-engine";
 
 export type SalesBoosterBasicPayload = {
   plan: "BASIC";
@@ -12,7 +15,7 @@ export type SalesBoosterBasicPayload = {
 };
 
 export type SalesBoosterProPayload = {
-  plan: "PRO";
+  plan: "PRO" | "ENTERPRISE";
   featuresUnlocked: true;
   companyName: string;
   autoFollowUps: Array<{
@@ -46,6 +49,11 @@ export type SalesBoosterProPayload = {
     state: "queued" | "sent_simulated";
     at: string;
   }>;
+  /** Stored in `dashboardConfig.salesBooster`. */
+  onLeadCreated: "assign" | "whatsapp" | "both";
+  followUpScheduleEnabled: boolean;
+  /** Pending tasks created by Sales Booster follow-up schedule (visible on dashboard). */
+  scheduledBoosterTaskCount: number;
 };
 
 export type SalesBoosterPayload = SalesBoosterBasicPayload | SalesBoosterProPayload;
@@ -99,7 +107,7 @@ function leadScore(input: {
 export async function buildSalesBoosterPayload(companyId: string): Promise<SalesBoosterPayload> {
   const company = await prisma.company.findUnique({
     where: { id: companyId },
-    select: { plan: true, name: true },
+    select: { plan: true, name: true, dashboardConfig: true },
   });
 
   if (!company) {
@@ -118,7 +126,8 @@ export async function buildSalesBoosterPayload(companyId: string): Promise<Sales
     };
   }
 
-  const entitled = company.plan === CompanyPlan.PRO;
+  const entitled = isPro(company.plan);
+  const sbCfg = parseSalesBoosterFromDashboardConfig(company.dashboardConfig);
 
   if (!entitled) {
     return {
@@ -130,20 +139,29 @@ export async function buildSalesBoosterPayload(companyId: string): Promise<Sales
 
   const now = Date.now();
 
-  const openLeads = await prisma.lead.findMany({
-    where: {
-      companyId,
-      status: { notIn: [LeadStatus.WON, LeadStatus.LOST] },
-    },
-    take: 60,
-    orderBy: { createdAt: "desc" },
-    include: {
-      tasks: {
-        where: { status: TaskStatus.PENDING },
-        orderBy: { dueDate: "asc" },
+  const [scheduledBoosterTaskCount, openLeads] = await Promise.all([
+    prisma.task.count({
+      where: {
+        companyId,
+        status: TaskStatus.PENDING,
+        title: { startsWith: SB_TASK_PREFIX },
       },
-    },
-  });
+    }),
+    prisma.lead.findMany({
+      where: {
+        companyId,
+        status: { notIn: [LeadStatus.WON, LeadStatus.LOST] },
+      },
+      take: 60,
+      orderBy: { createdAt: "desc" },
+      include: {
+        tasks: {
+          where: { status: TaskStatus.PENDING },
+          orderBy: { dueDate: "asc" },
+        },
+      },
+    }),
+  ]);
 
   const scored = openLeads.map((lead) => {
     const pending = lead.tasks;
@@ -265,12 +283,15 @@ export async function buildSalesBoosterPayload(companyId: string): Promise<Sales
   );
 
   return {
-    plan: "PRO",
+    plan: company.plan === CompanyPlan.ENTERPRISE ? ("ENTERPRISE" as const) : ("PRO" as const),
     featuresUnlocked: true,
     companyName: company.name,
     autoFollowUps,
     prioritizedLeads,
     statusSuggestions: statusSuggestions.slice(0, 6),
     whatsappSimulation,
+    onLeadCreated: sbCfg.onLeadCreated,
+    followUpScheduleEnabled: sbCfg.followUpScheduleEnabled,
+    scheduledBoosterTaskCount,
   };
 }

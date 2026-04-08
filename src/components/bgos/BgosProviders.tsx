@@ -3,11 +3,14 @@
 import type { ReactNode } from "react";
 import { BgosAppChrome } from "./BgosAppChrome";
 import { BgosDataProvider } from "./BgosDataProvider";
+import { BgosUpgradeModalProvider } from "./BgosUpgradeModalContext";
 
 export function BgosProviders({ children }: { children: ReactNode }) {
   return (
     <BgosDataProvider>
-      <BgosAppChrome>{children}</BgosAppChrome>
+      <BgosUpgradeModalProvider>
+        <BgosAppChrome>{children}</BgosAppChrome>
+      </BgosUpgradeModalProvider>
     </BgosDataProvider>
   );
 }

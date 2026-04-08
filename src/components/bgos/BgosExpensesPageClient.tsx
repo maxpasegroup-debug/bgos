@@ -16,6 +16,7 @@ import {
   YAxis,
 } from "recharts";
 import { DashboardSurface } from "@/components/dashboard/DashboardSurface";
+import { useBgosDashboardContext } from "@/components/bgos/BgosDataProvider";
 import { EXPENSE_CATEGORIES } from "@/lib/expense-categories";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
 
@@ -53,6 +54,7 @@ const btnPrimary =
   "inline-flex min-h-[48px] items-center justify-center rounded-xl border border-[#FFC300]/45 bg-[#FFC300]/18 px-5 text-sm font-bold text-[#FFC300] transition hover:bg-[#FFC300]/24 disabled:opacity-50";
 
 export function BgosExpensesPageClient() {
+  const { trialReadOnly } = useBgosDashboardContext();
   const [rows, setRows] = useState<ExpenseRow[]>([]);
   const [analytics, setAnalytics] = useState<AnalyticsPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -134,6 +136,10 @@ export function BgosExpensesPageClient() {
 
   async function addExpense(e: React.FormEvent) {
     e.preventDefault();
+    if (trialReadOnly) {
+      setError("Your free trial has expired. Upgrade to add expenses.");
+      return;
+    }
     setFieldErrors({});
     const errs: typeof fieldErrors = {};
     if (!title.trim()) errs.title = "Title is required";
@@ -158,9 +164,17 @@ export function BgosExpensesPageClient() {
           date: new Date(date + "T12:00:00").toISOString(),
         }),
       });
-      const data = (await res.json()) as { ok?: boolean; error?: string };
+      const data = (await res.json()) as { ok?: boolean; error?: string; code?: string };
       if (!res.ok || !data.ok) {
-        setError(typeof data.error === "string" ? data.error : "Could not save expense");
+        setError(
+          data.code === "TRIAL_EXPIRED"
+            ? typeof data.error === "string" && data.error.trim()
+              ? data.error
+              : "Your free trial has expired. Upgrade to continue."
+            : typeof data.error === "string"
+              ? data.error
+              : "Could not save expense",
+        );
         return;
       }
       setTitle("");
@@ -290,6 +304,7 @@ export function BgosExpensesPageClient() {
             <span className="text-[11px] font-medium text-white/50">Title</span>
             <input
               className={inputClass}
+              disabled={trialReadOnly}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
@@ -304,6 +319,7 @@ export function BgosExpensesPageClient() {
               min={0.01}
               step="0.01"
               className={inputClass}
+              disabled={trialReadOnly}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               required
@@ -315,6 +331,7 @@ export function BgosExpensesPageClient() {
             <span className="text-[11px] font-medium text-white/50">Category</span>
             <select
               className={`${inputClass} cursor-pointer`}
+              disabled={trialReadOnly}
               value={category}
               onChange={(e) => setCategory(e.target.value as (typeof EXPENSE_CATEGORIES)[number])}
             >
@@ -327,9 +344,16 @@ export function BgosExpensesPageClient() {
           </label>
           <label className="sm:col-span-2">
             <span className="text-[11px] font-medium text-white/50">Date</span>
-            <input type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} required />
+            <input
+              type="date"
+              className={inputClass}
+              disabled={trialReadOnly}
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              required
+            />
           </label>
-          <button type="submit" className={`${btnPrimary} sm:col-span-2`} disabled={busy}>
+          <button type="submit" className={`${btnPrimary} sm:col-span-2`} disabled={busy || trialReadOnly}>
             {busy ? "Saving…" : "Add expense"}
           </button>
         </form>

@@ -116,7 +116,9 @@ export async function POST(request: Request) {
         where: { email: { equals: email, mode: "insensitive" } },
         include: {
           memberships: {
-            include: { company: { select: { id: true, plan: true } } },
+            include: {
+              company: { select: { id: true, plan: true, trialEndDate: true } },
+            },
             orderBy: { createdAt: "asc" },
           },
         },
@@ -141,7 +143,9 @@ export async function POST(request: Request) {
         },
         include: {
           memberships: {
-            include: { company: { select: { id: true, plan: true } } },
+            include: {
+              company: { select: { id: true, plan: true, trialEndDate: true } },
+            },
             orderBy: { createdAt: "asc" },
           },
         },
@@ -205,6 +209,7 @@ export async function POST(request: Request) {
         companyId: m.companyId,
         plan: m.company.plan,
         jobRole: m.jobRole,
+        trialEndsAt: m.company.trialEndDate?.toISOString() ?? null,
       }));
   const primary = mems[0];
 

@@ -1,4 +1,4 @@
-import { LeadStatus } from "@prisma/client";
+import { LeadStatus, TaskStatus } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -8,10 +8,14 @@ import { ACTIVITY_TYPES, logActivity } from "@/lib/activity-log";
 import { LEAD_ACTIVITY, logLeadActivity } from "@/lib/lead-activity";
 import { leadStatusLabel } from "@/lib/lead-pipeline";
 import { serializeLead } from "@/lib/lead-serialize";
+import { isAutomationCenterEnabled } from "@/lib/automation-center";
 import { prisma } from "@/lib/prisma";
+import { handleNewLead } from "@/lib/nexa-engine";
+import { runSalesBoosterOnLeadCreated } from "@/lib/sales-booster-engine";
 import { runAutomationExecution } from "@/lib/automation-execution";
 import { createLeadTask, dueDateCallLead, taskTitleCallLead } from "@/lib/task-engine";
 import { findUserInCompany } from "@/lib/user-company";
+import { isCompanyBasicTrialExpired, trialExpiredJsonResponse } from "@/lib/trial";
 
 const bodySchema = z.object({
   name: z.string().trim().min(1).max(200),
@@ -24,6 +28,10 @@ const bodySchema = z.object({
 export async function POST(request: NextRequest) {
   const session = await requireAuthWithCompany(request);
   if (session instanceof NextResponse) return session;
+
+  if (await isCompanyBasicTrialExpired(session.companyId)) {
+    return trialExpiredJsonResponse();
+  }
 
   const parsed = await parseJsonBodyZod(request, bodySchema);
   if (!parsed.ok) return parsed.response;
@@ -51,13 +59,14 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const lead = await prisma.$transaction(async (tx) => {
+  const leadRow = await prisma.$transaction(async (tx) => {
     const created = await tx.lead.create({
       data: {
         name,
         phone,
         value: value ?? null,
         companyId,
+        createdByUserId: actorId,
         assignedTo: assigneeId,
         ...(partnerId ? { partnerId } : {}),
         status: LeadStatus.NEW,
@@ -108,14 +117,55 @@ export async function POST(request: NextRequest) {
     return created;
   });
 
-  await runAutomationExecution(companyId, "LEAD_CREATED", {
-    lead: {
-      id: lead.id,
-      name: lead.name,
-      companyId: lead.companyId,
-      assignedTo: lead.assignedTo,
+  const nexaResult = await handleNewLead({ leadId: leadRow.id, companyId, actorUserId: actorId });
+
+  if (
+    nexaResult.reassigned &&
+    nexaResult.assignedUserId &&
+    nexaResult.assignedUserId !== assigneeId
+  ) {
+    await prisma.task.updateMany({
+      where: {
+        leadId: leadRow.id,
+        companyId,
+        status: TaskStatus.PENDING,
+        userId: assigneeId,
+      },
+      data: { userId: nexaResult.assignedUserId },
+    });
+  }
+
+  const automationCenterOn = await isAutomationCenterEnabled(companyId);
+  if (automationCenterOn) {
+    await runSalesBoosterOnLeadCreated({
+      leadId: leadRow.id,
+      companyId,
+      actorUserId: actorId,
+      assigneeExplicit: assignedToUserId !== undefined,
+      initialAssigneeId: assigneeId,
+    });
+  }
+
+  const leadForAutomation = await prisma.lead.findUnique({
+    where: { id: leadRow.id },
+    select: { id: true, name: true, companyId: true, assignedTo: true },
+  });
+
+  if (leadForAutomation && automationCenterOn) {
+    await runAutomationExecution(companyId, "LEAD_CREATED", {
+      lead: leadForAutomation,
+    });
+  }
+
+  const lead = await prisma.lead.findUnique({
+    where: { id: leadRow.id },
+    include: {
+      assignee: { select: { id: true, name: true, email: true } },
     },
   });
+  if (!lead) {
+    return jsonError(500, "INTERNAL", "Lead not found after create");
+  }
 
   return jsonSuccess({ lead: serializeLead(lead) }, 201);
 }

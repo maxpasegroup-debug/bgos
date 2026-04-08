@@ -2,4 +2,11 @@
 export const BGOS_MAIN_PAD =
   "mx-auto w-full max-w-[1600px] px-4 sm:px-7 lg:px-10";
 
-export const BGOS_GRID_GAP = "gap-5 sm:gap-6";
+/** Space between sibling cards in multi-column grids (32px). */
+export const BGOS_GRID_GAP = "gap-8";
+
+/** Vertical rhythm between major dashboard sections (32px). */
+export const BGOS_SECTION_GAP = "mb-8";
+
+/** Tighter stack inside a single section (e.g. analytics block). */
+export const BGOS_STACK_GAP = "space-y-8";

@@ -48,16 +48,23 @@ export async function GET(
 
   const mime = mimeForDocumentFileName(doc.fileName);
   const safe = doc.fileName.replace(/[^\x20-\x7E]/g, "_").slice(0, 180) || "download";
+  const inline =
+    request.nextUrl.searchParams.get("inline") === "1" ||
+    request.nextUrl.searchParams.get("inline") === "true";
 
   const stream = createReadStream(abs);
   const web = Readable.toWeb(stream);
+
+  const disposition = inline
+    ? `inline; filename="${safe}"`
+    : `attachment; filename="${safe}"`;
 
   return new Response(web as BodyInit, {
     status: 200,
     headers: {
       "Content-Type": mime,
       "Content-Length": String(size),
-      "Content-Disposition": `attachment; filename="${safe}"`,
+      "Content-Disposition": disposition,
       "Cache-Control": "private, no-store",
     },
   });

@@ -3,7 +3,12 @@
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { normalizeFinancialOverview } from "@/lib/dashboard-client-defaults";
-import type { DashboardMetrics, NexaInsight } from "@/types";
+import type {
+  DashboardAnalytics,
+  DashboardAnalyticsRangeMeta,
+  DashboardMetrics,
+  NexaInsight,
+} from "@/types";
 import { DashboardSurface } from "./DashboardSurface";
 
 function insightDotClass(severity: NexaInsight["severity"]) {
@@ -77,6 +82,21 @@ const metricLabels = [
   "Pending Approvals",
 ] as const;
 
+const emptyAnalytics = (): DashboardAnalytics => ({
+  revenue: 0,
+  leads: 0,
+  conversionPercent: 0,
+  expenses: 0,
+  trend: [],
+});
+
+const emptyAnalyticsRange = (): DashboardAnalyticsRangeMeta => ({
+  preset: "this_month",
+  from: "",
+  to: "",
+  label: "This Month",
+});
+
 function MetricCardSkeleton() {
   return (
     <DashboardSurface className="p-6">
@@ -119,7 +139,10 @@ export function CommandCenterSection() {
                 featuresUnlocked: false,
                 companyName: "",
               },
+            automationCenter: json.automationCenter ?? null,
             financial: normalizeFinancialOverview(json.financial),
+            analytics: json.analytics ?? emptyAnalytics(),
+            analyticsRange: json.analyticsRange ?? emptyAnalyticsRange(),
           });
           setLoadError(null);
           hasLoadedOnce.current = true;
@@ -132,7 +155,7 @@ export function CommandCenterSection() {
     };
 
     fetchData();
-    const intervalId = window.setInterval(fetchData, 5000);
+    const intervalId = window.setInterval(fetchData, 4000);
     return () => window.clearInterval(intervalId);
   }, []);
 

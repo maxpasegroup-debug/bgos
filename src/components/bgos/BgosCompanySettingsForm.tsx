@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useBgosDashboardContext } from "./BgosDataProvider";
 
 type CompanySettings = {
   id: string;
@@ -18,6 +19,7 @@ type CompanySettings = {
 };
 
 export function BgosCompanySettingsForm() {
+  const { trialReadOnly } = useBgosDashboardContext();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +50,10 @@ export function BgosCompanySettingsForm() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (trialReadOnly) {
+      setError("Your free trial has expired. Upgrade to save settings.");
+      return;
+    }
     setError(null);
     setSaved(false);
     setSaving(true);
@@ -70,7 +76,16 @@ export function BgosCompanySettingsForm() {
       });
       const data = (await res.json()) as { ok?: boolean; company?: CompanySettings; error?: string };
       if (!res.ok || !data.ok || !data.company) {
-        setError(typeof data.error === "string" ? data.error : "Could not save.");
+        const dj = data as { error?: string; code?: string };
+        setError(
+          dj.code === "TRIAL_EXPIRED"
+            ? typeof dj.error === "string" && dj.error.trim()
+              ? dj.error
+              : "Your free trial has expired. Upgrade to continue."
+            : typeof data.error === "string"
+              ? data.error
+              : "Could not save.",
+        );
         return;
       }
       setForm(data.company);
@@ -97,6 +112,7 @@ export function BgosCompanySettingsForm() {
 
   return (
     <form className="space-y-5" onSubmit={(e) => void onSubmit(e)} noValidate>
+      <fieldset disabled={trialReadOnly} className="min-w-0 space-y-5 border-0 p-0">
       <div>
         <label className={label} htmlFor="co-name">
           Company name
@@ -220,6 +236,7 @@ export function BgosCompanySettingsForm() {
         Plan: <span className="text-white/70">{form.plan}</span> · Industry:{" "}
         <span className="text-white/70">{form.industry}</span>
       </p>
+      </fieldset>
       {error ? (
         <p className="text-sm text-red-400" role="alert">
           {error}

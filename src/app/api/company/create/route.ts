@@ -13,6 +13,7 @@ import { setActiveCompanyCookie, setSessionCookie } from "@/lib/session-cookie";
 import { signAccessToken } from "@/lib/jwt";
 import { normalizeLogoUrl } from "@/lib/company-profile";
 import { companyMembershipClass } from "@/lib/user-company";
+import { trialEndDateFromStart } from "@/lib/trial";
 
 const bodySchema = z.object({
   name: z
@@ -170,13 +171,16 @@ export async function POST(request: NextRequest) {
   let companyId: string;
   try {
     const row = await prisma.$transaction(async (tx) => {
+      const trialStartDate = new Date();
       const co = await tx.company.create({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         data: {
           name,
           industry,
           plan: CompanyPlan.BASIC,
           ownerId: session.sub,
+          trialStartDate,
+          trialEndDate: trialEndDateFromStart(trialStartDate),
+          isTrialActive: true,
           ...(logoUrl != null ? { logoUrl } : {}),
           ...(primaryColor?.trim() ? { primaryColor: primaryColor.trim() } : {}),
           ...(secondaryColor?.trim() ? { secondaryColor: secondaryColor.trim() } : {}),
@@ -185,7 +189,7 @@ export async function POST(request: NextRequest) {
           ...(billingAddress?.trim() ? { billingAddress: billingAddress.trim() } : {}),
           ...(gstNumber?.trim() ? { gstNumber: gstNumber.trim().toUpperCase() } : {}),
           ...(bankDetails?.trim() ? { bankDetails: bankDetails.trim() } : {}),
-        } as any,
+        },
       });
       await tx.userCompany.create({
         data: {

@@ -5,15 +5,18 @@ import type { ReactNode } from "react";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
-const glowShadow =
-  "0 0 25px rgba(255, 59, 59, 0.25), 0 24px 56px -22px rgba(0, 0, 0, 0.52)";
+const glassBase =
+  "rounded-2xl border border-white/[0.09] bg-gradient-to-br from-white/[0.07] via-white/[0.03] to-transparent shadow-[0_8px_40px_-12px_rgba(0,0,0,0.5),inset_0_1px_0_0_rgba(255,255,255,0.06)] backdrop-blur-xl";
 
-const glowShadowFlat =
-  "0 0 25px rgba(255, 59, 59, 0.22), 0 20px 48px -20px rgba(0, 0, 0, 0.48)";
+const glowShadowHover =
+  "0 12px 48px -12px rgba(0,0,0,0.55), 0 0 36px -8px rgba(255,59,59,0.18), 0 0 48px -12px rgba(255,195,0,0.08), inset 0 1px 0 0 rgba(255,255,255,0.08)";
+
+const glowShadowFlatHover =
+  "0 10px 40px -10px rgba(0,0,0,0.5), 0 0 28px -6px rgba(255,255,255,0.06), inset 0 1px 0 0 rgba(255,255,255,0.07)";
 
 type DashboardSurfaceProps = Omit<HTMLMotionProps<"div">, "children"> & {
   children: ReactNode;
-  /** Subtle 3D tilt on hover; off for narrow pipeline chips */
+  /** Subtle 3D tilt on hover; off for dense controls */
   tilt?: boolean;
 };
 
@@ -29,28 +32,28 @@ export function DashboardSurface({
     ? undefined
     : tilt
       ? {
-          y: -6,
-          rotateX: 1.15,
-          rotateY: -0.55,
-          boxShadow: glowShadow,
-          borderColor: "rgba(255, 255, 255, 0.16)",
+          y: -4,
+          rotateX: 0.85,
+          rotateY: -0.4,
+          boxShadow: glowShadowHover,
+          borderColor: "rgba(255, 255, 255, 0.14)",
         }
       : {
-          y: -6,
-          boxShadow: glowShadowFlat,
-          borderColor: "rgba(255, 255, 255, 0.15)",
+          y: -3,
+          boxShadow: glowShadowFlatHover,
+          borderColor: "rgba(255, 255, 255, 0.12)",
         };
 
   return (
     <div
-      className="h-full [perspective:1200px]"
+      className="h-full [perspective:1400px]"
       style={{ transformStyle: "preserve-3d" }}
     >
       <motion.div
-        className={`rounded-xl border border-white/10 bg-white/5 shadow-lg backdrop-blur-lg ${className}`}
+        className={`${glassBase} ${className}`}
         initial={false}
         whileHover={hover}
-        transition={{ duration: 0.48, ease }}
+        transition={{ duration: 0.4, ease }}
         style={{ transformStyle: "preserve-3d" }}
         {...rest}
       >

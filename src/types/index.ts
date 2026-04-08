@@ -54,7 +54,7 @@ export type SalesBoosterBasic = {
 };
 
 export type SalesBoosterPro = {
-  plan: "PRO";
+  plan: "PRO" | "ENTERPRISE";
   featuresUnlocked: true;
   companyName: string;
   autoFollowUps: Array<{
@@ -88,6 +88,9 @@ export type SalesBoosterPro = {
     state: "queued" | "sent_simulated";
     at: string;
   }>;
+  onLeadCreated: "assign" | "whatsapp" | "both";
+  followUpScheduleEnabled: boolean;
+  scheduledBoosterTaskCount: number;
 };
 
 export type SalesBoosterPayload = SalesBoosterBasic | SalesBoosterPro;
@@ -97,6 +100,15 @@ export type NexaSnapshot = {
   overdueFollowUps: number;
   delays: number;
   opportunities: number;
+};
+
+/** Pro+ Automation Center panel (master toggle + snapshot stats). */
+export type DashboardAutomationCenter = {
+  enabled: boolean;
+  activeFlows: number;
+  followUpsPending: number;
+  overdueFollowUps: number;
+  nexaSuggestion: string | null;
 };
 
 export type DashboardOperations = {
@@ -179,6 +191,29 @@ export type TeamMemberPerformance = {
   pendingTasks: number;
 };
 
+export type DashboardAnalyticsTrendPoint = {
+  key: string;
+  label: string;
+  revenue: number;
+  leads: number;
+  expenses: number;
+};
+
+export type DashboardAnalytics = {
+  revenue: number;
+  leads: number;
+  conversionPercent: number;
+  expenses: number;
+  trend: DashboardAnalyticsTrendPoint[];
+};
+
+export type DashboardAnalyticsRangeMeta = {
+  preset: string;
+  from: string;
+  to: string;
+  label: string;
+};
+
 export type DashboardMetrics = {
   leads: number;
   revenue: number;
@@ -188,6 +223,8 @@ export type DashboardMetrics = {
   insights: NexaInsight[];
   salesBooster: SalesBoosterPayload;
   nexa: NexaSnapshot;
+  /** Pro+ only; `null` on Basic. */
+  automationCenter: DashboardAutomationCenter | null;
   operations: DashboardOperations;
   revenueBreakdown: DashboardRevenueBreakdown;
   risks: DashboardRisks;
@@ -197,4 +234,7 @@ export type DashboardMetrics = {
   partner: DashboardPartnerSummary;
   team: TeamMemberPerformance[];
   financial: DashboardFinancialOverview;
+  /** Period-scoped KPIs + trend (see `analyticsRange`). */
+  analytics: DashboardAnalytics;
+  analyticsRange: DashboardAnalyticsRangeMeta;
 };

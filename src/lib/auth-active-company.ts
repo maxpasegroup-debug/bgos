@@ -7,10 +7,14 @@
  * not a property of the user record.
  */
 
+import { jwtCompanyPlanFromUnknown, type JwtCompanyPlan } from "./plan-tier";
+
 export type JwtMembership = {
   companyId: string;
-  plan: "BASIC" | "PRO";
+  plan: JwtCompanyPlan;
   jobRole: string;
+  /** ISO 8601; when set for BASIC, middleware compares to `Date.now()` for expiry. */
+  trialEndsAt: string | null;
 };
 
 export function parseJwtMemberships(payload: Record<string, unknown>): JwtMembership[] | null {
@@ -21,10 +25,13 @@ export function parseJwtMemberships(payload: Record<string, unknown>): JwtMember
     if (!item || typeof item !== "object") continue;
     const o = item as Record<string, unknown>;
     const companyId = o.companyId;
-    const plan = o.plan === "PRO" ? "PRO" : "BASIC";
+    const plan = jwtCompanyPlanFromUnknown(o.plan);
     const jobRole = typeof o.jobRole === "string" ? o.jobRole : "";
     if (typeof companyId !== "string" || !companyId || !jobRole) continue;
-    out.push({ companyId, plan, jobRole });
+    const te = o.trialEndsAt;
+    const trialEndsAt =
+      typeof te === "string" && te.trim() ? te.trim() : null;
+    out.push({ companyId, plan, jobRole, trialEndsAt });
   }
   return out.length ? out : null;
 }
@@ -35,7 +42,7 @@ export function resolveTenantFromJwt(
 ): {
   needsCompany: boolean;
   companyId: string | null;
-  companyPlan: "BASIC" | "PRO";
+  companyPlan: JwtCompanyPlan;
   jobRole: string;
   workspaceReady: boolean;
 } {
@@ -77,11 +84,7 @@ export function resolveTenantFromJwt(
   }
 
   const row = memberships?.find((m) => m.companyId === chosen);
-  const companyPlan = row
-    ? row.plan
-    : payload.companyPlan === "PRO"
-      ? "PRO"
-      : "BASIC";
+  const companyPlan = row ? row.plan : jwtCompanyPlanFromUnknown(payload.companyPlan);
   const jobRole =
     row?.jobRole ?? (typeof payload.role === "string" ? payload.role : "ADMIN");
 
