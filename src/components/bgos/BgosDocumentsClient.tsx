@@ -70,6 +70,7 @@ export function BgosDocumentsClient({
 
   const [filterType, setFilterType] = useState<string>("");
   const [filterLeadId, setFilterLeadId] = useState("");
+  const [filterCustomerId, setFilterCustomerId] = useState("");
   const [filterUploadedBy, setFilterUploadedBy] = useState("");
 
   const [uploadType, setUploadType] = useState<DocumentType>("OTHER");
@@ -84,9 +85,10 @@ export function BgosDocumentsClient({
       try {
         const p = new URLSearchParams();
         if (effectiveListLeadId) p.set("leadId", effectiveListLeadId);
+        if (filterCustomerId.trim()) p.set("customerId", filterCustomerId.trim());
         if (filterType.trim()) p.set("type", filterType.trim());
         if (filterUploadedBy.trim()) p.set("uploadedByUserId", filterUploadedBy.trim());
-        const res = await fetch(`/api/document/list?${p}`, { credentials: "include" });
+        const res = await fetch(`/api/documents/list?${p}`, { credentials: "include" });
         const data = (await res.json()) as {
           ok?: boolean;
           documents?: PublicDocumentRow[];
@@ -111,7 +113,7 @@ export function BgosDocumentsClient({
         if (!opts?.silent) setLoading(false);
       }
     },
-    [effectiveListLeadId, filterType, filterUploadedBy],
+    [effectiveListLeadId, filterCustomerId, filterType, filterUploadedBy],
   );
 
   const loadLeads = useCallback(async () => {
@@ -163,7 +165,7 @@ export function BgosDocumentsClient({
       fd.set("type", uploadType);
       if (uploadTargetLeadId) fd.set("leadId", uploadTargetLeadId);
 
-      const res = await fetch("/api/document/upload", {
+      const res = await fetch("/api/documents/upload", {
         method: "POST",
         credentials: "include",
         body: fd,
@@ -354,6 +356,26 @@ export function BgosDocumentsClient({
                   <option value="">All leads</option>
                   {leads.map((l) => (
                     <option key={l.id} value={l.id}>
+                      {l.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            {!embeddedLeadId ? (
+              <label className="sm:min-w-[200px] sm:flex-1">
+                <span className="text-[10px] font-medium text-white/45">Customer</span>
+                <select
+                  className={inputClass}
+                  value={filterCustomerId}
+                  onChange={(e) => {
+                    setLoading(true);
+                    setFilterCustomerId(e.target.value);
+                  }}
+                >
+                  <option value="">All customers</option>
+                  {leads.map((l) => (
+                    <option key={`c-${l.id}`} value={l.id}>
                       {l.name}
                     </option>
                   ))}

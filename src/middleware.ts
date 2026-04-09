@@ -43,7 +43,7 @@ function normalizePathname(pathname: string): string {
  * Page routes that skip JWT enforcement here (no redirect to `/login` from middleware).
  * `/` is excluded from this list on purpose — it is handled in `app/page.tsx`.
  */
-const PUBLIC_ROUTES = ["/login", "/signup", "/onboarding"] as const;
+const PUBLIC_ROUTES = ["/login", "/signup", "/onboarding", "/iceconnect/customer-login"] as const;
 
 function isPublicRoute(pathname: string): boolean {
   const p = normalizePathname(pathname);
@@ -64,6 +64,7 @@ function skipsMiddlewareAuth(pathname: string, method: string): boolean {
   if (isRootPath(pathname)) return true;
   if (isPublicRoute(pathname)) return true;
   if (pathname === "/iceconnect/login") return true;
+  if (pathname === "/iceconnect/customer-login" || pathname === "/iceconnect/customer") return true;
   if (
     pathname === "/api/auth/login" ||
     pathname === "/api/auth/signup" ||
@@ -72,6 +73,7 @@ function skipsMiddlewareAuth(pathname: string, method: string): boolean {
   ) {
     return true;
   }
+  if (pathname.startsWith("/api/customer/")) return true;
   if (pathname === "/api/auth/refresh-session" && method === "POST") return true;
   if (pathname === "/api/payment/webhook" && method === "POST") return true;
   return false;
@@ -108,6 +110,7 @@ function iceAllowsPagePath(pathname: string): boolean {
 function iceAllowsApiPath(pathname: string): boolean {
   return (
     pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/customer") ||
     pathname.startsWith("/api/iceconnect") ||
     pathname.startsWith("/api/tasks/complete")
   );

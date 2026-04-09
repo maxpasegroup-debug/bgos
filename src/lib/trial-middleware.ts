@@ -51,6 +51,7 @@ export function trialExpiredAllowsApiRequest(pathname: string, method: string): 
     ["/api/payment/webhook", "POST"],
     ["/api/sales-booster/upgrade-request", "POST"],
     ["/api/company/switch", "POST"],
+    ["/api/bgos/growth-plan", "PATCH"],
   ];
   return allow.some(([path, mm]) => p === path && m === mm);
 }

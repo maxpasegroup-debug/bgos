@@ -47,6 +47,7 @@ export async function GET() {
       );
     case "valid": {
       let basicTrialExpired = false;
+      let companyName: string | null = null;
       if (token) {
         const vr = verifyAccessTokenResult(token);
         if (vr.ok) {
@@ -59,6 +60,13 @@ export async function GET() {
             );
             const dbExp = await isCompanyBasicTrialExpired(tenant.companyId);
             basicTrialExpired = jwtExp || dbExp;
+          }
+          if (tenant.companyId) {
+            const c = await prisma.company.findUnique({
+              where: { id: tenant.companyId },
+              select: { name: true },
+            });
+            companyName = c?.name ?? null;
           }
         }
       }
@@ -77,6 +85,7 @@ export async function GET() {
           email: session.user.email,
           role: session.user.role,
           companyId: session.user.companyId,
+          companyName,
           companyPlan: session.user.companyPlan,
           needsOnboarding: session.user.companyId === null,
           workspaceReady: session.user.workspaceReady,

@@ -37,6 +37,55 @@ function SkelCard({
   );
 }
 
+/** Loading placeholder for `/bgos` intelligence home (4 vertical sections). */
+export function BgosIntelligenceHomeSkeleton() {
+  return (
+    <div className={`${BGOS_MAIN_PAD} pb-16 pt-6`}>
+      <span className="sr-only">Loading home</span>
+      <div className="mx-auto w-full max-w-[1200px] space-y-8">
+        <div className="grid gap-6 lg:grid-cols-2">
+          <SkelCard className="min-h-[160px] sm:min-h-[180px]">
+            <SkelLine className="h-6 w-2/3" />
+            <SkelLine className="mt-4 h-4 w-full" />
+          </SkelCard>
+          <SkelCard className="min-h-[160px] sm:min-h-[180px]">
+            <SkelLine className="h-5 w-1/2" />
+            <SkelLine className="mt-4 h-4 w-full max-w-sm" />
+          </SkelCard>
+        </div>
+        <SkelCard className="min-h-[280px]">
+          <SkelLine className="h-5 w-40" />
+          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
+              <SkelLine key={i} className="h-20 rounded-xl" />
+            ))}
+          </div>
+          <SkelLine className="mt-6 h-36 w-full rounded-xl" />
+        </SkelCard>
+        <div className="grid gap-6 lg:grid-cols-3">
+          <SkelCard className="min-h-[220px]">
+            <SkelLine className="h-4 w-32" />
+            <SkelLine className="mt-4 h-10 w-full" />
+            <SkelLine className="mt-3 h-10 w-full" />
+          </SkelCard>
+          <SkelCard className="min-h-[220px]">
+            <SkelLine className="h-4 w-28" />
+            <SkelLine className="mt-4 h-8 w-24" />
+          </SkelCard>
+          <SkelCard className="min-h-[220px]">
+            <SkelLine className="h-4 w-36" />
+            <SkelLine className="mt-4 h-16 w-full" />
+          </SkelCard>
+        </div>
+        <SkelCard className="min-h-[320px]">
+          <SkelLine className="h-5 w-44" />
+          <SkelLine className="mt-6 h-24 w-full" />
+        </SkelCard>
+      </div>
+    </div>
+  );
+}
+
 export function BgosDashboardSkeletons() {
   return (
     <motion.div

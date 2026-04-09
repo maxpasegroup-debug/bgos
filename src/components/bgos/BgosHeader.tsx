@@ -12,6 +12,7 @@ type SessionUser = {
   name: string;
   email: string;
   role: string;
+  companyName: string | null;
 };
 
 function roleLabel(role: string): string {
@@ -34,6 +35,7 @@ export function BgosHeader() {
     name: "Solar Owner",
     email: "—",
     role: "ADMIN",
+    companyName: null,
   });
   const profileRef = useRef<HTMLDivElement | null>(null);
   const notifRef = useRef<HTMLDivElement | null>(null);
@@ -43,12 +45,18 @@ export function BgosHeader() {
     (async () => {
       try {
         const res = await fetch("/api/auth/me", { credentials: "include" });
-        const j = (await res.json()) as { user?: { name?: string; email?: string; role?: string } };
+        const j = (await res.json()) as {
+          user?: { name?: string; email?: string; role?: string; companyName?: string | null };
+        };
         if (!cancelled && j.user) {
           setSessionUser({
             name: (j.user.name || "Solar Owner").trim() || "Solar Owner",
             email: j.user.email || "—",
             role: j.user.role || "ADMIN",
+            companyName:
+              typeof j.user.companyName === "string" && j.user.companyName.trim()
+                ? j.user.companyName.trim()
+                : null,
           });
         }
       } catch {
@@ -171,14 +179,16 @@ export function BgosHeader() {
             <AnimatePresence>
               {notificationOpen ? (
                 <motion.div
-                  initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                  initial={{ opacity: 0, y: -6, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -8, scale: 0.98 }}
-                  transition={{ duration: 0.16 }}
-                  className="absolute right-0 top-12 z-50 w-64 rounded-xl border border-white/15 bg-white/10 p-3 shadow-2xl backdrop-blur-xl"
+                  exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  className="absolute right-0 top-12 z-50 w-[min(18rem,calc(100vw-1.25rem))] rounded-xl border border-slate-200/80 bg-white/95 p-3 shadow-xl backdrop-blur-xl dark:border-white/12 dark:bg-slate-950/92"
                 >
-                  <p className="text-xs font-semibold text-white">Notifications</p>
-                  <p className="mt-2 rounded-lg border border-white/10 bg-black/20 p-3 text-xs text-white/80">
+                  <p className="text-xs font-semibold tracking-wide text-slate-900 dark:text-white">
+                    Notifications
+                  </p>
+                  <p className="mt-2 rounded-lg border border-slate-200/70 bg-slate-50/90 p-3 text-xs text-slate-600 dark:border-white/10 dark:bg-white/[0.06] dark:text-white/75">
                     No notifications yet
                   </p>
                 </motion.div>
@@ -188,11 +198,13 @@ export function BgosHeader() {
           <div className="relative" ref={profileRef}>
             <button
               type="button"
+              aria-haspopup="menu"
+              aria-expanded={profileOpen}
               onClick={() => {
                 setProfileOpen((v) => !v);
                 setNotificationOpen(false);
               }}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-gradient-to-br from-[#FF3B3B]/35 to-[#FFC300]/25 text-[10px] font-bold text-white sm:h-9 sm:w-9 sm:text-xs"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-gradient-to-br from-[#FF3B3B]/40 to-[#FFC300]/28 text-[10px] font-bold text-white shadow-[0_0_0_1px_rgba(255,255,255,0.06)] transition-[box-shadow,transform] hover:border-white/25 active:scale-[0.98] sm:h-9 sm:w-9 sm:text-xs"
               title={sessionUser.name}
             >
               {initials}
@@ -200,39 +212,57 @@ export function BgosHeader() {
             <AnimatePresence>
               {profileOpen ? (
                 <motion.div
-                  initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                  role="menu"
+                  initial={{ opacity: 0, y: -6, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -8, scale: 0.98 }}
-                  transition={{ duration: 0.16 }}
-                  className="absolute right-0 top-12 z-50 w-72 rounded-xl border border-white/15 bg-white/10 p-3 shadow-2xl backdrop-blur-xl"
+                  exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  className="absolute right-0 top-12 z-50 w-[min(20rem,calc(100vw-1.25rem))] overflow-hidden rounded-xl border border-slate-200/80 bg-white/95 shadow-xl backdrop-blur-xl dark:border-white/12 dark:bg-slate-950/92"
                 >
-                  <div className="rounded-lg border border-white/10 bg-black/20 p-3">
-                    <p className="truncate text-sm font-semibold text-white">{sessionUser.name}</p>
-                    <p className="mt-1 text-xs text-white/80">{roleLabel(sessionUser.role)}</p>
-                    <p className="mt-1 truncate text-xs text-white/65">{sessionUser.email}</p>
+                  <div className="border-b border-slate-200/70 px-3.5 py-3 dark:border-white/[0.08]">
+                    <p className="truncate text-sm font-semibold tracking-tight text-slate-900 dark:text-white">
+                      {sessionUser.name}
+                    </p>
+                    <p className="mt-1 text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-white/55">
+                      Role ·{" "}
+                      <span className="text-slate-800 dark:text-white/90">{roleLabel(sessionUser.role)}</span>
+                    </p>
+                    <p className="mt-2 text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-white/55">
+                      Company ·{" "}
+                      <span className="normal-case tracking-normal text-slate-800 dark:text-white/90">
+                        {sessionUser.companyName ?? (
+                          <span className="text-slate-400 dark:text-white/45">—</span>
+                        )}
+                      </span>
+                    </p>
                   </div>
-                  <div className="mt-2 space-y-1">
-                    <button
-                      type="button"
-                      className="w-full rounded-lg px-3 py-2 text-left text-sm text-white/85 hover:bg-white/10"
+                  <nav className="flex flex-col p-1.5">
+                    <Link
+                      href="/bgos/billing"
+                      role="menuitem"
+                      onClick={() => setProfileOpen(false)}
+                      className="rounded-lg px-3 py-2.5 text-left text-sm text-slate-800 transition-colors hover:bg-slate-100 dark:text-white/90 dark:hover:bg-white/[0.08]"
                     >
-                      My Profile
-                    </button>
+                      Subscription &amp; Billing
+                    </Link>
                     <Link
                       href="/bgos/settings"
-                      className="block w-full rounded-lg px-3 py-2 text-left text-sm text-white/85 hover:bg-white/10"
+                      role="menuitem"
+                      onClick={() => setProfileOpen(false)}
+                      className="rounded-lg px-3 py-2.5 text-left text-sm text-slate-800 transition-colors hover:bg-slate-100 dark:text-white/90 dark:hover:bg-white/[0.08]"
                     >
-                      Settings
+                      Company Settings
                     </Link>
                     <button
                       type="button"
+                      role="menuitem"
                       disabled={logoutBusy}
                       onClick={() => void doLogout()}
-                      className="w-full rounded-lg px-3 py-2 text-left text-sm text-[#FFC300] hover:bg-white/10 disabled:opacity-60"
+                      className="rounded-lg px-3 py-2.5 text-left text-sm font-medium text-[#c48f00] transition-colors hover:bg-amber-50 disabled:opacity-60 dark:text-[#FFC300] dark:hover:bg-white/[0.06]"
                     >
                       {logoutBusy ? "Logging out..." : "Logout"}
                     </button>
-                  </div>
+                  </nav>
                 </motion.div>
               ) : null}
             </AnimatePresence>

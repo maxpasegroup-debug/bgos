@@ -152,6 +152,8 @@ export type RunSalesBoosterOnLeadCreatedInput = {
   assigneeExplicit: boolean;
   /** Assignee ID from the create transaction (before Nexa / booster migrations). */
   initialAssigneeId: string;
+  /** Optional one-time override from create-lead UX. */
+  modeOverride?: SalesBoosterOnLeadCreated;
 };
 
 export type RunSalesBoosterOnLeadCreatedResult = {
@@ -185,7 +187,7 @@ export async function runSalesBoosterOnLeadCreated(
   });
 
   const defaults = parseSalesBoosterFromDashboardConfig(company?.dashboardConfig);
-  const mode = defaults.onLeadCreated;
+  const mode = input.modeOverride ?? defaults.onLeadCreated;
 
   if (!company || isPlanLockedToBasic() || !isPro(company.plan)) {
     return empty(mode);

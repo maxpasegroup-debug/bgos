@@ -9,9 +9,9 @@ import { LEAD_ACTIVITY, logLeadActivity } from "@/lib/lead-activity";
 import { leadStatusLabel } from "@/lib/lead-pipeline";
 import { serializeLead } from "@/lib/lead-serialize";
 import { isAutomationCenterEnabled } from "@/lib/automation-center";
+import { handleLeadCreated } from "@/lib/automation-engine";
 import { prisma } from "@/lib/prisma";
 import { handleNewLead } from "@/lib/nexa-engine";
-import { runSalesBoosterOnLeadCreated } from "@/lib/sales-booster-engine";
 import { runAutomationExecution } from "@/lib/automation-execution";
 import { createLeadTask, dueDateCallLead, taskTitleCallLead } from "@/lib/task-engine";
 import { findUserInCompany } from "@/lib/user-company";
@@ -23,6 +23,7 @@ const bodySchema = z.object({
   value: z.number().nonnegative().optional(),
   assignedToUserId: z.string().optional(),
   partnerId: z.string().cuid().optional(),
+  automationAction: z.enum(["assign", "whatsapp", "both"]).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
   const parsed = await parseJsonBodyZod(request, bodySchema);
   if (!parsed.ok) return parsed.response;
 
-  const { name, phone, value, assignedToUserId, partnerId } = parsed.data;
+  const { name, phone, value, assignedToUserId, partnerId, automationAction } = parsed.data;
   const companyId = session.companyId;
   const actorId = session.sub;
 
@@ -137,12 +138,16 @@ export async function POST(request: NextRequest) {
 
   const automationCenterOn = await isAutomationCenterEnabled(companyId);
   if (automationCenterOn) {
-    await runSalesBoosterOnLeadCreated({
-      leadId: leadRow.id,
-      companyId,
+    await handleLeadCreated({
+      lead: {
+        id: leadRow.id,
+        companyId,
+        assignedTo: leadRow.assignedTo,
+      },
       actorUserId: actorId,
       assigneeExplicit: assignedToUserId !== undefined,
       initialAssigneeId: assigneeId,
+      modeOverride: automationAction,
     });
   }
 

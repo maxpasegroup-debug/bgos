@@ -363,6 +363,22 @@ function ensureFooterSpace(doc: PdfDoc, y: number): number {
   return y;
 }
 
+function drawPaymentDetailsBlock(doc: PdfDoc, bankDetails: string | null | undefined, y: number): number {
+  const text = bankDetails?.trim();
+  if (!text) return y;
+
+  doc.font("Helvetica-Bold").fontSize(9).fillColor("#64748b").text("Payment details", MARGIN, y);
+  y += 12;
+  const innerX = MARGIN + 4;
+  const innerW = CONTENT_W - 8;
+  const bodyH = doc.heightOfString(text, { width: innerW, lineGap: 2 }) + 20;
+  const boxH = Math.max(48, bodyH);
+  doc.roundedRect(MARGIN, y, CONTENT_W, boxH, 3).fill("#fafafa").stroke("#e2e8f0");
+  doc.font("Helvetica").fontSize(8.5).fillColor("#334155");
+  doc.text(text, innerX, y + 12, { width: innerW, lineGap: 2 });
+  return y + boxH + 18;
+}
+
 function drawNotesAndFooter(doc: PdfDoc, notes: string | null, y: number) {
   y = ensureFooterSpace(doc, y);
   let ny = y;
@@ -494,6 +510,8 @@ export async function buildInvoicePdf(options: {
     y,
   );
 
+  y = ensureFooterSpace(doc, y);
+  y = drawPaymentDetailsBlock(doc, company.bankDetails, y);
   drawNotesAndFooter(doc, null, y);
 
   return pdfToBuffer(doc);

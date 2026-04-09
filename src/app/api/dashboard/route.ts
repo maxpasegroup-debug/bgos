@@ -95,9 +95,7 @@ export async function GET(request: NextRequest) {
     return handleApiError("GET /api/dashboard", e);
   }
 
-  const analyticsOut = entitledPro
-    ? analytics
-    : { ...analytics, trend: [] as typeof analytics.trend };
+  const analyticsOut = analytics;
 
   return NextResponse.json({
     leads,

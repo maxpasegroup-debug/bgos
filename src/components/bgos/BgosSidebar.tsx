@@ -7,11 +7,16 @@ import type { ComponentType } from "react";
 
 const navItems = [
   { id: "home", label: "Home", href: "/bgos", icon: HomeIcon },
-  { id: "pricing", label: "Pricing", href: "/bgos/pricing", icon: PricingIcon },
+  { id: "billing", label: "Billing", href: "/bgos/billing", icon: BillingIcon },
+  { id: "subscription", label: "Plans", href: "/bgos/subscription", icon: PricingIcon },
   { id: "sales", label: "Sales", href: "/bgos/sales", icon: SalesIcon },
   { id: "operations", label: "Operations", href: "/bgos/operations", icon: OpsIcon },
+  { id: "accounts", label: "Accounts", href: "/bgos/accounts", icon: RevenueIcon },
+  { id: "inventory", label: "Inventory", href: "/bgos/inventory", icon: DocsIcon },
+  { id: "customer", label: "Customers", href: "/bgos/customer", icon: TeamIcon },
+  { id: "automation", label: "Automation", href: "/bgos/automation", icon: NexaIcon },
   { id: "documents", label: "Documents", href: "/bgos/documents", icon: DocsIcon },
-  { id: "team", label: "Team", href: "/bgos/team", icon: TeamIcon },
+  { id: "team", label: "Team", href: "/bgos/hr", icon: TeamIcon },
   { id: "revenue", label: "Revenue", href: "/bgos/revenue", icon: RevenueIcon },
   { id: "risks", label: "Risks", href: "/bgos/risks", icon: RisksIcon },
   { id: "nexa", label: "Nexa", href: "/bgos/nexa", icon: NexaIcon },
@@ -112,6 +117,20 @@ function SalesIcon({ className }: { className?: string }) {
         strokeLinejoin="round"
         strokeWidth={1.75}
         d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+      />
+    </svg>
+  );
+}
+
+function BillingIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" aria-hidden>
+      <path
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.75}
+        d="M9 12h6m-6 4h6M9 8h2m5-6H8a3 3 0 00-3 3v12a3 3 0 003 3h10a3 3 0 003-3V8M9 4h8v4H9V4z"
       />
     </svg>
   );

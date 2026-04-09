@@ -1,5 +1,5 @@
-import { BgosDashboardView } from "@/components/bgos/BgosDashboardView";
+import { BgosSalesCommandCenter } from "@/components/bgos/BgosSalesCommandCenter";
 
 export default function BgosSalesPage() {
-  return <BgosDashboardView section="sales" />;
+  return <BgosSalesCommandCenter />;
 }

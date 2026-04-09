@@ -34,6 +34,13 @@ enum CompanyPlan {
   ENTERPRISE
 }
 
+/** Derived billing/trial state; kept in sync on writes and subscription reads. */
+enum CompanySubscriptionStatus {
+  TRIAL
+  ACTIVE
+  EXPIRED
+}
+
 enum CompanyIndustry {
   SOLAR
 }
@@ -87,6 +94,13 @@ model Company {
   trialEndDate   DateTime?
   isTrialActive  Boolean   @default(true)
 
+  /**
+   * Subscription status (trial / active paid / expired trial).
+   * Canonical plan tier remains {@link CompanyPlan} in `plan`. Trial end instant remains `trialEndDate`
+   * (APIs may expose it as `trialEndsAt`).
+   */
+  subscriptionStatus CompanySubscriptionStatus @default(TRIAL)
+
   logoUrl         String?
   primaryColor    String?
   secondaryColor  String?
@@ -126,9 +140,98 @@ model Company {
   commissions    Commission[]
   siteVisits     SiteVisit[]
   approvals      Approval[]
+  growthPlan     CompanyGrowthPlan?
+  employeePips   EmployeePip[]
+  lcoLoans       LcoLoan[]
+  customerUsers  CustomerPortalUser[]
+  complaints     CustomerComplaint[]
 
   @@index([name])
   @@index([ownerId])
+}
+
+/** Boss monthly targets on Home — drives projections (1Y / multi-year copy). */
+model CompanyGrowthPlan {
+  id                    String   @id @default(cuid())
+  companyId             String   @unique
+  targetRevenueOneMonth Float    @default(0)
+  targetLeadsOneMonth   Int      @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  company               Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+/** Performance improvement plan for an employee. */
+model EmployeePip {
+  id          String   @id @default(cuid())
+  companyId   String
+  userId      String
+  goal        String   @db.Text
+  progress    Int      @default(0)
+  isCompleted Boolean  @default(false)
+  dueDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([companyId, userId, isCompleted])
+}
+
+/** Loan compliance tracker linked to customer lead. */
+model LcoLoan {
+  id         String   @id @default(cuid())
+  companyId  String
+  leadId     String
+  loanAmount Float
+  /// PENDING | APPROVED | REJECTED
+  status     String   @default("PENDING")
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([leadId])
+  @@index([status])
+}
+
+/** Customer login account for ICECONNECT customer portal (one per customer lead). */
+model CustomerPortalUser {
+  id           String   @id @default(cuid())
+  companyId    String
+  leadId       String   @unique
+  mobile       String
+  passwordHash String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead         Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([mobile])
+  @@unique([companyId, mobile])
+}
+
+/** Customer complaints linked to a customer lead. */
+model CustomerComplaint {
+  id          String   @id @default(cuid())
+  companyId   String
+  leadId      String
+  description String   @db.Text
+  /// PENDING | RESOLVED
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([leadId])
+  @@index([status])
 }
 
 /// Processed billing webhook deliveries (e.g. Stripe `evt_*`) — prevents double-applying upgrades.
@@ -181,6 +284,7 @@ model User {
   leaveRequests          LeaveRequest[]
   attendances            Attendance[]
   salaries               Salary[]
+  pips                   EmployeePip[]
   createdChannelPartners ChannelPartner[] @relation("PartnerCreator")
   assignedSiteVisits     SiteVisit[] @relation("SiteVisitAssignee")
   documentsUploaded      Document[]
@@ -216,6 +320,9 @@ model Lead {
   commissions Commission[]
   siteVisits  SiteVisit[]
   approvals   Approval[]
+  lcoLoans    LcoLoan[]
+  customerUser CustomerPortalUser?
+  complaints   CustomerComplaint[]
   installations Installation[]
   serviceTickets ServiceTicket[]
   siteReport  String? @db.Text
@@ -466,6 +573,7 @@ model Document {
   id        String   @id @default(cuid())
   companyId String
   leadId    String?
+  customerId String?
   /// AGREEMENT | APPROVAL | REPORT | OTHER
   type      String
   /// Storage key: `{companyId}/documents/{yyyy}/{mm}/{unique}-{safeName}` (local disk or S3 object key).
@@ -485,6 +593,7 @@ model Document {
   @@index([companyId, type])
   @@index([companyId, uploadedByUserId])
   @@index([leadId])
+  @@index([customerId])
 }
 
 model LeaveRequest {
@@ -544,6 +653,7 @@ model Product {
   /// Panel | Inverter | Battery | Accessories
   category  String
   unit      String
+  minStockLevel Float @default(5)
   createdAt DateTime @default(now())
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)

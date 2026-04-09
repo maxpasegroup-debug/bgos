@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { BgosDashboardGrid } from "./BgosDashboardGrid";
-import { BgosDashboardSkeletons } from "./BgosDashboardSkeletons";
+import { BgosDashboardSkeletons, BgosIntelligenceHomeSkeleton } from "./BgosDashboardSkeletons";
+import { BgosIntelligenceHome } from "./BgosIntelligenceHome";
 import { useBgosDashboardContext } from "./BgosDataProvider";
 import { BGOS_MAIN_PAD } from "./layoutTokens";
 import { DASHBOARD_RANGE_LABELS } from "@/lib/dashboard-range";
@@ -18,6 +19,7 @@ const routeToSection: Record<string, string> = {
 };
 
 export function BgosDashboardView({ section }: { section?: string }) {
+  const isIntelHome = !section;
   const { dashboard, error, refetch, isLoading, analyticsRangePreset } = useBgosDashboardContext();
   const scrollKey = section ? routeToSection[section] ?? section : undefined;
   const [userName, setUserName] = useState("Boss");
@@ -50,7 +52,7 @@ export function BgosDashboardView({ section }: { section?: string }) {
   }, [scrollKey, isLoading]);
 
   if (isLoading) {
-    return <BgosDashboardSkeletons />;
+    return isIntelHome ? <BgosIntelligenceHomeSkeleton /> : <BgosDashboardSkeletons />;
   }
 
   if (error !== null && dashboard === null) {
@@ -71,6 +73,10 @@ export function BgosDashboardView({ section }: { section?: string }) {
         </div>
       </div>
     );
+  }
+
+  if (isIntelHome) {
+    return <BgosIntelligenceHome />;
   }
 
   return (

@@ -22,6 +22,7 @@ const formSchema = z.object({
   phone: phoneSchema,
   valueStr: z.string().optional(),
   assignedToUserId: z.string().optional(),
+  automationAction: z.enum(["assign", "whatsapp", "both"]).optional(),
 });
 
 type PublicUser = {
@@ -50,6 +51,7 @@ export function BgosAddLeadModal({
   const [phone, setPhone] = useState("");
   const [valueStr, setValueStr] = useState("");
   const [assignedToUserId, setAssignedToUserId] = useState("");
+  const [automationAction, setAutomationAction] = useState<"assign" | "whatsapp" | "both">("both");
   const [users, setUsers] = useState<PublicUser[]>([]);
   const [currentUser, setCurrentUser] = useState<{ id: string; role: string } | null>(null);
   const [usersNote, setUsersNote] = useState<string | null>(null);
@@ -125,6 +127,7 @@ export function BgosAddLeadModal({
     setSubmitError(null);
     setSuccess(null);
     setAssignedToUserId("");
+    setAutomationAction("both");
     const t = window.setTimeout(() => nameInputRef.current?.focus(), 50);
     return () => window.clearTimeout(t);
   }, [open, loadSessionAndUsers]);
@@ -162,6 +165,7 @@ export function BgosAddLeadModal({
       phone,
       valueStr: valueStr.trim() || undefined,
       assignedToUserId: assignedToUserId || undefined,
+      automationAction,
     });
     if (!parsed.success) {
       const fe = parsed.error.flatten().fieldErrors;
@@ -190,6 +194,7 @@ export function BgosAddLeadModal({
       phone: string;
       value?: number;
       assignedToUserId?: string;
+      automationAction?: "assign" | "whatsapp" | "both";
     } = {
       name: parsed.data.name,
       phone: parsed.data.phone,
@@ -198,6 +203,7 @@ export function BgosAddLeadModal({
     if (parsed.data.assignedToUserId?.trim()) {
       body.assignedToUserId = parsed.data.assignedToUserId.trim();
     }
+    if (parsed.data.automationAction) body.automationAction = parsed.data.automationAction;
 
     setSubmitting(true);
     try {
@@ -374,6 +380,23 @@ export function BgosAddLeadModal({
             {usersNote ? (
               <p className="mt-1 text-xs text-amber-200/80">{usersNote}</p>
             ) : null}
+          </div>
+
+          <div>
+            <label htmlFor="add-lead-automation" className="text-[10px] font-semibold uppercase tracking-wider text-white/45">
+              What should Nexa do?
+            </label>
+            <select
+              id="add-lead-automation"
+              name="automationAction"
+              value={automationAction}
+              onChange={(e) => setAutomationAction(e.target.value as "assign" | "whatsapp" | "both")}
+              className={inputClass}
+            >
+              <option value="assign">Assign to employee</option>
+              <option value="whatsapp">Send WhatsApp intro</option>
+              <option value="both">Do both</option>
+            </select>
           </div>
 
           {submitError ? (

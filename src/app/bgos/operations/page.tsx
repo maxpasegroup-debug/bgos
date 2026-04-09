@@ -1,5 +1,5 @@
-import { BgosDashboardView } from "@/components/bgos/BgosDashboardView";
+import { BgosOperationsCommandCenter } from "@/components/bgos/operations/BgosOperationsCommandCenter";
 
 export default function BgosOperationsPage() {
-  return <BgosDashboardView section="operations" />;
+  return <BgosOperationsCommandCenter />;
 }

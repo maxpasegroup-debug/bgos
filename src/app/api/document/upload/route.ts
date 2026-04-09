@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
   const fileRaw = form.get("file");
   const typeRaw = form.get("type");
   const leadRaw = form.get("leadId");
+  const customerRaw = form.get("customerId");
 
   if (!(fileRaw instanceof File)) {
     return NextResponse.json(
@@ -53,6 +54,7 @@ export async function POST(request: NextRequest) {
   }
 
   let leadId: string | null = null;
+  let customerId: string | null = null;
   if (leadRaw != null && String(leadRaw).trim() !== "") {
     const id = z.string().cuid().safeParse(String(leadRaw).trim());
     if (!id.success) {
@@ -73,6 +75,27 @@ export async function POST(request: NextRequest) {
     }
     leadId = lead.id;
   }
+  if (customerRaw != null && String(customerRaw).trim() !== "") {
+    const id = z.string().cuid().safeParse(String(customerRaw).trim());
+    if (!id.success) {
+      return NextResponse.json(
+        { ok: false as const, error: "Invalid customer", code: "VALIDATION" as const },
+        { status: 400 },
+      );
+    }
+    const customerLead = await prisma.lead.findFirst({
+      where: { id: id.data, companyId: session.companyId },
+      select: { id: true },
+    });
+    if (!customerLead) {
+      return NextResponse.json(
+        { ok: false as const, error: "Customer not found", code: "NOT_FOUND" as const },
+        { status: 404 },
+      );
+    }
+    customerId = customerLead.id;
+    if (!leadId) leadId = customerLead.id;
+  }
 
   const displayName = fileRaw.name?.trim() || "document";
   let storageKey: string;
@@ -86,10 +109,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const row = await prisma.document.create({
+    const row = await (prisma as any).document.create({
       data: {
         companyId: session.companyId,
         leadId,
+        customerId,
         type: typeParsed.data,
         fileUrl: storageKey,
         fileName: displayName.slice(0, 500),

@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 
 const querySchema = z.object({
   leadId: z.string().cuid().optional(),
+  customerId: z.string().cuid().optional(),
   type: documentTypeSchema.optional(),
   uploadedByUserId: z.string().cuid().optional(),
 });
@@ -23,6 +24,7 @@ export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams;
   const parsed = querySchema.safeParse({
     leadId: sp.get("leadId")?.trim() || undefined,
+    customerId: sp.get("customerId")?.trim() || undefined,
     type: sp.get("type")?.trim() || undefined,
     uploadedByUserId: sp.get("uploadedByUserId")?.trim() || undefined,
   });
@@ -37,11 +39,13 @@ export async function GET(request: NextRequest) {
   const where: {
     companyId: string;
     leadId?: string | null;
+    customerId?: string | null;
     type?: string;
     uploadedByUserId?: string;
   } = { companyId: session.companyId };
 
   if (parsed.data.leadId) where.leadId = parsed.data.leadId;
+  if (parsed.data.customerId) where.customerId = parsed.data.customerId;
   if (parsed.data.type) where.type = parsed.data.type;
   if (parsed.data.uploadedByUserId) where.uploadedByUserId = parsed.data.uploadedByUserId;
 

@@ -1,4 +1,4 @@
-import { CompanyIndustry, CompanyPlan, UserRole } from "@prisma/client";
+import { CompanyIndustry, CompanyPlan, CompanySubscriptionStatus, UserRole } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -181,6 +181,7 @@ export async function POST(request: NextRequest) {
           trialStartDate,
           trialEndDate: trialEndDateFromStart(trialStartDate),
           isTrialActive: true,
+          subscriptionStatus: CompanySubscriptionStatus.TRIAL,
           ...(logoUrl != null ? { logoUrl } : {}),
           ...(primaryColor?.trim() ? { primaryColor: primaryColor.trim() } : {}),
           ...(secondaryColor?.trim() ? { secondaryColor: secondaryColor.trim() } : {}),

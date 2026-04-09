@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { Prisma, type CompanyPlan } from "@prisma/client";
+import { Prisma, CompanySubscriptionStatus, type CompanyPlan } from "@prisma/client";
 import type Stripe from "stripe";
 import {
   getBillingStripeEnv,
@@ -108,6 +108,7 @@ export async function POST(request: NextRequest) {
           data: {
             plan: targetPlan as CompanyPlan,
             isTrialActive: false,
+            subscriptionStatus: CompanySubscriptionStatus.ACTIVE,
           },
         }),
       ]);
