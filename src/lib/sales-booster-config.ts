@@ -10,6 +10,10 @@ const configSchema = z
   .object({
     onLeadCreated: z.enum(["assign", "whatsapp", "both"]).optional(),
     followUpScheduleEnabled: z.boolean().optional(),
+    addonEnabled: z.boolean().optional(),
+    aiAutoReplies: z.boolean().optional(),
+    campaignAutomation: z.boolean().optional(),
+    leadScoring: z.boolean().optional(),
   })
   .strict();
 
@@ -18,11 +22,24 @@ export type SalesBoosterStoredConfig = z.infer<typeof configSchema>;
 export const SALES_BOOSTER_DEFAULTS = {
   onLeadCreated: "both" as SalesBoosterOnLeadCreated,
   followUpScheduleEnabled: true,
+  addonEnabled: false,
+  aiAutoReplies: false,
+  campaignAutomation: false,
+  leadScoring: false,
 } as const;
+
+export type ParsedSalesBoosterConfig = {
+  onLeadCreated: SalesBoosterOnLeadCreated;
+  followUpScheduleEnabled: boolean;
+  addonEnabled: boolean;
+  aiAutoReplies: boolean;
+  campaignAutomation: boolean;
+  leadScoring: boolean;
+};
 
 export function parseSalesBoosterFromDashboardConfig(
   raw: Prisma.JsonValue | null | undefined,
-): { onLeadCreated: SalesBoosterOnLeadCreated; followUpScheduleEnabled: boolean } {
+): ParsedSalesBoosterConfig {
   if (raw === null || raw === undefined) {
     return { ...SALES_BOOSTER_DEFAULTS };
   }
@@ -36,10 +53,15 @@ export function parseSalesBoosterFromDashboardConfig(
     return { ...SALES_BOOSTER_DEFAULTS };
   }
   const c = parsed.data;
+  const addon = c.addonEnabled ?? false;
   return {
     onLeadCreated: c.onLeadCreated ?? SALES_BOOSTER_DEFAULTS.onLeadCreated,
     followUpScheduleEnabled:
       c.followUpScheduleEnabled ?? SALES_BOOSTER_DEFAULTS.followUpScheduleEnabled,
+    addonEnabled: addon,
+    aiAutoReplies: c.aiAutoReplies ?? addon,
+    campaignAutomation: c.campaignAutomation ?? addon,
+    leadScoring: c.leadScoring ?? addon,
   };
 }
 

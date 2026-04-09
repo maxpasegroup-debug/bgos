@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const DASHBOARD_RANGE_PRESETS = [
   "today",
+  "this_week",
   "this_month",
   "last_month",
   "3_months",
@@ -16,6 +17,7 @@ export const dashboardRangePresetSchema = z.enum(DASHBOARD_RANGE_PRESETS);
 
 export const DASHBOARD_RANGE_LABELS: Record<DashboardRangePreset, string> = {
   today: "Today",
+  this_week: "This Week",
   this_month: "This Month",
   last_month: "Last Month",
   "3_months": "3 Months",
@@ -25,7 +27,7 @@ export const DASHBOARD_RANGE_LABELS: Record<DashboardRangePreset, string> = {
 };
 
 /** BASIC (non–Pro+) may only request these presets; broader ranges require Pro+. */
-export const DASHBOARD_RANGE_BASIC_FREE = ["today", "this_month"] as const satisfies readonly DashboardRangePreset[];
+export const DASHBOARD_RANGE_BASIC_FREE = ["today", "this_week", "this_month"] as const satisfies readonly DashboardRangePreset[];
 
 const BASIC_FREE_SET = new Set<string>(DASHBOARD_RANGE_BASIC_FREE);
 
@@ -35,6 +37,14 @@ export function dashboardRangeRequiresPro(preset: DashboardRangePreset): boolean
 
 function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+}
+
+/** Week starts Monday (common for business dashboards). */
+function startOfWeekMonday(d: Date): Date {
+  const day = d.getDay();
+  const offset = day === 0 ? -6 : 1 - day;
+  const n = new Date(d.getFullYear(), d.getMonth(), d.getDate() + offset, 0, 0, 0, 0);
+  return n;
 }
 
 function endOfDay(d: Date): Date {
@@ -68,6 +78,11 @@ export function resolveDashboardRange(preset: DashboardRangePreset, now = new Da
   switch (preset) {
     case "today": {
       const start = startOfDay(now);
+      const end = endOfDay(now);
+      return { preset, start, end, label };
+    }
+    case "this_week": {
+      const start = startOfWeekMonday(now);
       const end = endOfDay(now);
       return { preset, start, end, label };
     }

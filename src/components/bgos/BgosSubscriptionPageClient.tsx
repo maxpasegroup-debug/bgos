@@ -9,8 +9,16 @@ import { fetchStripeCheckoutUrl } from "@/lib/stripe-plan-checkout";
 import { BGOS_MAIN_PAD } from "./layoutTokens";
 import { useBgosDashboardContext } from "./BgosDataProvider";
 
+declare global {
+  interface Window {
+    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
+  }
+}
+
 const WA_ENTERPRISE =
-  "https://wa.me/918089239823?text=Hi%20I%20want%20Enterprise%20BGOS%20demo";
+  "https://wa.me/918089239823?text=Hi%2C%20I%20want%20Enterprise%20BGOS%20plan";
+
+const RAZORPAY_KEY = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID?.trim();
 
 type SubscriptionPayload = {
   planType: CompanyPlan;
@@ -45,6 +53,18 @@ function statusLabel(status: CompanySubscriptionStatus): string {
   }
 }
 
+function loadRazorpayScript(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (window.Razorpay) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://checkout.razorpay.com/v1/checkout.js";
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("Could not load Razorpay checkout"));
+    document.body.appendChild(s);
+  });
+}
+
 const cardWrap =
   "rounded-2xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_0_40px_-12px_rgba(0,0,0,0.5)] backdrop-blur-sm sm:p-6";
 const planTitle = "text-xs font-semibold uppercase tracking-[0.2em] text-[#FFC300]/90";
@@ -56,7 +76,7 @@ export function BgosSubscriptionPageClient() {
   const { planLockedToBasic } = useBgosDashboardContext();
   const [data, setData] = useState<SubscriptionPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [proBusy, setProBusy] = useState(false);
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -87,20 +107,134 @@ export function BgosSubscriptionPageClient() {
     void load();
   }, [load]);
 
-  const startProCheckout = useCallback(async () => {
-    if (planLockedToBasic) {
-      setError("Plan upgrades are not available in this environment.");
-      return;
-    }
-    setProBusy(true);
-    const result = await fetchStripeCheckoutUrl("PRO");
-    setProBusy(false);
-    if (!result.ok) {
-      setError(result.message);
-      return;
-    }
-    window.location.assign(result.url);
-  }, [planLockedToBasic]);
+  const openRazorpayCheckout = useCallback(
+    async (plan: "basic" | "pro") => {
+      if (planLockedToBasic) {
+        setError("Plan upgrades are not available in this environment.");
+        return;
+      }
+      if (!RAZORPAY_KEY) {
+        if (plan === "basic") {
+          setError(
+            "Set NEXT_PUBLIC_RAZORPAY_KEY_ID to pay for Basic in-app, or use Billing from your admin.",
+          );
+          return;
+        }
+        setCheckoutBusy(true);
+        const result = await fetchStripeCheckoutUrl("PRO");
+        setCheckoutBusy(false);
+        if (!result.ok) {
+          setError(result.message);
+          return;
+        }
+        window.location.assign(result.url);
+        return;
+      }
+
+      setCheckoutBusy(true);
+      setError(null);
+      try {
+        await loadRazorpayScript();
+        const orderRes = await fetch("/api/payment/razorpay/order", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plan }),
+        });
+        const orderJson = (await orderRes.json()) as {
+          ok?: boolean;
+          message?: string;
+          error?: string;
+          order_id?: string;
+          amount?: number;
+          currency?: string;
+          data?: { order_id?: string; amount?: number; currency?: string };
+        };
+        if (!orderRes.ok) {
+          setCheckoutBusy(false);
+          setError(orderJson.message ?? orderJson.error ?? "Could not create order.");
+          return;
+        }
+        const orderId = orderJson.order_id ?? orderJson.data?.order_id;
+        const amount = orderJson.amount ?? orderJson.data?.amount;
+        const currency = orderJson.currency ?? orderJson.data?.currency ?? "INR";
+        if (!orderId || typeof amount !== "number") {
+          setCheckoutBusy(false);
+          setError("Invalid order response from server.");
+          return;
+        }
+
+        const meRes = await fetch("/api/auth/me", { credentials: "include" });
+        const meJson = (await meRes.json()) as { user?: { name?: string; email?: string } };
+        const prefillName = (meJson.user?.name ?? "").trim() || "Customer";
+        const prefillEmail = (meJson.user?.email ?? "").trim() || "customer@example.com";
+
+        const RazorpayCtor = window.Razorpay;
+        if (!RazorpayCtor) {
+          setCheckoutBusy(false);
+          setError("Razorpay failed to load. Refresh and try again.");
+          return;
+        }
+
+        const rzp = new RazorpayCtor({
+          key: RAZORPAY_KEY,
+          amount,
+          currency,
+          order_id: orderId,
+          name: "BGOS",
+          description: plan === "pro" ? "Pro — monthly" : "Basic — monthly",
+          prefill: { name: prefillName, email: prefillEmail },
+          handler: (response: {
+            razorpay_payment_id: string;
+            razorpay_order_id: string;
+            razorpay_signature: string;
+          }) => {
+            void (async () => {
+              try {
+                const vRes = await fetch("/api/payment/razorpay/verify", {
+                  method: "POST",
+                  credentials: "include",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    razorpay_order_id: response.razorpay_order_id,
+                    razorpay_payment_id: response.razorpay_payment_id,
+                    razorpay_signature: response.razorpay_signature,
+                  }),
+                });
+                const vJson = (await vRes.json()) as { message?: string; error?: string; ok?: boolean };
+                if (!vRes.ok) {
+                  setError(vJson.message ?? vJson.error ?? "Payment verification failed.");
+                  setCheckoutBusy(false);
+                  return;
+                }
+                await fetch("/api/auth/refresh-session", {
+                  method: "POST",
+                  credentials: "include",
+                });
+                setCheckoutBusy(false);
+                await load();
+                setError(null);
+              } catch {
+                setCheckoutBusy(false);
+                setError("Could not verify payment. Contact support if you were charged.");
+              }
+            })();
+          },
+          modal: {
+            ondismiss: () => {
+              setCheckoutBusy(false);
+              setError("Payment cancelled — you can try again when you’re ready.");
+            },
+          },
+        });
+        rzp.open();
+      } catch {
+        setCheckoutBusy(false);
+        setError("Checkout could not start. Try again.");
+      }
+    },
+    [planLockedToBasic, load],
+  );
 
   const rank = data ? planRank(data.planType) : 0;
   const trialDays = data?.trialDaysRemaining ?? null;
@@ -162,17 +296,23 @@ export function BgosSubscriptionPageClient() {
                     Status:{" "}
                     <span className="font-medium text-white/85">{statusLabel(data.subscriptionStatus)}</span>
                   </p>
+                  {data.subscriptionStatus === CompanySubscriptionStatus.TRIAL &&
+                  trialDays != null &&
+                  trialDays > 0 ? (
+                    <p className="mt-2 text-sm text-emerald-200/90">
+                      Trial · {trialDays} day{trialDays === 1 ? "" : "s"} remaining
+                    </p>
+                  ) : null}
                 </div>
                 <div className="sm:text-right">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-white/40">
-                    Renewal / trial end
+                    {data.subscriptionStatus === CompanySubscriptionStatus.TRIAL
+                      ? "Trial ends"
+                      : data.renewalDate
+                        ? "Renewal / paid through"
+                        : "Renewal / trial end"}
                   </p>
-                  <p className="mt-0.5 text-sm font-medium text-white/80">
-                    {data.subscriptionStatus === CompanySubscriptionStatus.TRIAL ||
-                    (data.planType === CompanyPlan.BASIC && data.renewalDate)
-                      ? formatDate(data.renewalDate)
-                      : "—"}
-                  </p>
+                  <p className="mt-0.5 text-sm font-medium text-white/80">{formatDate(data.renewalDate)}</p>
                 </div>
               </div>
             </>
@@ -180,7 +320,6 @@ export function BgosSubscriptionPageClient() {
         </motion.section>
 
         <div className="mt-8 grid gap-6 lg:grid-cols-3">
-          {/* Basic */}
           <motion.article
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -203,7 +342,7 @@ export function BgosSubscriptionPageClient() {
               </li>
               <li className={featureLi}>
                 <span className={dot} />
-                Team management
+                Team management (up to 5 members)
               </li>
               <li className={featureLi}>
                 <span className={dot} />
@@ -216,12 +355,14 @@ export function BgosSubscriptionPageClient() {
                   Trial Active ({trialDays} day{trialDays === 1 ? "" : "s"} left)
                 </span>
               ) : basicExpired ? (
-                <Link
-                  href="/bgos/pricing"
-                  className="inline-flex w-full items-center justify-center rounded-xl border border-[#FFC300]/35 bg-[#FFC300]/10 px-4 py-2.5 text-sm font-semibold text-[#FFE08A] transition-colors hover:bg-[#FFC300]/16"
+                <button
+                  type="button"
+                  disabled={checkoutBusy || planLockedToBasic}
+                  onClick={() => void openRazorpayCheckout("basic")}
+                  className="inline-flex w-full items-center justify-center rounded-xl border border-[#FFC300]/35 bg-[#FFC300]/10 px-4 py-2.5 text-sm font-semibold text-[#FFE08A] transition-colors hover:bg-[#FFC300]/16 disabled:opacity-50"
                 >
-                  Upgrade Now
-                </Link>
+                  {checkoutBusy ? "Opening checkout…" : "Activate plan"}
+                </button>
               ) : data?.planType === CompanyPlan.BASIC &&
                 data.subscriptionStatus === CompanySubscriptionStatus.ACTIVE ? (
                 <span className="inline-flex w-full items-center justify-center rounded-xl border border-white/10 bg-white/[0.06] px-4 py-2.5 text-center text-sm font-medium text-white/70">
@@ -235,7 +376,6 @@ export function BgosSubscriptionPageClient() {
             </div>
           </motion.article>
 
-          {/* Pro */}
           <motion.article
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -248,7 +388,7 @@ export function BgosSubscriptionPageClient() {
             <div className="border-b border-white/10 pb-4 pt-6 sm:pt-4">
               <p className={planTitle}>Pro plan</p>
               <p className="mt-3 text-lg font-semibold text-white">₹12,000 / month</p>
-              <p className="mt-1 text-sm text-white/55">Full growth stack</p>
+              <p className="mt-1 text-sm text-white/55">Full growth stack · unlimited team</p>
             </div>
             <ul className={featureList}>
               <li className={featureLi}>
@@ -280,17 +420,16 @@ export function BgosSubscriptionPageClient() {
               ) : (
                 <button
                   type="button"
-                  disabled={proBusy || planLockedToBasic}
-                  onClick={() => void startProCheckout()}
+                  disabled={checkoutBusy || planLockedToBasic}
+                  onClick={() => void openRazorpayCheckout("pro")}
                   className="inline-flex w-full items-center justify-center rounded-xl border border-[#FFC300]/40 bg-gradient-to-r from-[#FF3B3B]/20 to-[#FFC300]/15 px-4 py-2.5 text-sm font-semibold text-[#FFE08A] shadow-[0_0_24px_-8px_rgba(255,195,0,0.4)] transition-opacity disabled:opacity-50"
                 >
-                  {proBusy ? "Opening checkout…" : "Upgrade to Pro"}
+                  {checkoutBusy ? "Opening checkout…" : "Upgrade to Pro"}
                 </button>
               )}
             </div>
           </motion.article>
 
-          {/* Enterprise */}
           <motion.article
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}

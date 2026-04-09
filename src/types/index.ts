@@ -72,6 +72,7 @@ export type SalesBoosterPro = {
     reason: string;
     value: number | null;
     currentStatusLabel: string;
+    assigneeName: string;
   }>;
   statusSuggestions: Array<{
     leadId: string;
@@ -91,6 +92,10 @@ export type SalesBoosterPro = {
   onLeadCreated: "assign" | "whatsapp" | "both";
   followUpScheduleEnabled: boolean;
   scheduledBoosterTaskCount: number;
+  advancedAddon: boolean;
+  aiAutoReplies: boolean;
+  campaignAutomation: boolean;
+  leadScoring: boolean;
 };
 
 export type SalesBoosterPayload = SalesBoosterBasic | SalesBoosterPro;

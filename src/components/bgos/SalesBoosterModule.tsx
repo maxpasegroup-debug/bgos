@@ -448,7 +448,9 @@ export function SalesBoosterModule({
                   >
                     <div>
                       <p className="text-sm font-medium text-white">{p.leadName}</p>
-                      <p className="text-[10px] text-white/40">{p.currentStatusLabel}</p>
+                      <p className="text-[10px] text-white/40">
+                        {p.currentStatusLabel} · {p.assigneeName}
+                      </p>
                       <p className="text-[10px] text-white/50">{p.reason}</p>
                     </div>
                     <div className="text-right">

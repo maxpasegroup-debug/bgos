@@ -1,7 +1,9 @@
+import type { Prisma } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuthWithCompany } from "@/lib/auth";
+import { getLeadIdsAssignedToUser, resolveDocumentVaultScope } from "@/lib/document-access-control";
 import { formatDocumentUploaderRole } from "@/lib/document-role-label";
 import {
   type PublicUploaderFilterOption,
@@ -36,18 +38,80 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const where: {
-    companyId: string;
-    leadId?: string | null;
-    customerId?: string | null;
-    type?: string;
-    uploadedByUserId?: string;
-  } = { companyId: session.companyId };
+  const vaultScope = await resolveDocumentVaultScope(session);
+  const filters: Record<string, unknown> = {};
 
-  if (parsed.data.leadId) where.leadId = parsed.data.leadId;
-  if (parsed.data.customerId) where.customerId = parsed.data.customerId;
-  if (parsed.data.type) where.type = parsed.data.type;
-  if (parsed.data.uploadedByUserId) where.uploadedByUserId = parsed.data.uploadedByUserId;
+  if (parsed.data.leadId) filters.leadId = parsed.data.leadId;
+  if (parsed.data.customerId) filters.customerId = parsed.data.customerId;
+  if (parsed.data.type) filters.type = parsed.data.type;
+  if (parsed.data.uploadedByUserId) filters.uploadedByUserId = parsed.data.uploadedByUserId;
+
+  let employeeAccess: Prisma.DocumentWhereInput | undefined;
+
+  if (vaultScope === "mine") {
+    const assignedLeadIds = await getLeadIdsAssignedToUser(session.companyId, session.sub);
+    const assignedSet = new Set(assignedLeadIds);
+
+    if (parsed.data.leadId && !assignedSet.has(parsed.data.leadId)) {
+      return NextResponse.json(
+        {
+          ok: false as const,
+          error: "You can only view documents for leads assigned to you.",
+          code: "FORBIDDEN" as const,
+        },
+        { status: 403 },
+      );
+    }
+    if (parsed.data.customerId && !assignedSet.has(parsed.data.customerId)) {
+      return NextResponse.json(
+        {
+          ok: false as const,
+          error: "You can only view documents for customers linked to your leads.",
+          code: "FORBIDDEN" as const,
+        },
+        { status: 403 },
+      );
+    }
+    if (
+      parsed.data.uploadedByUserId &&
+      parsed.data.uploadedByUserId !== session.sub
+    ) {
+      return NextResponse.json(
+        {
+          ok: false as const,
+          error: "You cannot filter by another team member's uploads.",
+          code: "FORBIDDEN" as const,
+        },
+        { status: 403 },
+      );
+    }
+
+    const or: Prisma.DocumentWhereInput[] = [{ uploadedByUserId: session.sub }];
+    if (assignedLeadIds.length > 0) {
+      or.push({ leadId: { in: assignedLeadIds } });
+      or.push({ customerId: { in: assignedLeadIds } } as Prisma.DocumentWhereInput);
+    }
+    employeeAccess = { OR: or };
+  }
+
+  const filterInput =
+    Object.keys(filters).length > 0 ? (filters as Prisma.DocumentWhereInput) : null;
+
+  const where: Prisma.DocumentWhereInput =
+    vaultScope === "all"
+      ? { companyId: session.companyId, ...(filterInput ?? {}) }
+      : {
+          companyId: session.companyId,
+          AND: [
+            employeeAccess as Prisma.DocumentWhereInput,
+            ...(filterInput ? [filterInput] : []),
+          ],
+        };
+
+  const uploadersWhereBase: Prisma.DocumentWhereInput =
+    vaultScope === "all"
+      ? { companyId: session.companyId, uploadedByUserId: { not: null } }
+      : where;
 
   const [rows, distinctUploaders] = await Promise.all([
     prisma.document.findMany({
@@ -59,7 +123,7 @@ export async function GET(request: NextRequest) {
       },
     }),
     prisma.document.findMany({
-      where: { companyId: session.companyId, uploadedByUserId: { not: null } },
+      where: uploadersWhereBase,
       distinct: ["uploadedByUserId"],
       select: { uploadedByUserId: true },
     }),
@@ -77,7 +141,12 @@ export async function GET(request: NextRequest) {
         select: { id: true, name: true },
       }),
       prisma.document.findMany({
-        where: { companyId: session.companyId, uploadedByUserId: { in: uploaderIds } },
+        where: {
+          AND: [
+            uploadersWhereBase,
+            { uploadedByUserId: { in: uploaderIds } },
+          ],
+        },
         select: { uploadedByUserId: true, uploadedByRole: true, createdAt: true },
         orderBy: { createdAt: "desc" },
       }),
@@ -104,6 +173,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     ok: true as const,
+    vaultScope,
     documents: rows.map(serializeDocument),
     uploaders,
   });

@@ -160,11 +160,18 @@ export default function OnboardingPage() {
       const data = (await res.json()) as {
         ok?: boolean;
         error?: string;
+        message?: string;
         companyId?: string;
       };
 
       if (!res.ok || !data.ok) {
-        setError(typeof data.error === "string" ? data.error : "Could not create business");
+        setError(
+          typeof data.error === "string"
+            ? data.error
+            : typeof data.message === "string"
+              ? data.message
+              : "Could not create business",
+        );
         return;
       }
 
@@ -203,9 +210,15 @@ export default function OnboardingPage() {
         method: "POST",
         credentials: "include",
       });
-      const data = (await res.json()) as { ok?: boolean; error?: string };
+      const data = (await res.json()) as { ok?: boolean; error?: string; message?: string };
       if (!res.ok || !data.ok) {
-        setError(typeof data.error === "string" ? data.error : "Could not activate workspace");
+        setError(
+          typeof data.error === "string"
+            ? data.error
+            : typeof data.message === "string"
+              ? data.message
+              : "Could not activate workspace",
+        );
         return;
       }
       router.push(nextPath);
@@ -326,6 +339,7 @@ export default function OnboardingPage() {
               autoComplete="organization"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              disabled={pending}
               className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none ring-cyan-500/40 focus:ring-2"
             />
           </div>
@@ -338,6 +352,7 @@ export default function OnboardingPage() {
               name="industry"
               value={industry}
               onChange={(e) => setIndustry(e.target.value as "SOLAR")}
+              disabled={pending}
               className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none ring-cyan-500/40 focus:ring-2"
             >
               <option value="SOLAR">Solar</option>
@@ -355,6 +370,7 @@ export default function OnboardingPage() {
               placeholder="https://… or /path-in-public"
               value={logoUrl}
               onChange={(e) => setLogoUrl(e.target.value)}
+              disabled={pending}
               className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none ring-cyan-500/40 focus:ring-2"
             />
             <p className="mt-1 text-[11px] text-white/40">
@@ -373,6 +389,7 @@ export default function OnboardingPage() {
               autoComplete="email"
               value={companyEmail}
               onChange={(e) => setCompanyEmail(e.target.value)}
+              disabled={pending}
               className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none ring-cyan-500/40 focus:ring-2"
             />
           </div>
@@ -386,6 +403,7 @@ export default function OnboardingPage() {
               type="tel"
               value={companyPhone}
               onChange={(e) => setCompanyPhone(e.target.value)}
+              disabled={pending}
               className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none ring-cyan-500/40 focus:ring-2"
             />
           </div>
@@ -399,6 +417,7 @@ export default function OnboardingPage() {
               rows={3}
               value={billingAddress}
               onChange={(e) => setBillingAddress(e.target.value)}
+              disabled={pending}
               className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none ring-cyan-500/40 focus:ring-2"
             />
           </div>
@@ -411,6 +430,7 @@ export default function OnboardingPage() {
               name="gstNumber"
               value={gstNumber}
               onChange={(e) => setGstNumber(e.target.value)}
+              disabled={pending}
               className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none ring-cyan-500/40 focus:ring-2"
             />
           </div>

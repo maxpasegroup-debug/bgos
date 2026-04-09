@@ -8,12 +8,29 @@ import { BgosCompanySwitcher } from "./BgosCompanySwitcher";
 import { useBgosDashboardContext } from "./BgosDataProvider";
 import { BGOS_MAIN_PAD } from "./layoutTokens";
 
+type BillingPeek = {
+  planLabel: string;
+  subscriptionStatus: string;
+  trialDaysRemaining: number | null;
+  renewalDateIso: string | null;
+};
+
 type SessionUser = {
   name: string;
   email: string;
   role: string;
   companyName: string | null;
+  billing: BillingPeek | null;
 };
+
+const WA_ENTERPRISE =
+  "https://wa.me/918089239823?text=Hi%2C%20I%20want%20Enterprise%20BGOS%20plan";
+
+function formatShortDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
 
 function roleLabel(role: string): string {
   if (role === "ADMIN") return "Boss";
@@ -36,6 +53,7 @@ export function BgosHeader() {
     email: "—",
     role: "ADMIN",
     companyName: null,
+    billing: null,
   });
   const profileRef = useRef<HTMLDivElement | null>(null);
   const notifRef = useRef<HTMLDivElement | null>(null);
@@ -46,9 +64,16 @@ export function BgosHeader() {
       try {
         const res = await fetch("/api/auth/me", { credentials: "include" });
         const j = (await res.json()) as {
+          billing?: {
+            planLabel?: string;
+            subscriptionStatus?: string;
+            trialDaysRemaining?: number | null;
+            renewalDateIso?: string | null;
+          };
           user?: { name?: string; email?: string; role?: string; companyName?: string | null };
         };
         if (!cancelled && j.user) {
+          const b = j.billing;
           setSessionUser({
             name: (j.user.name || "Solar Owner").trim() || "Solar Owner",
             email: j.user.email || "—",
@@ -56,6 +81,21 @@ export function BgosHeader() {
             companyName:
               typeof j.user.companyName === "string" && j.user.companyName.trim()
                 ? j.user.companyName.trim()
+                : null,
+            billing:
+              b &&
+              typeof b.planLabel === "string" &&
+              typeof b.subscriptionStatus === "string"
+                ? {
+                    planLabel: b.planLabel,
+                    subscriptionStatus: b.subscriptionStatus,
+                    trialDaysRemaining:
+                      typeof b.trialDaysRemaining === "number" ? b.trialDaysRemaining : null,
+                    renewalDateIso:
+                      typeof b.renewalDateIso === "string" && b.renewalDateIso.trim()
+                        ? b.renewalDateIso
+                        : null,
+                  }
                 : null,
           });
         }
@@ -235,6 +275,33 @@ export function BgosHeader() {
                         )}
                       </span>
                     </p>
+                    {sessionUser.billing ? (
+                      <div className="mt-2 space-y-1 border-t border-slate-200/70 pt-2 dark:border-white/[0.08]">
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:text-white/55">
+                          Plan ·{" "}
+                          <span className="normal-case tracking-normal text-slate-800 dark:text-white/90">
+                            {sessionUser.billing.planLabel}
+                          </span>
+                        </p>
+                        {sessionUser.billing.subscriptionStatus === "TRIAL" &&
+                        sessionUser.billing.trialDaysRemaining != null ? (
+                          <p className="text-[11px] text-slate-600 dark:text-white/65">
+                            Trial · {sessionUser.billing.trialDaysRemaining} day
+                            {sessionUser.billing.trialDaysRemaining === 1 ? "" : "s"} left
+                          </p>
+                        ) : null}
+                        {sessionUser.billing.renewalDateIso ? (
+                          <p className="text-[11px] text-slate-600 dark:text-white/65">
+                            {sessionUser.billing.subscriptionStatus === "TRIAL"
+                              ? "Trial ends"
+                              : "Paid through"}{" "}
+                            <span className="font-medium text-slate-800 dark:text-white/85">
+                              {formatShortDate(sessionUser.billing.renewalDateIso)}
+                            </span>
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                   <nav className="flex flex-col p-1.5">
                     <Link
@@ -243,8 +310,26 @@ export function BgosHeader() {
                       onClick={() => setProfileOpen(false)}
                       className="rounded-lg px-3 py-2.5 text-left text-sm text-slate-800 transition-colors hover:bg-slate-100 dark:text-white/90 dark:hover:bg-white/[0.08]"
                     >
-                      Subscription &amp; Billing
+                      Billing
                     </Link>
+                    <Link
+                      href="/bgos/subscription"
+                      role="menuitem"
+                      onClick={() => setProfileOpen(false)}
+                      className="rounded-lg px-3 py-2.5 text-left text-sm text-slate-800 transition-colors hover:bg-slate-100 dark:text-white/90 dark:hover:bg-white/[0.08]"
+                    >
+                      Upgrade plan
+                    </Link>
+                    <a
+                      href={WA_ENTERPRISE}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      role="menuitem"
+                      onClick={() => setProfileOpen(false)}
+                      className="rounded-lg px-3 py-2.5 text-left text-sm text-slate-800 transition-colors hover:bg-slate-100 dark:text-white/90 dark:hover:bg-white/[0.08]"
+                    >
+                      Enterprise (WhatsApp)
+                    </a>
                     <Link
                       href="/bgos/settings"
                       role="menuitem"

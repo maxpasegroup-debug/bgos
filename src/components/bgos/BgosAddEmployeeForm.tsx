@@ -1,6 +1,7 @@
 "use client";
 
 import { UserRole } from "@prisma/client";
+import Link from "next/link";
 import { useState } from "react";
 import { useBgosDashboardContext } from "./BgosDataProvider";
 
@@ -38,6 +39,7 @@ export function BgosAddEmployeeForm() {
   const [msg, setMsg] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [seatGateOpen, setSeatGateOpen] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -77,6 +79,15 @@ export function BgosAddEmployeeForm() {
             typeof j.error === "string" && j.error.trim()
               ? j.error
               : "Your free trial has expired. Upgrade to continue.",
+          );
+          return;
+        }
+        if (j.code === "PLAN_SEAT_LIMIT") {
+          setSeatGateOpen(true);
+          setMsg(
+            typeof j.error === "string" && j.error.trim()
+              ? j.error
+              : "Upgrade to add more team members.",
           );
           return;
         }
@@ -205,6 +216,41 @@ export function BgosAddEmployeeForm() {
           {submitting ? "Creating…" : "Create employee"}
         </button>
       </div>
+
+      {seatGateOpen ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-4 backdrop-blur-[2px]"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="seat-gate-title"
+        >
+          <div className="max-w-md rounded-2xl border border-white/12 bg-slate-950 px-5 py-5 shadow-2xl sm:px-6">
+            <h2 id="seat-gate-title" className="text-base font-semibold text-white">
+              Team limit reached
+            </h2>
+            <p className="mt-2 text-sm text-white/70">
+              Basic includes up to five workspace members. Upgrade to Pro for unlimited seats and full
+              automation.
+            </p>
+            <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setSeatGateOpen(false)}
+                className="rounded-xl border border-white/15 px-4 py-2.5 text-sm font-medium text-white/85 transition hover:bg-white/[0.06]"
+              >
+                Close
+              </button>
+              <Link
+                href="/bgos/subscription"
+                onClick={() => setSeatGateOpen(false)}
+                className="inline-flex items-center justify-center rounded-xl bg-[#FFC300]/90 px-4 py-2.5 text-center text-sm font-semibold text-black transition hover:bg-[#FFC300]"
+              >
+                Upgrade to Pro
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </form>
   );
 }

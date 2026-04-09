@@ -15,6 +15,8 @@ export type JwtMembership = {
   jobRole: string;
   /** ISO 8601; when set for BASIC, middleware compares to `Date.now()` for expiry. */
   trialEndsAt: string | null;
+  /** ISO 8601 end of paid Razorpay/Stripe period; when future, trial/billing gates stay open. */
+  subscriptionPeriodEnd: string | null;
 };
 
 export function parseJwtMemberships(payload: Record<string, unknown>): JwtMembership[] | null {
@@ -31,7 +33,10 @@ export function parseJwtMemberships(payload: Record<string, unknown>): JwtMember
     const te = o.trialEndsAt;
     const trialEndsAt =
       typeof te === "string" && te.trim() ? te.trim() : null;
-    out.push({ companyId, plan, jobRole, trialEndsAt });
+    const spe = o.subscriptionPeriodEnd;
+    const subscriptionPeriodEnd =
+      typeof spe === "string" && spe.trim() ? spe.trim() : null;
+    out.push({ companyId, plan, jobRole, trialEndsAt, subscriptionPeriodEnd });
   }
   return out.length ? out : null;
 }

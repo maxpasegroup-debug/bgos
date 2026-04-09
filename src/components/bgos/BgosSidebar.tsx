@@ -4,12 +4,14 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
+import { useBgosDashboardContext } from "./BgosDataProvider";
 
 const navItems = [
   { id: "home", label: "Home", href: "/bgos", icon: HomeIcon },
   { id: "billing", label: "Billing", href: "/bgos/billing", icon: BillingIcon },
   { id: "subscription", label: "Plans", href: "/bgos/subscription", icon: PricingIcon },
   { id: "sales", label: "Sales", href: "/bgos/sales", icon: SalesIcon },
+  { id: "sales-booster", label: "Sales Booster", href: "/sales-booster", icon: LightningIcon },
   { id: "operations", label: "Operations", href: "/bgos/operations", icon: OpsIcon },
   { id: "accounts", label: "Accounts", href: "/bgos/accounts", icon: RevenueIcon },
   { id: "inventory", label: "Inventory", href: "/bgos/inventory", icon: DocsIcon },
@@ -24,19 +26,26 @@ const navItems = [
 
 export function BgosSidebar() {
   const pathname = usePathname();
+  const { hasProPlan, planLockedToBasic } = useBgosDashboardContext();
 
   return (
     <aside className="fixed bottom-0 left-0 top-0 z-40 flex w-16 flex-col border-r border-white/10 bg-black/30 py-4 backdrop-blur-md">
       <nav className="flex flex-1 flex-col items-center gap-1 px-1.5">
         {navItems.map((item) => {
+          const href =
+            item.id === "sales-booster" && !planLockedToBasic && hasProPlan
+              ? "/sales-booster/dashboard"
+              : item.href;
           const active =
-            item.href === "/bgos"
-              ? pathname === "/bgos"
-              : pathname === item.href || pathname.startsWith(`${item.href}/`);
+            item.id === "sales-booster"
+              ? pathname === "/sales-booster" || pathname.startsWith("/sales-booster/")
+              : item.href === "/bgos"
+                ? pathname === "/bgos"
+                : pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
             <SidebarLink
               key={item.id}
-              href={item.href}
+              href={href}
               label={item.label}
               icon={item.icon}
               active={active}
@@ -91,6 +100,20 @@ function SidebarLink({
         {label}
       </span>
     </div>
+  );
+}
+
+function LightningIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" aria-hidden>
+      <path
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.85}
+        d="M13 3L4 14h7l-1 7 9-11h-7l1-7z"
+      />
+    </svg>
   );
 }
 

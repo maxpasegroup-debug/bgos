@@ -72,6 +72,8 @@ export function BgosDocumentsClient({
   const [filterLeadId, setFilterLeadId] = useState("");
   const [filterCustomerId, setFilterCustomerId] = useState("");
   const [filterUploadedBy, setFilterUploadedBy] = useState("");
+  /** From `/api/documents/list` — drives vault copy and filters. */
+  const [vaultScope, setVaultScope] = useState<"all" | "mine" | null>(null);
 
   const [uploadType, setUploadType] = useState<DocumentType>("OTHER");
   const [uploadLeadId, setUploadLeadId] = useState("");
@@ -91,6 +93,7 @@ export function BgosDocumentsClient({
         const res = await fetch(`/api/documents/list?${p}`, { credentials: "include" });
         const data = (await res.json()) as {
           ok?: boolean;
+          vaultScope?: "all" | "mine";
           documents?: PublicDocumentRow[];
           uploaders?: PublicUploaderFilterOption[];
           error?: string;
@@ -101,6 +104,9 @@ export function BgosDocumentsClient({
             setDocuments([]);
           }
           return;
+        }
+        if (data.vaultScope === "all" || data.vaultScope === "mine") {
+          setVaultScope(data.vaultScope);
         }
         setDocuments(data.documents);
         if (Array.isArray(data.uploaders)) setUploaders(data.uploaders);
@@ -117,9 +123,11 @@ export function BgosDocumentsClient({
   );
 
   const loadLeads = useCallback(async () => {
-    if (embeddedLeadId) return;
+    if (embeddedLeadId || vaultScope === null) return;
     try {
-      const res = await fetch("/api/leads?limit=200", { credentials: "include" });
+      const qs =
+        vaultScope === "mine" ? "limit=200&assignedTo=me" : "limit=200";
+      const res = await fetch(`/api/leads?${qs}`, { credentials: "include" });
       const data = (await res.json()) as {
         ok?: boolean;
         leads?: { id: string; name: string }[];
@@ -129,7 +137,7 @@ export function BgosDocumentsClient({
     } catch {
       /* optional */
     }
-  }, [embeddedLeadId]);
+  }, [embeddedLeadId, vaultScope]);
 
   useEffect(() => {
     void loadLeads();
@@ -211,17 +219,21 @@ export function BgosDocumentsClient({
     );
   }
 
-  const showUploaderFilter = !embeddedLeadId && uploaders.length > 0;
+  const showUploaderFilter =
+    vaultScope === "all" && !embeddedLeadId && uploaders.length > 0;
+  const vaultTitle =
+    vaultScope === "mine" ? "My Documents" : vaultScope === "all" ? "All Documents" : "Documents";
+  const vaultSubtitle =
+    vaultScope === "mine"
+      ? "Files you uploaded and documents for leads assigned to you. Refreshes every few seconds."
+      : "Company vault — agreements, site files, invoices, and customer documents. Refreshes every few seconds.";
 
   return (
     <div className={compact ? "space-y-4" : "mx-auto max-w-7xl space-y-8 px-4 sm:px-6"}>
       {!embeddedLeadId && !compact ? (
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-white">Documents</h1>
-          <p className="mt-1 text-sm text-white/55">
-            Company vault — agreements, approvals, site reports, and customer files. Refreshes every
-            few seconds.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight text-white">{vaultTitle}</h1>
+          <p className="mt-1 text-sm text-white/55">{vaultSubtitle}</p>
         </div>
       ) : null}
 
@@ -263,7 +275,9 @@ export function BgosDocumentsClient({
                 onChange={(e) => setUploadLeadId(e.target.value)}
                 disabled={busy || trialReadOnly}
               >
-                <option value="">Company-wide (no lead)</option>
+                <option value="">
+                  {vaultScope === "mine" ? "Not linked to a lead (your uploads only)" : "Company-wide (no lead)"}
+                </option>
                 {leads.map((l) => (
                   <option key={l.id} value={l.id}>
                     {l.name}
@@ -321,7 +335,11 @@ export function BgosDocumentsClient({
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h3 className={`font-semibold text-white ${compact ? "text-sm" : "text-base"}`}>Library</h3>
-            <p className="mt-1 text-xs text-white/45">Filter by type, lead, or who uploaded.</p>
+            <p className="mt-1 text-xs text-white/45">
+              {vaultScope === "mine"
+                ? "Filter by type, lead, or customer (your assigned leads only)."
+                : "Filter by type, lead, customer, or who uploaded."}
+            </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <label className="sm:w-44">
@@ -353,7 +371,7 @@ export function BgosDocumentsClient({
                     setFilterLeadId(e.target.value);
                   }}
                 >
-                  <option value="">All leads</option>
+                  <option value="">{vaultScope === "mine" ? "All my leads" : "All leads"}</option>
                   {leads.map((l) => (
                     <option key={l.id} value={l.id}>
                       {l.name}
@@ -373,7 +391,9 @@ export function BgosDocumentsClient({
                     setFilterCustomerId(e.target.value);
                   }}
                 >
-                  <option value="">All customers</option>
+                  <option value="">
+                    {vaultScope === "mine" ? "All my customers" : "All customers"}
+                  </option>
                   {leads.map((l) => (
                     <option key={`c-${l.id}`} value={l.id}>
                       {l.name}

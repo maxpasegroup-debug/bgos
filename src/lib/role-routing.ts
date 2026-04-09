@@ -48,6 +48,7 @@ type RouteRule = { prefix: string; roles: Set<string> };
 
 const PAGE_RULES: RouteRule[] = [
   { prefix: "/bgos", roles: new Set(["ADMIN", "MANAGER"]) },
+  { prefix: "/sales-booster", roles: new Set(["ADMIN", "MANAGER"]) },
   { prefix: "/iceconnect/sales", roles: new Set(["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER"]) },
   { prefix: "/iceconnect/sales-head", roles: new Set(["SALES_HEAD", "ADMIN", "MANAGER"]) },
   { prefix: "/iceconnect/partner", roles: new Set(["CHANNEL_PARTNER", "ADMIN", "MANAGER"]) },
@@ -64,6 +65,7 @@ const PAGE_RULES: RouteRule[] = [
 ];
 
 const API_RULES: RouteRule[] = [
+  { prefix: "/api/bgos/sales-booster", roles: new Set(["ADMIN", "MANAGER"]) },
   { prefix: "/api/dashboard", roles: new Set(["ADMIN", "MANAGER"]) },
   { prefix: "/api/activity", roles: new Set(["ADMIN", "MANAGER"]) },
   { prefix: "/api/automation", roles: new Set(["ADMIN", "MANAGER"]) },

@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuthWithCompany } from "@/lib/auth";
+import { resolveDocumentVaultScope } from "@/lib/document-access-control";
 import { serializeDocument } from "@/lib/document-serialize";
 import { documentTypeSchema } from "@/lib/document-types";
 import {
@@ -99,6 +100,31 @@ export async function POST(request: NextRequest) {
     }
     customerId = customerLead.id;
     if (!leadId) leadId = customerLead.id;
+  }
+
+  const vaultScope = await resolveDocumentVaultScope(session);
+  if (vaultScope === "mine") {
+    const targetLeadId = leadId ?? customerId;
+    if (targetLeadId) {
+      const assigned = await prisma.lead.findFirst({
+        where: {
+          id: targetLeadId,
+          companyId: session.companyId,
+          assignedTo: session.sub,
+        },
+        select: { id: true },
+      });
+      if (!assigned) {
+        return NextResponse.json(
+          {
+            ok: false as const,
+            error: "You can only attach documents to leads assigned to you.",
+            code: "FORBIDDEN" as const,
+          },
+          { status: 403 },
+        );
+      }
+    }
   }
 
   const displayName = fileRaw.name?.trim() || "document";

@@ -95,6 +95,10 @@ export async function POST(request: NextRequest) {
     }
 
     try {
+      const now = new Date();
+      const subscriptionPeriodEnd = new Date(now);
+      subscriptionPeriodEnd.setUTCDate(subscriptionPeriodEnd.getUTCDate() + 30);
+
       await prisma.$transaction([
         prisma.billingWebhookEvent.create({
           data: {
@@ -109,6 +113,8 @@ export async function POST(request: NextRequest) {
             plan: targetPlan as CompanyPlan,
             isTrialActive: false,
             subscriptionStatus: CompanySubscriptionStatus.ACTIVE,
+            subscriptionPeriodStart: now,
+            subscriptionPeriodEnd,
           },
         }),
       ]);

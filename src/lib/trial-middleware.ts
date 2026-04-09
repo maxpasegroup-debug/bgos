@@ -1,6 +1,6 @@
 /**
- * Edge-safe trial checks (JWT claims only). No Prisma.
- * Must stay in sync with {@link isBasicTrialExpired} in `trial.ts` for membership `trialEndsAt`.
+ * Edge-safe subscription checks (JWT claims only). No Prisma.
+ * Keep aligned with {@link deriveSubscriptionStatus} and {@link isCompanyBasicTrialExpired}.
  */
 
 import { parseJwtMemberships, resolveTenantFromJwt } from "@/lib/auth-active-company";
@@ -15,27 +15,61 @@ function normalizePathname(pathname: string): string {
   return pathname;
 }
 
-/** True when active company is BASIC and JWT membership `trialEndsAt` is in the past. */
-export function jwtSaysBasicTrialExpired(
+function subscriptionPeriodEndMs(row: { subscriptionPeriodEnd: string | null }): number | null {
+  const iso = row.subscriptionPeriodEnd;
+  if (!iso) return null;
+  const ms = Date.parse(iso);
+  return Number.isNaN(ms) ? null : ms;
+}
+
+/**
+ * True when the active company must not use the product without visiting billing (BASIC trial ended
+ * without pay, PRO period ended when `subscriptionPeriodEnd` is present in JWT, etc.).
+ */
+export function jwtSaysSubscriptionExpired(
   payload: Record<string, unknown>,
   activeCompanyIdCookie: string | undefined,
 ): boolean {
   const tenant = resolveTenantFromJwt(payload, activeCompanyIdCookie);
   if (tenant.needsCompany || !tenant.companyId) return false;
-  if (tenant.companyPlan !== "BASIC") return false;
+  if (tenant.companyPlan === "ENTERPRISE") return false;
+
   const mems = parseJwtMemberships(payload);
   const row = mems?.find((m) => m.companyId === tenant.companyId);
-  const iso = row?.trialEndsAt;
-  if (!iso) return false;
-  const endMs = Date.parse(iso);
-  if (Number.isNaN(endMs)) return false;
-  return Date.now() >= endMs;
+  if (!row) return false;
+
+  const periodEndMs = subscriptionPeriodEndMs(row);
+  if (periodEndMs != null && Date.now() < periodEndMs) {
+    return false;
+  }
+
+  if (tenant.companyPlan === "PRO") {
+    if (row.subscriptionPeriodEnd == null) return false;
+    return Date.now() >= (periodEndMs ?? 0);
+  }
+
+  if (tenant.companyPlan !== "BASIC") return false;
+
+  const trialIso = row.trialEndsAt;
+  if (!trialIso) return false;
+  const trialEndMs = Date.parse(trialIso);
+  if (Number.isNaN(trialEndMs)) return false;
+  if (Date.now() < trialEndMs) return false;
+  return true;
+}
+
+/** @deprecated alias — use {@link jwtSaysSubscriptionExpired}. */
+export function jwtSaysBasicTrialExpired(
+  payload: Record<string, unknown>,
+  activeCompanyIdCookie: string | undefined,
+): boolean {
+  return jwtSaysSubscriptionExpired(payload, activeCompanyIdCookie);
 }
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 /**
- * When Basic trial is expired at the edge: allow reads and a small mutation allowlist
+ * When subscription is expired at the edge: allow reads and a small mutation allowlist
  * (session, checkout, sales contact, company switch). Everything else returns 403 TRIAL_EXPIRED.
  */
 export function trialExpiredAllowsApiRequest(pathname: string, method: string): boolean {
@@ -49,6 +83,9 @@ export function trialExpiredAllowsApiRequest(pathname: string, method: string): 
     ["/api/auth/logout", "POST"],
     ["/api/payment/checkout", "POST"],
     ["/api/payment/webhook", "POST"],
+    ["/api/payment/razorpay/order", "POST"],
+    ["/api/payment/razorpay/verify", "POST"],
+    ["/api/payment/razorpay/webhook", "POST"],
     ["/api/sales-booster/upgrade-request", "POST"],
     ["/api/company/switch", "POST"],
     ["/api/bgos/growth-plan", "PATCH"],

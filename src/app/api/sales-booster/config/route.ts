@@ -17,6 +17,10 @@ const patchSchema = z
   .object({
     onLeadCreated: z.enum(["assign", "whatsapp", "both"]).optional(),
     followUpScheduleEnabled: z.boolean().optional(),
+    addonEnabled: z.boolean().optional(),
+    aiAutoReplies: z.boolean().optional(),
+    campaignAutomation: z.boolean().optional(),
+    leadScoring: z.boolean().optional(),
   })
   .strict();
 

@@ -13,6 +13,10 @@ import {
   toPublicUser,
   USER_ADMIN_ROLES,
 } from "@/lib/user-company";
+import {
+  BASIC_PLAN_MAX_MEMBERS,
+  basicPlanMemberLimitReached,
+} from "@/lib/plan-seats";
 import { isCompanyBasicTrialExpired, trialExpiredJsonResponse } from "@/lib/trial";
 
 /** Roles the Add Employee form may assign (field staff bound to the boss company). */
@@ -77,6 +81,18 @@ export async function POST(request: NextRequest) {
 
   if (await isCompanyBasicTrialExpired(session.companyId)) {
     return trialExpiredJsonResponse();
+  }
+
+  const companyRow = await prisma.company.findUnique({
+    where: { id: session.companyId },
+    select: { plan: true },
+  });
+  if (companyRow && (await basicPlanMemberLimitReached(session.companyId, companyRow.plan))) {
+    return jsonError(
+      403,
+      "PLAN_SEAT_LIMIT",
+      `Basic plan supports up to ${BASIC_PLAN_MAX_MEMBERS} team members. Upgrade to Pro for a larger team.`,
+    );
   }
 
   const parsed = await parseJsonBodyZod(request, createBodySchema);

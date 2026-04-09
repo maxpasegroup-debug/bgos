@@ -38,80 +38,101 @@ function jwtHasCompanyContext(
   return Boolean(u.companyId) || (u.memberships?.length ?? 0) > 0;
 }
 
-export async function POST(request: NextRequest) {
+async function getCurrentUser(request: NextRequest) {
   const session = requireAuth(request);
-  if (session instanceof NextResponse) return session;
+  if (session instanceof NextResponse) return null;
+  return session;
+}
 
-  const token = getTokenFromRequest(request);
-  const jwtOnly = token ? getAuthUserFromToken(token) : null;
-  if (!jwtOnly) {
-    return NextResponse.json(
-      { ok: false as const, error: "Invalid session", code: "UNAUTHORIZED" },
-      { status: 401 },
-    );
-  }
+export async function POST(request: NextRequest) {
+  try {
+    const raw = await parseJsonBody(request);
+    if (!raw.ok) return raw.response;
+    const body = raw.data;
+    console.log("ONBOARD INPUT:", body);
 
-  if (!jwtHasCompanyContext(jwtOnly)) {
-    const stale = await prisma.userCompany.findFirst({
-      where: { userId: session.sub },
-      orderBy: { createdAt: "asc" },
-      include: { company: { select: { id: true, plan: true } } },
-    });
-    if (stale) {
-      const u = await prisma.user.findUnique({
-        where: { id: session.sub },
-        select: { workspaceActivatedAt: true },
-      });
-      const mems = await loadMembershipsForJwt(session.sub);
-      const primary = mems[0]!;
-      let newToken: string;
-      try {
-        newToken = signAccessToken({
-          sub: session.sub,
-          email: session.email,
-          role: primary.jobRole,
-          companyId: primary.companyId,
-          companyPlan: primary.plan,
-          workspaceReady: Boolean(u?.workspaceActivatedAt),
-          memberships: mems,
-        });
-      } catch {
-        return NextResponse.json(
-          { ok: false as const, error: "Authentication is not configured", code: "SERVER_ERROR" },
-          { status: 500 },
-        );
-      }
-      const res = NextResponse.json({
-        ok: true as const,
-        companyId: stale.companyId,
-        recovered: true as const,
-      });
-      setSessionCookie(res, newToken);
-      setActiveCompanyCookie(res, primary.companyId);
-      return res;
+    const user = await getCurrentUser(request);
+    if (!user) {
+      return NextResponse.json(
+        { success: false as const, message: "Unauthorized" },
+        { status: 401 },
+      );
     }
-  }
+    console.log("USER:", user.sub);
 
-  const raw = await parseJsonBody(request);
-  if (!raw.ok) return raw.response;
+    const parsed = bodySchema.safeParse(body);
+    if (!parsed.success) {
+      return zodValidationErrorResponse(parsed.error);
+    }
+    if (!parsed.data.name.trim()) {
+      return NextResponse.json(
+        { success: false as const, message: "companyName must not be empty" },
+        { status: 400 },
+      );
+    }
 
-  const parsed = bodySchema.safeParse(raw.data);
-  if (!parsed.success) {
-    return zodValidationErrorResponse(parsed.error);
-  }
+    const token = getTokenFromRequest(request);
+    const jwtOnly = token ? getAuthUserFromToken(token) : null;
+    if (!jwtOnly) {
+      return NextResponse.json(
+        { ok: false as const, error: "Invalid session", code: "UNAUTHORIZED" },
+        { status: 401 },
+      );
+    }
 
-  const {
-    name,
-    industry,
-    logoUrl: logoIn,
-    primaryColor,
-    secondaryColor,
-    companyEmail,
-    companyPhone,
-    billingAddress,
-    gstNumber,
-    bankDetails,
-  } = parsed.data;
+    if (!jwtHasCompanyContext(jwtOnly)) {
+      const stale = await prisma.userCompany.findFirst({
+        where: { userId: user.sub },
+        orderBy: { createdAt: "asc" },
+        include: { company: { select: { id: true, plan: true } } },
+      });
+      if (stale) {
+        const u = await prisma.user.findUnique({
+          where: { id: user.sub },
+          select: { workspaceActivatedAt: true },
+        });
+        const mems = await loadMembershipsForJwt(user.sub);
+        const primary = mems[0]!;
+        let newToken: string;
+        try {
+          newToken = signAccessToken({
+            sub: user.sub,
+            email: user.email,
+            role: primary.jobRole,
+            companyId: primary.companyId,
+            companyPlan: primary.plan,
+            workspaceReady: Boolean(u?.workspaceActivatedAt),
+            memberships: mems,
+          });
+        } catch {
+          return NextResponse.json(
+            { ok: false as const, error: "Authentication is not configured", code: "SERVER_ERROR" },
+            { status: 500 },
+          );
+        }
+        const res = NextResponse.json({
+          ok: true as const,
+          companyId: stale.companyId,
+          recovered: true as const,
+        });
+        setSessionCookie(res, newToken);
+        setActiveCompanyCookie(res, primary.companyId);
+        return res;
+      }
+    }
+
+    const {
+      name,
+      industry,
+      logoUrl: logoIn,
+      primaryColor,
+      secondaryColor,
+      companyEmail,
+      companyPhone,
+      billingAddress,
+      gstNumber,
+      bankDetails,
+    } = parsed.data;
 
   let logoUrl: string | null = null;
   if (logoIn != null && logoIn.trim() !== "") {
@@ -129,55 +150,82 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const addingAnotherBusiness = jwtHasCompanyContext(jwtOnly);
+    const addingAnotherBusiness = jwtHasCompanyContext(jwtOnly);
 
-  if (addingAnotherBusiness) {
-    if (!session.workspaceReady) {
-      return NextResponse.json(
-        {
-          ok: false as const,
-          error: "Complete workspace activation before creating another company",
-          code: "WORKSPACE_NOT_ACTIVATED" as const,
-        },
-        { status: 403 },
-      );
+    if (addingAnotherBusiness) {
+      if (!user.workspaceReady) {
+        return NextResponse.json(
+          {
+            ok: false as const,
+            error: "Complete workspace activation before creating another company",
+            code: "WORKSPACE_NOT_ACTIVATED" as const,
+          },
+          { status: 403 },
+        );
+      }
+      if (user.role !== UserRole.ADMIN && user.role !== UserRole.MANAGER) {
+        return NextResponse.json(
+          {
+            ok: false as const,
+            error: "Only workspace admins can create a company",
+            code: "FORBIDDEN" as const,
+          },
+          { status: 403 },
+        );
+      }
+      const owner = await prisma.user.findUnique({
+        where: { id: user.sub },
+        select: { workspaceActivatedAt: true },
+      });
+      if (!owner?.workspaceActivatedAt) {
+        return NextResponse.json(
+          {
+            ok: false as const,
+            error: "Complete workspace activation first",
+            code: "WORKSPACE_NOT_ACTIVATED" as const,
+          },
+          { status: 403 },
+        );
+      }
     }
-    if (session.role !== UserRole.ADMIN && session.role !== UserRole.MANAGER) {
-      return NextResponse.json(
-        {
-          ok: false as const,
-          error: "Only workspace admins can create a company",
-          code: "FORBIDDEN" as const,
-        },
-        { status: 403 },
-      );
-    }
-    const owner = await prisma.user.findUnique({
-      where: { id: session.sub },
-      select: { workspaceActivatedAt: true },
+
+    const existingByOwnerAndName = await prisma.company.findFirst({
+      where: { ownerId: user.sub, name: { equals: name, mode: "insensitive" } },
+      select: { id: true },
     });
-    if (!owner?.workspaceActivatedAt) {
-      return NextResponse.json(
-        {
-          ok: false as const,
-          error: "Complete workspace activation first",
-          code: "WORKSPACE_NOT_ACTIVATED" as const,
-        },
-        { status: 403 },
-      );
+    if (existingByOwnerAndName) {
+      const mems = await loadMembershipsForJwt(user.sub);
+      const primary = mems[0]!;
+      const jwtCompany = mems.find((m) => m.companyId === existingByOwnerAndName.id) ?? primary;
+      const newToken = signAccessToken({
+        sub: user.sub,
+        email: user.email,
+        role: jwtCompany.jobRole,
+        companyId: jwtCompany.companyId,
+        companyPlan: jwtCompany.plan,
+        workspaceReady: addingAnotherBusiness,
+        memberships: mems,
+      });
+      const res = NextResponse.json({
+        ok: true as const,
+        companyId: existingByOwnerAndName.id,
+        existing: true as const,
+      });
+      setSessionCookie(res, newToken);
+      setActiveCompanyCookie(res, existingByOwnerAndName.id);
+      return res;
     }
-  }
 
-  let companyId: string;
-  try {
+    let companyId: string;
     const row = await prisma.$transaction(async (tx) => {
       const trialStartDate = new Date();
+      // New workspaces: BASIC + 15-day trial window (wall-clock end on `trialEndDate`).
       const co = await tx.company.create({
         data: {
           name,
           industry,
           plan: CompanyPlan.BASIC,
-          ownerId: session.sub,
+          ownerId: user.sub,
           trialStartDate,
           trialEndDate: trialEndDateFromStart(trialStartDate),
           isTrialActive: true,
@@ -194,7 +242,7 @@ export async function POST(request: NextRequest) {
       });
       await tx.userCompany.create({
         data: {
-          userId: session.sub,
+          userId: user.sub,
           companyId: co.id,
           role: companyMembershipClass(UserRole.ADMIN),
           jobRole: UserRole.ADMIN,
@@ -203,55 +251,62 @@ export async function POST(request: NextRequest) {
       return co;
     });
     companyId = row.id;
-  } catch (e) {
-    return handleApiError("POST /api/company/create", e);
-  }
 
-  if (industry === CompanyIndustry.SOLAR) {
-    try {
-      await applyIndustryTemplate(companyId, "SOLAR");
-    } catch (e) {
-      createLogger("company/create").error("applyIndustryTemplate failed", e, { companyId });
+    if (industry === CompanyIndustry.SOLAR) {
+      try {
+        await applyIndustryTemplate(companyId, "SOLAR");
+      } catch (e) {
+        createLogger("company/create").error("applyIndustryTemplate failed", e, { companyId });
+      }
     }
-  }
 
-  const mems = await loadMembershipsForJwt(session.sub);
-  const primary = mems[0]!;
-  const jwtCompany = mems.find((m) => m.companyId === companyId) ?? primary;
-  const workspaceReady = addingAnotherBusiness;
+    const mems = await loadMembershipsForJwt(user.sub);
+    const primary = mems[0]!;
+    const jwtCompany = mems.find((m) => m.companyId === companyId) ?? primary;
+    const workspaceReady = addingAnotherBusiness;
 
-  let newToken: string;
-  try {
-    newToken = signAccessToken({
-      sub: session.sub,
-      email: session.email,
-      role: jwtCompany.jobRole,
-      companyId: jwtCompany.companyId,
-      companyPlan: jwtCompany.plan,
-      workspaceReady,
-      memberships: mems,
+    let newToken: string;
+    try {
+      newToken = signAccessToken({
+        sub: user.sub,
+        email: user.email,
+        role: jwtCompany.jobRole,
+        companyId: jwtCompany.companyId,
+        companyPlan: jwtCompany.plan,
+        workspaceReady,
+        memberships: mems,
+      });
+    } catch {
+      return NextResponse.json(
+        { ok: false as const, error: "Authentication is not configured", code: "SERVER_ERROR" },
+        { status: 500 },
+      );
+    }
+
+    const res = NextResponse.json({
+      ok: true as const,
+      companyId,
+      user: {
+        id: user.sub,
+        email: user.email,
+        role: UserRole.ADMIN,
+        companyId,
+        companyPlan: CompanyPlan.BASIC,
+      },
     });
-  } catch {
+
+    setSessionCookie(res, newToken);
+    setActiveCompanyCookie(res, companyId);
+
+    return res;
+  } catch (error) {
+    const e = error as Error;
     return NextResponse.json(
-      { ok: false as const, error: "Authentication is not configured", code: "SERVER_ERROR" },
+      {
+        success: false as const,
+        message: e?.message || "Onboarding failed",
+      },
       { status: 500 },
     );
   }
-
-  const res = NextResponse.json({
-    ok: true as const,
-    companyId,
-    user: {
-      id: session.sub,
-      email: session.email,
-      role: UserRole.ADMIN,
-      companyId,
-      companyPlan: CompanyPlan.BASIC,
-    },
-  });
-
-  setSessionCookie(res, newToken);
-  setActiveCompanyCookie(res, companyId);
-
-  return res;
 }

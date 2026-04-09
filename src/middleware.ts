@@ -26,7 +26,7 @@ import {
 } from "@/lib/host-routing";
 import { getRoleHome, roleCanAccessPath } from "@/lib/role-routing";
 import {
-  jwtSaysBasicTrialExpired,
+  jwtSaysSubscriptionExpired,
   trialExpiredAllowsApiRequest,
   TRIAL_EXPIRED_API_MESSAGE,
 } from "@/lib/trial-middleware";
@@ -76,6 +76,7 @@ function skipsMiddlewareAuth(pathname: string, method: string): boolean {
   if (pathname.startsWith("/api/customer/")) return true;
   if (pathname === "/api/auth/refresh-session" && method === "POST") return true;
   if (pathname === "/api/payment/webhook" && method === "POST") return true;
+  if (pathname === "/api/payment/razorpay/webhook" && method === "POST") return true;
   return false;
 }
 
@@ -99,6 +100,7 @@ function bgosAllowsPagePath(pathname: string): boolean {
   /** `/` is handled in `app/page.tsx` (logged in → `/bgos`, else → `/login`). */
   if (pathname === "/") return true;
   if (pathname === "/bgos" || pathname.startsWith("/bgos/")) return true;
+  if (pathname === "/sales-booster" || pathname.startsWith("/sales-booster/")) return true;
   if (isPublicRoute(pathname)) return true;
   return false;
 }
@@ -113,6 +115,20 @@ function iceAllowsApiPath(pathname: string): boolean {
     pathname.startsWith("/api/customer") ||
     pathname.startsWith("/api/iceconnect") ||
     pathname.startsWith("/api/tasks/complete")
+  );
+}
+
+function billingFunnelPagePath(pathname: string): boolean {
+  const p = normalizePathname(pathname);
+  return (
+    p === "/bgos/billing" ||
+    p.startsWith("/bgos/billing/") ||
+    p === "/bgos/subscription" ||
+    p.startsWith("/bgos/subscription/") ||
+    p === "/bgos/pricing" ||
+    p.startsWith("/bgos/pricing/") ||
+    p === "/sales-booster" ||
+    p.startsWith("/sales-booster/")
   );
 }
 
@@ -410,14 +426,24 @@ export async function middleware(request: NextRequest) {
   const companyPlan = isPlanLockedToBasic() ? "BASIC" : companyPlanRaw;
 
   const activeCompanyCookie = request.cookies.get(ACTIVE_COMPANY_COOKIE_NAME)?.value;
-  const basicTrialExpiredJwt =
+  const subscriptionExpiredJwt =
     hasCompanyContext &&
     !needsCompany &&
-    jwtSaysBasicTrialExpired(verified.payload, activeCompanyCookie);
+    jwtSaysSubscriptionExpired(verified.payload, activeCompanyCookie);
+
+  if (
+    tenant === "bgos" &&
+    !pathname.startsWith("/api") &&
+    (normalizePathname(pathname) === "/bgos" || pathname.startsWith("/bgos/")) &&
+    subscriptionExpiredJwt &&
+    !billingFunnelPagePath(pathname)
+  ) {
+    return NextResponse.redirect(new URL("/bgos/billing", request.url));
+  }
 
   if (
     pathname.startsWith("/api") &&
-    basicTrialExpiredJwt &&
+    subscriptionExpiredJwt &&
     !trialExpiredAllowsApiRequest(normalizedPath, method)
   ) {
     return NextResponse.json(

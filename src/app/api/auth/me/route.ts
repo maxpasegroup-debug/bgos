@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { CompanyPlan } from "@prisma/client";
 import { jsonSuccess } from "@/lib/api-response";
 import { resolveTenantFromJwt } from "@/lib/auth-active-company";
 import { ACTIVE_COMPANY_COOKIE_NAME, AUTH_COOKIE_NAME } from "@/lib/auth-config";
@@ -7,8 +8,22 @@ import { getMeSessionFromToken } from "@/lib/auth";
 import { verifyAccessTokenResult } from "@/lib/jwt";
 import { isPlanLockedToBasic } from "@/lib/plan-production-lock";
 import { prisma } from "@/lib/prisma";
+import { syncCompanySubscriptionStatus, trialDaysRemaining } from "@/lib/subscription-status";
 import { isCompanyBasicTrialExpired } from "@/lib/trial";
-import { jwtSaysBasicTrialExpired } from "@/lib/trial-middleware";
+import { jwtSaysSubscriptionExpired } from "@/lib/trial-middleware";
+
+function planLabel(plan: CompanyPlan): string {
+  switch (plan) {
+    case CompanyPlan.BASIC:
+      return "Basic";
+    case CompanyPlan.PRO:
+      return "Pro";
+    case CompanyPlan.ENTERPRISE:
+      return "Enterprise";
+    default:
+      return plan;
+  }
+}
 
 /**
  * Current session (cookie JWT). No cookie → `authenticated: false` (200).
@@ -48,25 +63,52 @@ export async function GET() {
     case "valid": {
       let basicTrialExpired = false;
       let companyName: string | null = null;
+      let billing:
+        | {
+            plan: CompanyPlan;
+            planLabel: string;
+            subscriptionStatus: string;
+            trialDaysRemaining: number | null;
+            renewalDateIso: string | null;
+          }
+        | undefined;
+
       if (token) {
         const vr = verifyAccessTokenResult(token);
         if (vr.ok) {
           const payload = vr.payload as Record<string, unknown>;
           const tenant = resolveTenantFromJwt(payload, activeCompanyIdCookie ?? undefined);
-          if (!tenant.needsCompany && tenant.companyId && tenant.companyPlan === "BASIC") {
-            const jwtExp = jwtSaysBasicTrialExpired(
+          if (!tenant.needsCompany && tenant.companyId) {
+            const jwtExp = jwtSaysSubscriptionExpired(
               payload,
               activeCompanyIdCookie ?? undefined,
             );
             const dbExp = await isCompanyBasicTrialExpired(tenant.companyId);
             basicTrialExpired = jwtExp || dbExp;
-          }
-          if (tenant.companyId) {
-            const c = await prisma.company.findUnique({
+            await syncCompanySubscriptionStatus(tenant.companyId);
+            const co = await prisma.company.findUnique({
               where: { id: tenant.companyId },
-              select: { name: true },
+              select: {
+                name: true,
+                plan: true,
+                subscriptionStatus: true,
+                trialEndDate: true,
+                subscriptionPeriodEnd: true,
+              },
             });
-            companyName = c?.name ?? null;
+            companyName = co?.name ?? null;
+            if (co) {
+              billing = {
+                plan: co.plan,
+                planLabel: planLabel(co.plan),
+                subscriptionStatus: co.subscriptionStatus,
+                trialDaysRemaining: trialDaysRemaining(co.trialEndDate),
+                renewalDateIso:
+                  co.subscriptionPeriodEnd?.toISOString() ??
+                  co.trialEndDate?.toISOString() ??
+                  null,
+              };
+            }
           }
         }
       }
@@ -79,6 +121,7 @@ export async function GET() {
         authenticated: true as const,
         planLockedToBasic: isPlanLockedToBasic(),
         basicTrialExpired,
+        ...(billing ? { billing } : {}),
         user: {
           id: session.user.sub,
           name: u?.name ?? "",

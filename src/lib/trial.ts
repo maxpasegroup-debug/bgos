@@ -1,8 +1,9 @@
 import "server-only";
 
-import { CompanyPlan } from "@prisma/client";
+import { CompanySubscriptionStatus, CompanyPlan } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncCompanySubscriptionStatus } from "@/lib/subscription-status";
 
 import { TRIAL_EXPIRED_API_MESSAGE } from "@/lib/trial-middleware";
 
@@ -21,14 +22,17 @@ export function trialEndDateFromStart(trialStartDate: Date): Date {
 export type CompanyTrialFields = {
   plan: CompanyPlan;
   trialEndDate: Date | null;
+  subscriptionPeriodEnd?: Date | null;
 };
 
 /**
- * BASIC companies with a trial end set are blocked after `trialEndDate` (inclusive of the instant).
- * `trialEndDate == null` → legacy company (no trial enforcement).
+ * BASIC companies with a trial end set are blocked after `trialEndDate` unless a paid period is active.
  */
 export function isBasicTrialExpired(company: CompanyTrialFields): boolean {
   if (company.plan !== CompanyPlan.BASIC) return false;
+  if (company.subscriptionPeriodEnd && Date.now() < company.subscriptionPeriodEnd.getTime()) {
+    return false;
+  }
   if (!company.trialEndDate) return false;
   return Date.now() >= company.trialEndDate.getTime();
 }
@@ -44,11 +48,10 @@ export function trialExpiredJsonResponse(): NextResponse {
   );
 }
 
+/**
+ * True when the workspace should be read-only / blocked for mutations (Basic trial ended, Pro period ended, etc.).
+ */
 export async function isCompanyBasicTrialExpired(companyId: string): Promise<boolean> {
-  const c = await prisma.company.findUnique({
-    where: { id: companyId },
-    select: { plan: true, trialEndDate: true },
-  });
-  if (!c) return false;
-  return isBasicTrialExpired(c);
+  const status = await syncCompanySubscriptionStatus(companyId);
+  return status === CompanySubscriptionStatus.EXPIRED;
 }

@@ -100,6 +100,10 @@ model Company {
    * (APIs may expose it as `trialEndsAt`).
    */
   subscriptionStatus CompanySubscriptionStatus @default(TRIAL)
+  /** Wall-clock start of the current paid Razorpay/Stripe period (optional). */
+  subscriptionPeriodStart DateTime?
+  /** Paid access valid strictly before this instant (Razorpay monthly renewals extend this). */
+  subscriptionPeriodEnd   DateTime?
 
   logoUrl         String?
   primaryColor    String?
@@ -145,6 +149,7 @@ model Company {
   lcoLoans       LcoLoan[]
   customerUsers  CustomerPortalUser[]
   complaints     CustomerComplaint[]
+  razorpayPayments RazorpayPayment[]
 
   @@index([name])
   @@index([ownerId])
@@ -245,6 +250,26 @@ model BillingWebhookEvent {
   @@index([receivedAt])
 }
 
+/// Razorpay Checkout payments (verify path + idempotency).
+model RazorpayPayment {
+  id                String      @id @default(cuid())
+  companyId         String
+  userId            String
+  razorpayOrderId   String      @unique
+  razorpayPaymentId String?     @unique
+  plan              CompanyPlan
+  amount            Int
+  currency          String      @default("INR")
+  status            String
+  createdAt         DateTime    @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([userId])
+}
+
 /// Membership: `role` is company-level (ADMIN vs EMPLOYEE); `jobRole` is operational RBAC (solar CRM role enum).
 model UserCompany {
   id        String   @id @default(cuid())
@@ -288,6 +313,7 @@ model User {
   createdChannelPartners ChannelPartner[] @relation("PartnerCreator")
   assignedSiteVisits     SiteVisit[] @relation("SiteVisitAssignee")
   documentsUploaded      Document[]
+  razorpayPayments       RazorpayPayment[]
 
   @@index([email])
 }

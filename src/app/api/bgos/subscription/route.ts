@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
       name: true,
       plan: true,
       trialEndDate: true,
+      subscriptionPeriodEnd: true,
       subscriptionStatus: true,
     },
   });
@@ -50,7 +51,9 @@ export async function GET(request: NextRequest) {
   const daysLeft = trialDaysRemaining(company.trialEndDate);
 
   let renewalDate: string | null = null;
-  if (company.plan === CompanyPlan.BASIC && company.trialEndDate) {
+  if (company.subscriptionPeriodEnd) {
+    renewalDate = company.subscriptionPeriodEnd.toISOString();
+  } else if (company.plan === CompanyPlan.BASIC && company.trialEndDate) {
     renewalDate = trialEndsAt;
   }
 

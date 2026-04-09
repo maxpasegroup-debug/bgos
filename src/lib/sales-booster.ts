@@ -33,6 +33,7 @@ export type SalesBoosterProPayload = {
     reason: string;
     value: number | null;
     currentStatusLabel: string;
+    assigneeName: string;
   }>;
   statusSuggestions: Array<{
     leadId: string;
@@ -54,6 +55,11 @@ export type SalesBoosterProPayload = {
   followUpScheduleEnabled: boolean;
   /** Pending tasks created by Sales Booster follow-up schedule (visible on dashboard). */
   scheduledBoosterTaskCount: number;
+  /** Enterprise or Pro + Sales Booster add-on. */
+  advancedAddon: boolean;
+  aiAutoReplies: boolean;
+  campaignAutomation: boolean;
+  leadScoring: boolean;
 };
 
 export type SalesBoosterPayload = SalesBoosterBasicPayload | SalesBoosterProPayload;
@@ -159,6 +165,7 @@ export async function buildSalesBoosterPayload(companyId: string): Promise<Sales
           where: { status: TaskStatus.PENDING },
           orderBy: { dueDate: "asc" },
         },
+        assignee: { select: { name: true } },
       },
     }),
   ]);
@@ -187,6 +194,7 @@ export async function buildSalesBoosterPayload(companyId: string): Promise<Sales
     reason: s.reason,
     value: s.lead.value,
     currentStatusLabel: leadStatusLabel(s.lead.status),
+    assigneeName: s.lead.assignee?.name?.trim() ? s.lead.assignee.name.trim() : "Unassigned",
   }));
 
   const autoFollowUps: SalesBoosterProPayload["autoFollowUps"] = [];
@@ -282,6 +290,9 @@ export async function buildSalesBoosterPayload(companyId: string): Promise<Sales
     },
   );
 
+  const advancedAddon =
+    company.plan === CompanyPlan.ENTERPRISE || sbCfg.addonEnabled;
+
   return {
     plan: company.plan === CompanyPlan.ENTERPRISE ? ("ENTERPRISE" as const) : ("PRO" as const),
     featuresUnlocked: true,
@@ -293,5 +304,9 @@ export async function buildSalesBoosterPayload(companyId: string): Promise<Sales
     onLeadCreated: sbCfg.onLeadCreated,
     followUpScheduleEnabled: sbCfg.followUpScheduleEnabled,
     scheduledBoosterTaskCount,
+    advancedAddon,
+    aiAutoReplies: sbCfg.aiAutoReplies,
+    campaignAutomation: sbCfg.campaignAutomation,
+    leadScoring: sbCfg.leadScoring,
   };
 }

@@ -4,6 +4,11 @@ import { createReadStream, existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { requireAuthWithCompany } from "@/lib/auth";
+import {
+  employeeCanViewDocument,
+  getLeadIdsAssignedToUser,
+  resolveDocumentVaultScope,
+} from "@/lib/document-access-control";
 import { absoluteDocumentPath, mimeForDocumentFileName } from "@/lib/document-storage";
 import { prisma } from "@/lib/prisma";
 
@@ -23,9 +28,27 @@ export async function GET(
 
   const doc = await prisma.document.findFirst({
     where: { id: id.trim(), companyId: session.companyId },
+    select: {
+      id: true,
+      companyId: true,
+      leadId: true,
+      customerId: true,
+      fileUrl: true,
+      fileName: true,
+      uploadedByUserId: true,
+    },
   });
   if (!doc) {
     return NextResponse.json({ ok: false as const, error: "Not found" }, { status: 404 });
+  }
+
+  const vaultScope = await resolveDocumentVaultScope(session);
+  if (vaultScope === "mine") {
+    const assignedIds = await getLeadIdsAssignedToUser(session.companyId, session.sub);
+    const assignedSet = new Set(assignedIds);
+    if (!employeeCanViewDocument(doc, session.sub, assignedSet)) {
+      return NextResponse.json({ ok: false as const, error: "Not found" }, { status: 404 });
+    }
   }
 
   let abs: string;
