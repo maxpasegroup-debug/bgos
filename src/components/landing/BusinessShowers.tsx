@@ -5,36 +5,21 @@ import { SectionReveal } from "./SectionReveal";
 import { Container } from "./Container";
 import { staggerContainer, staggerItem } from "./motionPresets";
 import { blockGap, sectionDivider, sectionY } from "./spacing";
-import { useMemo } from "react";
+import type { ComponentType } from "react";
 
-type SymbolDrop = { label: string; delay: number; left: number; pill?: boolean };
-
-const symbols: SymbolDrop[] = [
-  { label: "₹", delay: 0, left: 18 },
-  { label: "📈", delay: 1.4, left: 42 },
-  { label: "leads", delay: 2.6, left: 62, pill: true },
-  { label: "📊", delay: 0.7, left: 82 },
-  { label: "₹", delay: 3.2, left: 32 },
-];
+const problems = [
+  "Leads come in... but no proper follow-up",
+  "Team does not know who is handling what",
+  "Deals get delayed or lost",
+  "No clear view of revenue",
+] as const;
 
 export function BusinessShowers() {
-  const particles = useMemo(
-    () =>
-      Array.from({ length: 14 }, (_, i) => ({
-        id: i,
-        left: `${8 + (i * 17) % 84}%`,
-        delay: (i % 8) * 0.4,
-        duration: 16 + (i % 5) * 2,
-        size: i % 5 === 0 ? 2.5 : 1.5,
-      })),
-    []
-  );
-
   return (
-    <SectionReveal className={`relative overflow-hidden ${sectionDivider} ${sectionY}`}>
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-white/40 to-transparent" />
+    <SectionReveal id="problem" className={`relative overflow-hidden ${sectionDivider} ${sectionY}`}>
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_55%_at_50%_0%,rgba(99,102,241,0.12),transparent_62%)]" />
 
-      <Container className="relative text-center">
+      <Container className="relative">
         <motion.div
           initial="hidden"
           whileInView="show"
@@ -43,73 +28,56 @@ export function BusinessShowers() {
         >
           <motion.h2
             variants={staggerItem}
-            className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl"
+            className="text-center text-3xl font-bold tracking-tight text-white sm:text-4xl"
           >
-            Hosting Business Showers
+            Where Most Businesses Lose Money
           </motion.h2>
-          <motion.p
-            variants={staggerItem}
-            className="mx-auto mt-5 max-w-xl text-base font-normal leading-relaxed text-slate-600 sm:mt-6 sm:text-lg"
-          >
-            Leads, revenue, automation — flowing continuously
-          </motion.p>
         </motion.div>
 
-        <div
-          className={`relative mx-auto max-w-3xl overflow-hidden rounded-2xl border border-gray-200 bg-white/70 shadow-lg backdrop-blur-md ${blockGap} h-[280px] sm:h-[320px]`}
-        >
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_0%,rgba(239,68,68,0.06),transparent_58%)]" />
-
-          {particles.map((p) => (
-            <motion.span
-              key={p.id}
-              className="absolute top-0 rounded-full bg-gradient-to-b from-amber-300/50 to-red-400/35"
-              style={{
-                left: p.left,
-                width: p.size,
-                height: p.size,
-                translateX: "-50%",
-              }}
-              initial={{ y: -16, opacity: 0 }}
-              animate={{ y: [0, 320], opacity: [0, 0.5, 0.45, 0.1] }}
-              transition={{
-                duration: p.duration,
-                repeat: Infinity,
-                ease: "linear",
-                delay: p.delay,
-                times: [0, 0.06, 0.88, 1],
-              }}
-            />
-          ))}
-
-          {symbols.map((s) => (
-            <motion.div
-              key={`${s.label}-${s.left}-${s.delay}`}
-              className={`absolute top-0 flex -translate-x-1/2 items-center justify-center font-semibold tracking-wide text-slate-800 ${
-                s.pill
-                  ? "rounded-full border border-gray-200 bg-white/90 px-3 py-1 text-[10px] uppercase shadow-sm backdrop-blur-sm"
-                  : "text-base sm:text-lg"
-              }`}
-              style={{ left: `${s.left}%` }}
-              initial={{ y: -24, opacity: 0 }}
-              animate={{
-                y: [0, 300],
-                opacity: [0, 0.9, 0.85, 0.15],
-                rotate: [0, s.pill === true ? 0 : 3],
-              }}
-              transition={{
-                duration: 18,
-                repeat: Infinity,
-                ease: "linear",
-                delay: s.delay,
-                times: [0, 0.05, 0.9, 1],
-              }}
-            >
-              {s.label}
-            </motion.div>
+        <div className={`grid gap-5 sm:grid-cols-2 ${blockGap}`}>
+          {problems.map((line, i) => (
+            <ProblemCard key={line} index={i} text={line} />
           ))}
         </div>
+        <p className="mt-8 text-center text-lg font-semibold text-indigo-200">BGOS fixes this completely.</p>
       </Container>
     </SectionReveal>
   );
+}
+
+function ProblemCard({
+  text,
+  index,
+}: {
+  text: string;
+  index: number;
+}) {
+  const icons: ComponentType<{ className?: string }>[] = [LeadIssueIcon, TeamIssueIcon, DelayIssueIcon, RevenueIssueIcon];
+  const Icon = icons[index] ?? LeadIssueIcon;
+
+  return (
+    <motion.article
+      whileHover={{ y: -4 }}
+      transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+      className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 shadow-[0_12px_30px_-18px_rgba(99,102,241,0.35)]"
+    >
+      <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-indigo-400/30 bg-indigo-500/15 text-indigo-200">
+        <Icon className="h-5 w-5" />
+      </div>
+      <p className="text-sm leading-relaxed text-white/80 sm:text-base">{text}</p>
+    </motion.article>
+  );
+}
+
+function LeadIssueIcon({ className }: { className?: string }) {
+  return <svg className={className} fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" d="M10 6a4 4 0 100 8 4 4 0 000-8zm6.5 6.5L21 17" /></svg>;
+}
+function TeamIssueIcon({ className }: { className?: string }) {
+  return <svg className={className} fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" d="M16 18v-1a4 4 0 00-8 0v1m12 0v-1a3 3 0 00-3-3m-8-3a3 3 0 110-6 3 3 0 010 6zm8 1a3 3 0 100-6" /></svg>;
+}
+function DelayIssueIcon({ className }: { className?: string }) {
+  return <svg className={className} fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 2m6-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+}
+function RevenueIssueIcon({ className }: { className?: string }) {
+  return <svg className={className} fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.7 0-3 1-3 2s1.3 2 3 2 3 1 3 2-1.3 2-3 2m0-8V7m0 9v1m9-5a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
 }

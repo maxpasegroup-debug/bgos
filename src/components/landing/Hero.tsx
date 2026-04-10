@@ -6,7 +6,7 @@ import { Container } from "./Container";
 import { heroY } from "./spacing";
 
 const outlineCta =
-  "inline-flex min-h-[46px] w-full items-center justify-center rounded-xl border border-gray-300 bg-white/80 px-8 py-3.5 text-center text-sm font-semibold tracking-wide text-slate-700 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-gray-400 hover:bg-white hover:shadow-md sm:w-auto";
+  "inline-flex min-h-[46px] w-full items-center justify-center rounded-xl border border-white/20 bg-white/[0.04] px-8 py-3.5 text-center text-sm font-semibold tracking-wide text-white/90 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-white/30 hover:bg-white/[0.08] hover:shadow-md sm:w-auto";
 
 function HeroDashboard() {
   const reduceMotion = useReducedMotion();
@@ -18,20 +18,20 @@ function HeroDashboard() {
           ? undefined
           : { duration: 7, repeat: Infinity, ease: "easeInOut" }
       }
-      className="relative mx-auto w-full max-w-md lg:mx-0 lg:max-w-[480px]"
+      className="relative mx-auto w-full max-w-md lg:mx-0 lg:max-w-[500px]"
     >
       <div
-        className="absolute -inset-8 rounded-3xl bg-gradient-to-br from-red-500/[0.08] via-transparent to-amber-400/[0.1] blur-3xl"
+        className="absolute -inset-8 rounded-3xl bg-gradient-to-br from-indigo-500/[0.22] via-violet-500/[0.12] to-cyan-400/[0.15] blur-3xl"
         aria-hidden
       />
-      <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white/60 p-6 shadow-xl backdrop-blur-xl sm:p-7">
-        <div className="mb-6 flex items-center justify-between border-b border-gray-200/80 pb-5">
+      <div className="relative overflow-hidden rounded-2xl border border-white/15 bg-[#121821]/85 p-6 shadow-xl backdrop-blur-xl sm:p-7">
+        <div className="mb-6 flex items-center justify-between border-b border-white/10 pb-5">
           <div className="flex gap-2">
             <span className="h-2 w-2 rounded-full bg-red-500" />
             <span className="h-2 w-2 rounded-full bg-amber-400" />
-            <span className="h-2 w-2 rounded-full bg-slate-300" />
+            <span className="h-2 w-2 rounded-full bg-white/40" />
           </div>
-          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">
             NEXA
           </span>
         </div>
@@ -44,12 +44,12 @@ function HeroDashboard() {
           ].map((s) => (
             <div
               key={s.k}
-              className="rounded-xl border border-gray-200/90 bg-white/70 px-2 py-3 text-center shadow-sm sm:px-3"
+              className="rounded-xl border border-white/10 bg-white/[0.04] px-2 py-3 text-center shadow-sm sm:px-3"
             >
-              <p className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">
+              <p className="text-[9px] font-semibold uppercase tracking-wider text-white/45">
                 {s.k}
               </p>
-              <p className="mt-1.5 text-sm font-bold text-slate-900 sm:text-base">
+              <p className="mt-1.5 text-sm font-bold text-white sm:text-base">
                 {s.v}
               </p>
               <p className="text-[10px] font-medium text-emerald-600">{s.d}</p>
@@ -57,8 +57,8 @@ function HeroDashboard() {
           ))}
         </div>
 
-        <div className="mb-5 rounded-xl border border-gray-200/90 bg-white/50 p-4 shadow-sm">
-          <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+        <div className="mb-5 rounded-xl border border-white/10 bg-white/[0.03] p-4 shadow-sm">
+          <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-white/45">
             Pipeline velocity
           </p>
           <svg
@@ -68,12 +68,12 @@ function HeroDashboard() {
           >
             <defs>
               <linearGradient id="heroLineLight" x1="0" x2="1" y1="0" y2="0">
-                <stop stopColor="#ef4444" />
-                <stop offset="1" stopColor="#facc15" />
+                <stop stopColor="#6366f1" />
+                <stop offset="1" stopColor="#8b5cf6" />
               </linearGradient>
               <linearGradient id="heroAreaLight" x1="0" x2="0" y1="0" y2="1">
-                <stop stopColor="#ef4444" stopOpacity="0.18" />
-                <stop offset="1" stopColor="#ef4444" stopOpacity="0" />
+                <stop stopColor="#6366f1" stopOpacity="0.22" />
+                <stop offset="1" stopColor="#6366f1" stopOpacity="0" />
               </linearGradient>
             </defs>
             <path
@@ -103,13 +103,13 @@ function HeroDashboard() {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5, duration: 0.6 }}
-          className="rounded-xl border border-gray-200 bg-white/90 px-4 py-3 shadow-md"
+          className="rounded-xl border border-white/10 bg-white/[0.05] px-4 py-3 shadow-md"
         >
           <div className="flex items-start gap-3">
             <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-gradient-to-r from-red-500 to-amber-400" />
             <div className="text-left">
-              <p className="text-xs font-semibold text-slate-900">New lead</p>
-              <p className="mt-0.5 text-[11px] font-medium leading-relaxed text-slate-600">
+              <p className="text-xs font-semibold text-white">New lead</p>
+              <p className="mt-0.5 text-[11px] font-medium leading-relaxed text-white/65">
                 Meridian Labs — qualified and routed to pipeline
               </p>
             </div>
@@ -135,21 +135,15 @@ export function Hero() {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.08 }}
-              className="text-xs font-semibold tracking-wide text-slate-500 sm:text-sm sm:text-slate-600"
+            className="text-xs font-semibold tracking-wide text-white/55 sm:text-sm"
             >
               BGOS – Business Growth Operating System
             </motion.p>
-            <h1 className="mt-4 text-4xl font-bold leading-[1.12] tracking-tight sm:text-5xl">
-              <span className="block bg-gradient-to-r from-red-500 to-yellow-400 bg-clip-text text-transparent">
-                Run Your Business.
-              </span>
-              <span className="mt-1 block bg-gradient-to-r from-red-500 to-yellow-400 bg-clip-text text-transparent">
-                Not Your Problems.
-              </span>
+            <h1 className="mt-4 text-4xl font-bold leading-[1.12] tracking-tight text-white sm:text-5xl">
+              Turn More Enquiries Into Confirmed Jobs - Without Chasing Every Lead
             </h1>
-            <p className="mx-auto mt-6 max-w-lg text-base font-normal leading-relaxed text-slate-600 sm:text-lg lg:mx-0">
-              BGOS automates, manages, and grows your business — while you
-              focus on what truly matters.
+            <p className="mx-auto mt-6 max-w-lg text-base font-normal leading-relaxed text-white/70 sm:text-lg lg:mx-0">
+              BGOS brings your leads, follow-ups, team, and revenue into one simple system - so nothing gets missed.
             </p>
             <div className="mt-9 flex w-full max-w-md flex-col gap-3 sm:max-w-none sm:flex-row sm:items-center lg:mx-0">
               <motion.div
@@ -159,7 +153,7 @@ export function Hero() {
               >
                 <Link
                   href="/signup"
-                  className="relative inline-flex min-h-[46px] w-full items-center justify-center overflow-hidden rounded-xl bg-gradient-to-r from-red-500 to-yellow-400 px-8 py-3.5 text-sm font-bold tracking-wide text-neutral-950 shadow-lg shadow-red-500/25 transition-shadow duration-300 hover:shadow-xl hover:shadow-amber-400/30 sm:w-auto"
+                  className="relative inline-flex min-h-[46px] w-full items-center justify-center overflow-hidden rounded-xl bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] px-8 py-3.5 text-sm font-bold tracking-wide text-white shadow-lg shadow-indigo-500/25 transition-shadow duration-300 hover:shadow-xl hover:shadow-violet-500/30 sm:w-auto"
                 >
                   <span
                     className="pointer-events-none absolute inset-0 overflow-hidden"
@@ -167,15 +161,16 @@ export function Hero() {
                   >
                     <span className="animate-btn-shine absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/35 to-transparent" />
                   </span>
-                  <span className="relative z-10">Start Free</span>
+                  <span className="relative z-10">Start Free Trial</span>
                 </Link>
               </motion.div>
               <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.99 }}>
-                <Link href="#what-is-bgos" className={outlineCta}>
+                <Link href="#solution" className={outlineCta}>
                   See How It Works
                 </Link>
               </motion.div>
             </div>
+            <p className="mt-4 text-sm font-medium text-white/50">Built for real business owners</p>
           </motion.div>
 
           <motion.div

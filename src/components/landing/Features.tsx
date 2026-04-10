@@ -9,34 +9,29 @@ import { useId, type ComponentType } from "react";
 
 const features = [
   {
-    title: "Lead Capture",
-    desc: "Turn interest into pipeline automatically.",
+    title: "Track every enquiry",
+    desc: "Keep every lead in one clear list.",
     icon: LeadIcon,
   },
   {
-    title: "AI Follow-ups",
-    desc: "NEXA keeps conversations warm, 24/7.",
+    title: "Respond faster",
+    desc: "Automated reminders help your team reply quickly.",
     icon: AiIcon,
   },
   {
-    title: "CRM Pipeline",
-    desc: "One calm view of every deal stage.",
+    title: "See your deals clearly",
+    desc: "Know what is pending, moving, or won.",
     icon: PipelineIcon,
   },
   {
-    title: "Campaign Automation",
-    desc: "Launch, learn, and optimize in sync.",
+    title: "Save time daily",
+    desc: "Simple automation handles repeated work.",
     icon: CampaignIcon,
   },
   {
-    title: "Smart Reports",
-    desc: "Signal over noise — always.",
+    title: "Keep your team aligned",
+    desc: "Everyone knows who owns each lead.",
     icon: ReportIcon,
-  },
-  {
-    title: "Automation Engine",
-    desc: "Compose workflows that scale with you.",
-    icon: EngineIcon,
   },
 ] as const;
 
@@ -192,29 +187,6 @@ function ReportIcon({ className }: { className?: string }) {
   );
 }
 
-function EngineIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 32 32" fill="none" aria-hidden>
-      <motion.g
-        animate={{ rotate: [0, 360] }}
-        transition={{ duration: 36, repeat: Infinity, ease: "linear" }}
-        style={{ transformOrigin: "16px 16px" }}
-      >
-        <circle
-          cx="16"
-          cy="16"
-          r="9"
-          className="stroke-red-500/50"
-          strokeWidth="1.5"
-          strokeDasharray="3 5"
-          fill="none"
-        />
-      </motion.g>
-      <circle cx="16" cy="16" r="3" className="fill-amber-400" />
-    </svg>
-  );
-}
-
 function FeatureCard({
   title,
   desc,
@@ -231,13 +203,13 @@ function FeatureCard({
         y: -6,
         transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] },
       }}
-      className="group rounded-xl border border-gray-200 bg-white p-8 shadow-sm transition-shadow duration-300 hover:border-gray-300 hover:shadow-lg hover:shadow-red-500/[0.06]"
+      className="group rounded-xl border border-white/10 bg-white/[0.03] p-8 shadow-sm transition-shadow duration-300 hover:border-indigo-300/40 hover:shadow-lg hover:shadow-indigo-500/[0.2]"
     >
-      <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-gray-200 bg-slate-50 shadow-sm transition-shadow duration-300 group-hover:shadow-md">
+      <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] shadow-sm transition-shadow duration-300 group-hover:shadow-md">
         <Icon className="h-6 w-6" />
       </div>
-      <h3 className="text-lg font-bold tracking-tight text-slate-900">{title}</h3>
-      <p className="mt-3 text-sm font-normal leading-relaxed tracking-wide text-slate-600">
+      <h3 className="text-lg font-bold tracking-tight text-white">{title}</h3>
+      <p className="mt-3 text-sm font-normal leading-relaxed tracking-wide text-white/65">
         {desc}
       </p>
     </motion.article>
@@ -246,7 +218,7 @@ function FeatureCard({
 
 export function Features() {
   return (
-    <SectionReveal className={`${sectionDivider} ${sectionY}`}>
+    <SectionReveal id="features" className={`${sectionDivider} ${sectionY}`}>
       <Container>
         <motion.div
           initial="hidden"
@@ -256,9 +228,9 @@ export function Features() {
         >
           <motion.h2
             variants={staggerItem}
-            className="text-center text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl"
+            className="text-center text-3xl font-bold tracking-tight text-white sm:text-4xl"
           >
-            Features
+            What You Get
           </motion.h2>
 
           <div className={`grid gap-6 sm:grid-cols-2 lg:grid-cols-3 ${blockGap}`}>
