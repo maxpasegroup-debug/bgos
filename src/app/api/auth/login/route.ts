@@ -80,37 +80,37 @@ function internalPostLoginLocation(
 }
 
 export async function POST(request: Request) {
-  const ip = getClientIpForRateLimit(request);
-  const limited = checkLoginRateLimit(ip);
-  if (!limited.ok) {
-    return NextResponse.json(
-      {
-        ok: false as const,
-        error: "Too many login attempts. Please wait and try again.",
-        code: "RATE_LIMITED" as const,
-      },
-      {
-        status: 429,
-        headers: { "Retry-After": String(limited.retryAfterSec) },
-      },
-    );
-  }
-
-  const raw = await parseJsonBody(request);
-  if (!raw.ok) return raw.response;
-
-  const parsed = bodySchema.safeParse(raw.data);
-  if (!parsed.success) {
-    return zodValidationErrorResponse(parsed.error);
-  }
-
-  const { password, respondWithJson, from: fromRaw } = parsed.data;
-  const from = fromRaw?.trim() || undefined;
-  const email = parsed.data.email?.trim();
-  const mobileRaw = parsed.data.mobile?.trim();
-
-  let user;
   try {
+    const ip = getClientIpForRateLimit(request);
+    const limited = checkLoginRateLimit(ip);
+    if (!limited.ok) {
+      return NextResponse.json(
+        {
+          success: false as const,
+          ok: false as const,
+          error: "Too many login attempts. Please wait and try again.",
+          code: "RATE_LIMITED" as const,
+        },
+        {
+          status: 429,
+          headers: { "Retry-After": String(limited.retryAfterSec) },
+        },
+      );
+    }
+
+    const raw = await parseJsonBody(request);
+    if (!raw.ok) return raw.response;
+
+    const parsed = bodySchema.safeParse(raw.data);
+    if (!parsed.success) {
+      return zodValidationErrorResponse(parsed.error);
+    }
+
+    const { password } = parsed.data;
+    const email = parsed.data.email?.trim();
+    const mobileRaw = parsed.data.mobile?.trim();
+
+    let user;
     if (email) {
       user = await prisma.user.findFirst({
         where: { email: { equals: email, mode: "insensitive" } },
@@ -130,6 +130,7 @@ export async function POST(request: Request) {
       if (variants.length === 0) {
         return NextResponse.json(
           {
+            success: false as const,
             ok: false as const,
             error: "Enter a valid mobile number",
             code: "VALIDATION_ERROR",
@@ -155,72 +156,74 @@ export async function POST(request: Request) {
         },
       });
     }
-  } catch (e) {
-    return handleApiError("POST /api/auth/login", e);
-  }
 
-  const authError = NextResponse.json(
-    {
-      ok: false as const,
-      error: email
-        ? "Invalid email or password"
-        : "Invalid mobile number or password",
-      code: AUTH_ERROR_CODES.INVALID_CREDENTIALS,
-    },
-    { status: 401 },
-  );
+    const authError = NextResponse.json(
+      {
+        success: false as const,
+        ok: false as const,
+        error: email
+          ? "Invalid email or password"
+          : "Invalid mobile number or password",
+        code: AUTH_ERROR_CODES.INVALID_CREDENTIALS,
+      },
+      { status: 401 },
+    );
 
-  if (!user || !user.isActive) {
-    return authError;
-  }
-
-  const valid = await verifyPassword(password, user.password);
-  if (!valid) {
-    return authError;
-  }
-
-  const membership = user.memberships[0];
-  let companyPlan: CompanyPlan;
-  let companyId: string | null;
-  let sessionRole: UserRole;
-  let needsOnboarding: boolean;
-
-  if (!membership) {
-    if (!email) {
-      return NextResponse.json(
-        {
-          ok: false as const,
-          error: "No company access for this account",
-          code: "NO_MEMBERSHIP",
-        },
-        { status: 403 },
-      );
+    if (!user || !user.isActive) {
+      return authError;
     }
-    companyPlan = CompanyPlan.BASIC;
-    companyId = null;
-    sessionRole = UserRole.ADMIN;
-    needsOnboarding = true;
-  } else {
-    companyPlan = membership.company?.plan ?? CompanyPlan.BASIC;
-    companyId = membership.companyId;
-    sessionRole = membership.jobRole;
-    needsOnboarding = false;
-  }
 
-  const mems = !membership
-    ? []
-    : user.memberships.map((m) => ({
-        companyId: m.companyId,
-        plan: m.company.plan,
-        jobRole: m.jobRole,
-        trialEndsAt: m.company.trialEndDate?.toISOString() ?? null,
-        subscriptionPeriodEnd: m.company.subscriptionPeriodEnd?.toISOString() ?? null,
-      }));
-  const primary = mems[0];
+    console.info("[auth/login] Before password check", {
+      userId: user.id,
+      hasMembership: user.memberships.length > 0,
+    });
+    const valid = await verifyPassword(password, user.password);
+    if (!valid) {
+      return authError;
+    }
 
-  let token: string;
-  try {
-    token = signAccessToken({
+    const membership = user.memberships[0];
+    let companyPlan: CompanyPlan;
+    let companyId: string | null;
+    let sessionRole: UserRole;
+    let needsOnboarding: boolean;
+
+    if (!membership) {
+      if (!email) {
+        return NextResponse.json(
+          {
+            success: false as const,
+            ok: false as const,
+            error: "No company access for this account",
+            code: "NO_MEMBERSHIP",
+          },
+          { status: 403 },
+        );
+      }
+      companyPlan = CompanyPlan.BASIC;
+      companyId = null;
+      sessionRole = UserRole.ADMIN;
+      needsOnboarding = true;
+    } else {
+      companyPlan = membership.company?.plan ?? CompanyPlan.BASIC;
+      companyId = membership.companyId;
+      sessionRole = membership.jobRole;
+      needsOnboarding = false;
+    }
+
+    const mems = !membership
+      ? []
+      : user.memberships.map((m) => ({
+          companyId: m.companyId,
+          plan: m.company.plan,
+          jobRole: m.jobRole,
+          trialEndsAt: m.company.trialEndDate?.toISOString() ?? null,
+          subscriptionPeriodEnd: m.company.subscriptionPeriodEnd?.toISOString() ?? null,
+        }));
+    const primary = mems[0];
+
+    // JWT creation
+    const token = signAccessToken({
       sub: user.id,
       email: user.email,
       role: primary?.jobRole ?? sessionRole,
@@ -231,57 +234,74 @@ export async function POST(request: Request) {
         : Boolean(user.workspaceActivatedAt),
       ...(mems.length ? { memberships: mems } : {}),
     });
-  } catch {
-    return NextResponse.json(
-      { ok: false as const, error: "Authentication is not configured", code: "SERVER_ERROR" },
-      { status: 500 },
+
+    const userPayload = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: sessionRole,
+      companyId,
+      companyPlan,
+      ...(needsOnboarding
+        ? { needsOnboarding: true as const }
+        : {
+            workspaceReady: Boolean(user.workspaceActivatedAt),
+            ...(user.workspaceActivatedAt
+              ? {}
+              : { needsWorkspaceActivation: true as const }),
+          }),
+    };
+
+    console.info("[auth/login] After success", {
+      userId: user.id,
+      companyId,
+      role: sessionRole,
+      plan: companyPlan,
+    });
+
+    const hostHeader = request.headers.get("host");
+    const needsCrossDomainHandoff = crossDomainLoginRequired(hostHeader, sessionRole);
+    const nextPath = internalPostLoginLocation(
+      sessionRole,
+      parsed.data.from?.trim() || undefined,
+      needsOnboarding,
+      companyId,
+      Boolean(user.workspaceActivatedAt),
     );
-  }
 
-  const userPayload = {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: sessionRole,
-    companyId,
-    companyPlan,
-    ...(needsOnboarding
-      ? { needsOnboarding: true as const }
-      : {
-          workspaceReady: Boolean(user.workspaceActivatedAt),
-          ...(user.workspaceActivatedAt
-            ? {}
-            : { needsWorkspaceActivation: true as const }),
-        }),
-  };
-
-  const workspaceActivated = Boolean(user.workspaceActivatedAt);
-  const hostHeader = request.headers.get("host");
-  const needsCrossDomainHandoff = crossDomainLoginRequired(hostHeader, sessionRole);
-
-  if (respondWithJson || needsCrossDomainHandoff) {
+    // Cookie setting
     const res = NextResponse.json({
+      success: true as const,
       ok: true as const,
       user: userPayload,
+      needsCrossDomainHandoff,
+      nextPath,
     });
     setSessionCookie(res, token);
     if (companyId) {
       setActiveCompanyCookie(res, companyId);
     }
+    console.info("[auth/login] Before response", {
+      userId: user.id,
+      nextPath,
+      needsCrossDomainHandoff,
+    });
     return res;
+  } catch (e) {
+    console.error("[auth/login] Unhandled error", e);
+    if (e instanceof Error && /sign|token|jwt/i.test(e.message)) {
+      return NextResponse.json(
+        {
+          success: false as const,
+          ok: false as const,
+          error: "Authentication is not configured",
+          code: "SERVER_ERROR",
+        },
+        { status: 500 },
+      );
+    }
+    const handled = handleApiError("POST /api/auth/login", e);
+    // Ensure a JSON body shape for clients.
+    return handled;
   }
-
-  const location = internalPostLoginLocation(
-    sessionRole,
-    from,
-    needsOnboarding,
-    companyId,
-    workspaceActivated,
-  );
-  const redirectRes = NextResponse.redirect(new URL(location, request.url), 303);
-  setSessionCookie(redirectRes, token);
-  if (companyId) {
-    setActiveCompanyCookie(redirectRes, companyId);
-  }
-  return redirectRes;
 }

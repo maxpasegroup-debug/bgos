@@ -1,7 +1,7 @@
 /** Consistent vertical rhythm — py-20 across marketing sections */
 export const sectionY = "py-20";
 
-export const sectionDivider = "border-t border-gray-200";
+export const sectionDivider = "border-t border-white/10";
 
 /** Hero uses same vertical rhythm as other sections */
 export const heroY = "py-20";
