@@ -1,3 +1,6 @@
+/** Sidebar width: icon rail (mobile) + labeled (md+). Keep in sync with BgosSidebar. */
+export const BGOS_SIDEBAR_PAD = "pl-16 md:pl-[240px]";
+
 /** Shared horizontal rhythm with header — max width + padding */
 export const BGOS_MAIN_PAD =
   "mx-auto w-full max-w-[1600px] px-4 sm:px-7 lg:px-10";

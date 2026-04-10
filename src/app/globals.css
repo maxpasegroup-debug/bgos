@@ -6,6 +6,23 @@
   --bgos-white: #ffffff;
   --bgos-bg: #05060a;
   --bgos-surface: #0a0f1a;
+  /* Premium shell (dark default) */
+  --bgos-page: #0b0f14;
+  --bgos-card: #121821;
+  --bgos-border: #1e2632;
+  --bgos-primary-from: #6366f1;
+  --bgos-primary-to: #8b5cf6;
+  --bgos-success: #22c55e;
+  --bgos-danger: #ef4444;
+}
+
+/* Light shell — applied via [data-bgos-theme="light"] on app root */
+[data-bgos-theme="light"] {
+  --bgos-page: #f1f5f9;
+  --bgos-card: #ffffff;
+  --bgos-border: #e2e8f0;
+  --bgos-primary-from: #4f46e5;
+  --bgos-primary-to: #7c3aed;
 }
 
 @theme inline {

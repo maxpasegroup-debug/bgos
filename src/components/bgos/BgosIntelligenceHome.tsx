@@ -106,6 +106,11 @@ export function BgosIntelligenceHome() {
   const [achievementOpen, setAchievementOpen] = useState(false);
 
   const revenuePotential = dashboard?.revenueBreakdown?.pipelineValue ?? 0;
+  const closedMonth = dashboard?.revenueBreakdown?.monthlyWon ?? 0;
+  const attentionCount =
+    (dashboard?.nexa?.pendingFollowUps ?? 0) +
+    (dashboard?.nexa?.overdueFollowUps ?? 0) +
+    (dashboard?.operations?.pendingSiteVisits ?? 0);
 
   const fetchPulse = useCallback(async (key: PulseRangeKey) => {
     const api = PULSE_RANGES.find((r) => r.key === key)?.api ?? "today";
@@ -251,9 +256,33 @@ export function BgosIntelligenceHome() {
           transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
           className={`${SECTION_MB} grid gap-6 lg:grid-cols-2 lg:gap-8`}
         >
-          <div className="flex flex-col justify-center rounded-2xl border border-white/[0.08] bg-gradient-to-br from-white/[0.07] via-white/[0.02] to-transparent px-6 py-8 sm:px-8 sm:py-10">
-            <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Welcome, Boss</h1>
-            <p className="mt-3 text-base text-white/60 sm:text-lg">Let&apos;s grow your business today.</p>
+          <div className="flex flex-col justify-center rounded-2xl border border-white/[0.08] bg-gradient-to-br from-indigo-500/[0.12] via-violet-500/[0.06] to-transparent px-6 py-8 sm:px-8 sm:py-10">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-indigo-300/90">Nexa AI</p>
+            <h1 className="mt-4 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+              This month you&apos;ve closed{" "}
+              <span className="bg-gradient-to-r from-indigo-300 to-violet-300 bg-clip-text text-transparent">
+                {formatInr(closedMonth)}
+              </span>
+            </h1>
+            <p className="mt-3 text-base text-white/65 sm:text-lg">
+              {attentionCount > 0
+                ? `${attentionCount} deals and visits need your attention`
+                : "Follow-ups are clear — keep the momentum."}
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link
+                href="/bgos/sales"
+                className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 px-6 text-sm font-semibold text-white shadow-[0_0_28px_-8px_rgba(99,102,241,0.55)] transition hover:brightness-110"
+              >
+                View leads
+              </Link>
+              <Link
+                href="/bgos/sales"
+                className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/15 bg-white/[0.06] px-6 text-sm font-semibold text-white/90 transition hover:border-white/25 hover:bg-white/[0.09]"
+              >
+                Fix issues
+              </Link>
+            </div>
           </div>
           <div className="flex flex-col justify-between rounded-2xl border border-white/[0.1] bg-gradient-to-br from-[#0f1628] via-[#121a2e] to-[#0b0f19] px-6 py-6 shadow-[0_0_60px_-20px_rgba(255,195,0,0.15)] sm:px-7 sm:py-7">
             <div>
@@ -296,7 +325,7 @@ export function BgosIntelligenceHome() {
           transition={{ duration: 0.4, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
           className={`${SECTION_MB} rounded-2xl border border-white/[0.08] bg-white/[0.03] px-5 py-6 sm:px-7 sm:py-7`}
         >
-          <h2 className="text-lg font-semibold tracking-tight text-white">Live business pulse</h2>
+          <h2 className="text-lg font-semibold tracking-tight text-white">How your business is doing</h2>
           <div className="mt-4 flex flex-wrap gap-2">
             {PULSE_RANGES.map((r) => {
               const locked = !hasProPlan && (r.key === "3_months" || r.key === "1_year");
@@ -335,7 +364,7 @@ export function BgosIntelligenceHome() {
                     ["Revenue", formatInr(pulseAnalytics.revenue)],
                     ["Leads", String(pulseAnalytics.leads)],
                     ["Sales success", `${pulseAnalytics.conversionPercent}%`],
-                    ["Collections", formatInr(pulseAnalytics.revenue)],
+                    ["Expenses", formatInr(pulseAnalytics.expenses)],
                   ] as const
                 ).map(([label, value]) => (
                   <div key={label} className="rounded-xl border border-white/[0.06] bg-black/20 px-4 py-4">
@@ -363,8 +392,8 @@ export function BgosIntelligenceHome() {
           className={`${SECTION_MB} grid gap-6 lg:grid-cols-3`}
         >
           <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6 lg:col-span-1">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFC300]/85">Your business plan</h2>
-            <p className="mt-4 text-sm font-medium text-white/80">1 month goal</p>
+            <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-300/90">Strategy</h2>
+            <p className="mt-4 text-sm font-medium text-white/80">1 month plan</p>
             <label className="mt-3 block">
               <span className="text-[11px] text-white/45">Target revenue (₹)</span>
               <input
@@ -399,7 +428,7 @@ export function BgosIntelligenceHome() {
             </button>
           </div>
           <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6">
-            <p className="text-sm font-medium text-white/80">1 year outlook</p>
+            <p className="text-sm font-medium text-white/80">3 year plan</p>
             <p className="mt-4 text-2xl font-semibold tabular-nums text-white">{formatInr(yearOutlook.projected)}</p>
             <p className="mt-1 text-xs text-white/45">Projected revenue (12× your monthly target)</p>
             <p className="mt-6 text-sm text-white/55">
@@ -412,7 +441,7 @@ export function BgosIntelligenceHome() {
           </div>
           <div className="flex flex-col justify-between rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6">
             <div>
-              <p className="text-sm font-medium text-white/80">3–5 year vision</p>
+              <p className="text-sm font-medium text-white/80">5 year vision</p>
               <p className="mt-4 text-sm leading-relaxed text-white/70">{threeYearCopy}</p>
             </div>
             <button
@@ -432,11 +461,11 @@ export function BgosIntelligenceHome() {
           transition={{ duration: 0.4, delay: 0.14, ease: [0.22, 1, 0.36, 1] }}
           className={`${SECTION_MB} rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6 sm:p-7`}
         >
-          <h2 className="text-lg font-semibold tracking-tight text-white">Nexa insights</h2>
+          <h2 className="text-lg font-semibold tracking-tight text-white">Nexa — suggested next steps</h2>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-white/40">Insights</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-white/40">What we noticed</p>
               <ul className="mt-3 space-y-2 text-sm text-white/75">
                 {salesDropHint ? <li className="rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2">{salesDropHint}</li> : null}
                 <li className="rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2">
@@ -447,7 +476,7 @@ export function BgosIntelligenceHome() {
               </ul>
             </div>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-white/40">Suggestions</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-white/40">Ideas for you</p>
               <ul className="mt-3 space-y-2 text-sm text-white/75">
                 <li className="rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2">Focus on your top leads first.</li>
                 <li className="rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2">Reassign tasks if someone is overloaded.</li>

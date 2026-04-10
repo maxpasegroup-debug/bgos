@@ -90,7 +90,7 @@ export function BgosDashboardGrid({
     return [
       { label: "Revenue", hint: period, value: formatInr(a.revenue) },
       { label: "New leads", hint: period, value: String(a.leads) },
-      { label: "Conversion", hint: "Won vs closed in period", value: `${a.conversionPercent}%` },
+      { label: "Sales success", hint: "Won vs closed in period", value: `${a.conversionPercent}%` },
       { label: "Expenses", hint: period, value: formatInr(a.expenses) },
     ];
   }, [dashboard]);
@@ -101,7 +101,7 @@ export function BgosDashboardGrid({
       ? [
           { label: "Revenue", hint: "", value: "—" },
           { label: "New leads", hint: "", value: "—" },
-          { label: "Conversion", hint: "", value: "—" },
+          { label: "Sales success", hint: "", value: "—" },
           { label: "Expenses", hint: "", value: "—" },
         ]
       : null);
@@ -124,10 +124,10 @@ export function BgosDashboardGrid({
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
-                Analytics
+                Business overview
               </p>
               <h2 className="mt-1 text-base font-semibold tracking-tight text-white sm:text-lg">
-                Reporting period
+                Time range
               </h2>
             </div>
             <label className="block shrink-0 sm:max-w-xs sm:flex-1">
@@ -712,7 +712,7 @@ function TeamPanel({
             className="mt-1 text-base font-semibold tracking-tight text-white sm:text-lg"
             id="team-performance"
           >
-            Performance
+            How your team is doing
           </h2>
           <p className="mt-1 text-xs text-white/45">Leads, wins, and pending tasks by person.</p>
           {team.length === 0 ? (

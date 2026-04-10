@@ -84,7 +84,7 @@ export function BgosDashboardView({ section }: { section?: string }) {
       <section className={`${BGOS_MAIN_PAD} pb-2 pt-5`}>
         <div className="rounded-2xl border border-white/[0.10] bg-gradient-to-br from-white/[0.07] via-white/[0.03] to-transparent px-5 py-5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] backdrop-blur-xl sm:px-6 sm:py-5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
-            Dashboard
+            Business overview
           </p>
           <h1 className="mt-1 text-xl font-semibold tracking-tight text-white sm:text-2xl">
             Welcome back, {userName}

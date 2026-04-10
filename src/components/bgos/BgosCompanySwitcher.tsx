@@ -20,7 +20,7 @@ type MeJson = {
   };
 };
 
-export function BgosCompanySwitcher() {
+export function BgosCompanySwitcher({ light = false }: { light?: boolean }) {
   const router = useRouter();
   const { refetch } = useBgosDashboardContext();
   const menuId = useId();
@@ -127,7 +127,11 @@ export function BgosCompanySwitcher() {
     <div ref={rootRef} className="relative min-w-0 shrink">
       <button
         type="button"
-        className="flex max-w-full min-w-0 items-center gap-1 rounded-md border border-white/10 bg-white/[0.04] py-1 pl-2.5 pr-2 text-left text-xs font-medium text-white/90 transition hover:border-white/15 hover:bg-white/[0.07] sm:text-sm"
+        className={
+          light
+            ? "flex max-w-full min-w-0 items-center gap-1 rounded-md border border-slate-200 bg-white py-1 pl-2.5 pr-2 text-left text-xs font-medium text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 sm:text-sm"
+            : "flex max-w-full min-w-0 items-center gap-1 rounded-md border border-white/10 bg-white/[0.04] py-1 pl-2.5 pr-2 text-left text-xs font-medium text-white/90 transition hover:border-white/15 hover:bg-white/[0.07] sm:text-sm"
+        }
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-controls={menuId}
@@ -136,7 +140,7 @@ export function BgosCompanySwitcher() {
       >
         <span className="min-w-0 truncate">{activeName}</span>
         <span
-          className={`shrink-0 text-white/45 transition ${open ? "rotate-180" : ""}`}
+          className={`shrink-0 transition ${open ? "rotate-180" : ""} ${light ? "text-slate-400" : "text-white/45"}`}
           aria-hidden
         >
           ▼
@@ -147,7 +151,11 @@ export function BgosCompanySwitcher() {
         <div
           id={menuId}
           role="listbox"
-          className="absolute left-0 top-[calc(100%+4px)] z-50 min-w-[12rem] max-w-[min(20rem,calc(100vw-3rem))] overflow-hidden rounded-lg border border-white/10 bg-[#0c101a]/95 py-1 shadow-xl backdrop-blur-md"
+          className={
+            light
+              ? "absolute left-0 top-[calc(100%+4px)] z-50 min-w-[12rem] max-w-[min(20rem,calc(100vw-3rem))] overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-xl"
+              : "absolute left-0 top-[calc(100%+4px)] z-50 min-w-[12rem] max-w-[min(20rem,calc(100vw-3rem))] overflow-hidden rounded-lg border border-white/10 bg-[#121821]/98 py-1 shadow-xl backdrop-blur-md"
+          }
         >
           <ul className="max-h-60 overflow-y-auto py-0.5">
             {companies.map((c) => {
@@ -159,9 +167,13 @@ export function BgosCompanySwitcher() {
                     role="option"
                     aria-selected={selected}
                     className={`flex w-full items-center px-3 py-2 text-left text-xs sm:text-sm ${
-                      selected
-                        ? "bg-white/[0.08] text-white"
-                        : "text-white/85 hover:bg-white/[0.06]"
+                      light
+                        ? selected
+                          ? "bg-indigo-50 text-indigo-900"
+                          : "text-slate-700 hover:bg-slate-50"
+                        : selected
+                          ? "bg-white/[0.08] text-white"
+                          : "text-white/85 hover:bg-white/[0.06]"
                     }`}
                     disabled={switchingId !== null}
                     onClick={() => void switchTo(c.companyId)}
@@ -177,10 +189,14 @@ export function BgosCompanySwitcher() {
               );
             })}
           </ul>
-          <div className="border-t border-white/10">
+          <div className={light ? "border-t border-slate-200" : "border-t border-white/10"}>
             <button
               type="button"
-              className="w-full px-3 py-2.5 text-left text-xs font-semibold text-[#FFC300]/95 hover:bg-white/[0.05] sm:text-sm"
+              className={
+                light
+                  ? "w-full px-3 py-2.5 text-left text-xs font-semibold text-indigo-600 hover:bg-slate-50 sm:text-sm"
+                  : "w-full px-3 py-2.5 text-left text-xs font-semibold text-[#FFC300]/95 hover:bg-white/[0.05] sm:text-sm"
+              }
               onClick={() => {
                 setOpen(false);
                 prepareAddBusinessNavigation();
