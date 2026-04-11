@@ -59,6 +59,9 @@ function LoginForm() {
         ok?: boolean;
         error?: string;
         code?: string;
+        nextPath?: string;
+        needsCompanySelection?: boolean;
+        companies?: unknown[];
         user?: {
           role: string;
           companyId?: string | null;
@@ -67,6 +70,10 @@ function LoginForm() {
         };
       };
       if (!res.ok) {
+        if (data.code === "CONTACT_ADMIN" && typeof data.error === "string") {
+          setError(data.error);
+          return;
+        }
         if (typeof data.error === "string" && data.error.trim()) {
           setError(data.error);
         } else if (data.code === "VALIDATION_ERROR") {
@@ -90,6 +97,27 @@ function LoginForm() {
         setError("Invalid sign-in response");
         return;
       }
+
+      try {
+        const listRes = await fetch("/api/company/list", { credentials: "include" });
+        const listJson = (await listRes.json()) as { ok?: boolean; companies?: unknown[] };
+        const multiCompany =
+          data.needsCompanySelection === true ||
+          (listJson.ok && Array.isArray(listJson.companies) && listJson.companies.length > 1) ||
+          (Array.isArray(data.companies) && data.companies.length > 1);
+        if (multiCompany) {
+          router.push("/iceconnect/select-company");
+          router.refresh();
+          return;
+        }
+        await fetch("/api/auth/refresh-session", {
+          method: "POST",
+          credentials: "include",
+        }).catch(() => undefined);
+      } catch {
+        /* non-fatal */
+      }
+
       const nav = resolveAfterLoginNavigation({
         role,
         from,
@@ -99,7 +127,9 @@ function LoginForm() {
         window.location.assign(nav.url);
         return;
       }
-      router.push(nav.path);
+      const serverPath =
+        typeof data.nextPath === "string" && data.nextPath.startsWith("/") ? data.nextPath : null;
+      router.push(serverPath ?? nav.path);
       router.refresh();
     } catch {
       setError("Network error");

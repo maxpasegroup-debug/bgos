@@ -10,7 +10,7 @@ import { mobileLookupVariants } from "@/lib/mobile-login";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
 import { signAccessToken } from "@/lib/jwt";
-import { roleCanAccessPath } from "@/lib/role-routing";
+import { postLoginDestination } from "@/lib/role-routing";
 import { setActiveCompanyCookie, setSessionCookie } from "@/lib/session-cookie";
 
 const bodySchema = z
@@ -50,7 +50,7 @@ const bodySchema = z
   });
 
 function isBossRole(role: UserRole): boolean {
-  return role === UserRole.ADMIN || role === UserRole.MANAGER;
+  return role === UserRole.ADMIN;
 }
 
 function crossDomainLoginRequired(hostHeader: string | null, role: UserRole): boolean {
@@ -61,7 +61,7 @@ function crossDomainLoginRequired(hostHeader: string | null, role: UserRole): bo
   return false;
 }
 
-/** Resolve same-origin Location after login (cookies are set on this response before redirect). */
+/** Resolve same-origin path after login (cookies are set on this response). */
 function internalPostLoginLocation(
   role: UserRole,
   from: string | null | undefined,
@@ -72,11 +72,7 @@ function internalPostLoginLocation(
   if (needsOnboardingFlow || companyId == null || !workspaceActivated) {
     return "/onboarding";
   }
-  const safeFrom =
-    from && from.startsWith("/") && roleCanAccessPath(role, from) ? from : null;
-  if (safeFrom) return safeFrom;
-  if (role === UserRole.ADMIN) return "/bgos";
-  return "/iceconnect";
+  return postLoginDestination(String(role), from?.trim() ?? null);
 }
 
 export async function POST(request: Request) {
@@ -118,7 +114,13 @@ export async function POST(request: Request) {
           memberships: {
             include: {
               company: {
-                select: { id: true, plan: true, trialEndDate: true, subscriptionPeriodEnd: true },
+                select: {
+                  id: true,
+                  name: true,
+                  plan: true,
+                  trialEndDate: true,
+                  subscriptionPeriodEnd: true,
+                },
               },
             },
             orderBy: { createdAt: "asc" },
@@ -148,7 +150,13 @@ export async function POST(request: Request) {
           memberships: {
             include: {
               company: {
-                select: { id: true, plan: true, trialEndDate: true, subscriptionPeriodEnd: true },
+                select: {
+                  id: true,
+                  name: true,
+                  plan: true,
+                  trialEndDate: true,
+                  subscriptionPeriodEnd: true,
+                },
               },
             },
             orderBy: { createdAt: "asc" },
@@ -205,7 +213,18 @@ export async function POST(request: Request) {
       sessionRole = UserRole.ADMIN;
       needsOnboarding = true;
     } else {
-      companyPlan = membership.company?.plan ?? CompanyPlan.BASIC;
+      if (!membership.company) {
+        return NextResponse.json(
+          {
+            success: false as const,
+            ok: false as const,
+            error: "Your company record is missing. Contact your administrator.",
+            code: "CONTACT_ADMIN" as const,
+          },
+          { status: 403 },
+        );
+      }
+      companyPlan = membership.company.plan ?? CompanyPlan.BASIC;
       companyId = membership.companyId;
       sessionRole = membership.jobRole;
       needsOnboarding = false;
@@ -221,12 +240,13 @@ export async function POST(request: Request) {
           subscriptionPeriodEnd: m.company.subscriptionPeriodEnd?.toISOString() ?? null,
         }));
     const primary = mems[0];
+    const effectiveRole = primary?.jobRole ?? sessionRole;
 
     // JWT creation
     const token = signAccessToken({
       sub: user.id,
       email: user.email,
-      role: primary?.jobRole ?? sessionRole,
+      role: effectiveRole,
       companyId: primary?.companyId ?? companyId,
       companyPlan: primary?.plan ?? companyPlan,
       workspaceReady: needsOnboarding
@@ -235,11 +255,18 @@ export async function POST(request: Request) {
       ...(mems.length ? { memberships: mems } : {}),
     });
 
+    const companiesPayload =
+      user.memberships?.map((m) => ({
+        companyId: m.companyId,
+        name: m.company?.name ?? "Company",
+        jobRole: m.jobRole,
+      })) ?? [];
+
     const userPayload = {
       id: user.id,
       name: user.name,
       email: user.email,
-      role: sessionRole,
+      role: effectiveRole,
       companyId,
       companyPlan,
       ...(needsOnboarding
@@ -260,9 +287,9 @@ export async function POST(request: Request) {
     });
 
     const hostHeader = request.headers.get("host");
-    const needsCrossDomainHandoff = crossDomainLoginRequired(hostHeader, sessionRole);
+    const needsCrossDomainHandoff = crossDomainLoginRequired(hostHeader, effectiveRole);
     const nextPath = internalPostLoginLocation(
-      sessionRole,
+      effectiveRole,
       parsed.data.from?.trim() || undefined,
       needsOnboarding,
       companyId,
@@ -274,6 +301,8 @@ export async function POST(request: Request) {
       success: true as const,
       ok: true as const,
       user: userPayload,
+      companies: companiesPayload,
+      needsCompanySelection: companiesPayload.length > 1,
       needsCrossDomainHandoff,
       nextPath,
     });

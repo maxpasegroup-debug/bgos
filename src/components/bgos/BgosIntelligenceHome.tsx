@@ -277,6 +277,12 @@ export function BgosIntelligenceHome() {
                 View leads
               </Link>
               <Link
+                href="/bgos/internal-sales"
+                className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-emerald-400/35 bg-emerald-500/15 px-6 text-sm font-semibold text-emerald-100 transition hover:border-emerald-400/50 hover:bg-emerald-500/22"
+              >
+                Team sales
+              </Link>
+              <Link
                 href="/bgos/sales"
                 className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/15 bg-white/[0.06] px-6 text-sm font-semibold text-white/90 transition hover:border-white/25 hover:bg-white/[0.09]"
               >

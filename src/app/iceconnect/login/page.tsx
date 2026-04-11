@@ -125,6 +125,10 @@ function IceconnectLoginForm() {
           if (!fe.identifier && !fe.password && data.error) setFormError(data.error);
           return;
         }
+        if (data.code === "CONTACT_ADMIN" && typeof data.error === "string") {
+          setFormError(data.error);
+          return;
+        }
         if (typeof data.error === "string" && data.error.trim()) {
           setFormError(data.error);
           if (data.code === "INVALID_CREDENTIALS") setCredentialsMismatch(true);
@@ -151,17 +155,31 @@ function IceconnectLoginForm() {
         return;
       }
 
+      const payload = data as typeof data & {
+        nextPath?: string;
+        needsCompanySelection?: boolean;
+        companies?: { companyId: string; name: string; jobRole: string }[];
+      };
+
       try {
         const [listRes, curRes] = await Promise.all([
           fetch("/api/company/list", { credentials: "include" }),
           fetch("/api/company/current", { credentials: "include" }),
         ]);
         const listJson = (await listRes.json()) as { ok?: boolean; companies?: unknown[] };
-        if (listJson.ok && Array.isArray(listJson.companies) && listJson.companies.length > 1) {
+        const multiCompany =
+          payload.needsCompanySelection === true ||
+          (listJson.ok && Array.isArray(listJson.companies) && listJson.companies.length > 1) ||
+          (Array.isArray(payload.companies) && payload.companies.length > 1);
+        if (multiCompany) {
           router.push("/iceconnect/select-company");
           router.refresh();
           return;
         }
+        await fetch("/api/auth/refresh-session", {
+          method: "POST",
+          credentials: "include",
+        }).catch(() => undefined);
         const curJson = (await curRes.json()) as {
           ok?: boolean;
           company?: {
@@ -187,7 +205,11 @@ function IceconnectLoginForm() {
         window.location.assign(nav.url);
         return;
       }
-      router.push(nav.path);
+      const serverPath =
+        typeof payload.nextPath === "string" && payload.nextPath.startsWith("/")
+          ? payload.nextPath
+          : null;
+      router.push(serverPath ?? nav.path);
       router.refresh();
     } catch {
       setFormError("Network error");

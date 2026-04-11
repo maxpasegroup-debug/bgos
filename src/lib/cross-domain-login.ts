@@ -6,7 +6,8 @@ import {
   publicIceconnectOrigin,
 } from "@/lib/host-routing";
 
-const BOSS_ROLES = new Set(["ADMIN", "MANAGER"]);
+/** Only true “boss” accounts use BGOS web; sales managers stay on ICECONNECT for internal sales. */
+const BOSS_ROLES = new Set(["ADMIN"]);
 const FIELD_ROLES = new Set([
   "SALES_HEAD",
   "SALES_EXECUTIVE",

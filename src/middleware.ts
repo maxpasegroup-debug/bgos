@@ -62,6 +62,9 @@ function isRootPath(pathname: string): boolean {
  */
 function skipsMiddlewareAuth(pathname: string, method: string): boolean {
   if (isRootPath(pathname)) return true;
+  if (normalizePathname(pathname) === "/lead") return true;
+  if (pathname === "/api/internal-sales/public/lead" && method === "POST") return true;
+  if (pathname === "/api/internal-sales/cron/automation" && method === "POST") return true;
   if (isPublicRoute(pathname)) return true;
   if (pathname === "/iceconnect/login") return true;
   if (pathname === "/iceconnect/customer-login" || pathname === "/iceconnect/customer") return true;
@@ -99,6 +102,7 @@ function loginRedirectUrl(request: NextRequest, pathname: string, tenant: HostTe
 function bgosAllowsPagePath(pathname: string): boolean {
   /** `/` is handled in `app/page.tsx` (logged in → `/bgos`, else → `/login`). */
   if (pathname === "/") return true;
+  if (normalizePathname(pathname) === "/lead") return true;
   if (pathname === "/bgos" || pathname.startsWith("/bgos/")) return true;
   if (pathname === "/sales-booster" || pathname.startsWith("/sales-booster/")) return true;
   if (isPublicRoute(pathname)) return true;
@@ -106,6 +110,7 @@ function bgosAllowsPagePath(pathname: string): boolean {
 }
 
 function iceAllowsPagePath(pathname: string): boolean {
+  if (normalizePathname(pathname) === "/lead") return true;
   return pathname === "/iceconnect" || pathname.startsWith("/iceconnect/");
 }
 
@@ -114,6 +119,7 @@ function iceAllowsApiPath(pathname: string): boolean {
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/customer") ||
     pathname.startsWith("/api/iceconnect") ||
+    pathname.startsWith("/api/internal-sales") ||
     pathname.startsWith("/api/tasks/complete")
   );
 }

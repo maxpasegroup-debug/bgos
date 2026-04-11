@@ -1,7 +1,10 @@
 import {
   CompanyIndustry,
   CompanyPlan,
+  CompanySubscriptionStatus,
   DealStatus,
+  InternalCallStatus,
+  InternalSalesStage,
   LeadStatus,
   PaymentStatus,
   TaskStatus,
@@ -91,10 +94,64 @@ async function main() {
   }
 
   const telecaller = await member("Sales TC", "9111111111", "telecaller@iceconnect.demo", UserRole.TELECALLER);
+
+  const internalCompany = await prisma.company.create({
+    data: {
+      name: "BGOS Internal",
+      plan: CompanyPlan.ENTERPRISE,
+      ownerId: boss.id,
+      industry: CompanyIndustry.SOLAR,
+      subscriptionStatus: CompanySubscriptionStatus.ACTIVE,
+      isTrialActive: false,
+      internalSalesOrg: true,
+      internalSalesDefaultAssigneeId: telecaller.id,
+    },
+  });
+  await prisma.userCompany.create({
+    data: {
+      userId: boss.id,
+      companyId: internalCompany.id,
+      role: companyMembershipClass(UserRole.MANAGER),
+      jobRole: UserRole.MANAGER,
+    },
+  });
+  await prisma.userCompany.create({
+    data: {
+      userId: telecaller.id,
+      companyId: internalCompany.id,
+      role: companyMembershipClass(UserRole.SALES_EXECUTIVE),
+      jobRole: UserRole.SALES_EXECUTIVE,
+    },
+  });
+
   const engineer = await member("Field Engineer", "9222222222", "engineer@iceconnect.demo", UserRole.SITE_ENGINEER);
+  await prisma.userCompany.create({
+    data: {
+      userId: engineer.id,
+      companyId: internalCompany.id,
+      role: companyMembershipClass(UserRole.SITE_ENGINEER),
+      jobRole: UserRole.SITE_ENGINEER,
+    },
+  });
   const installer = await member("Lead Installer", "9333333333", "installer@iceconnect.demo", UserRole.INSTALLATION_TEAM);
   const accounts = await member("Accounts", "9444444444", "accounts@iceconnect.demo", UserRole.ACCOUNTANT);
   const service = await member("Service Desk", "9555555555", "service@iceconnect.demo", UserRole.SERVICE_TEAM);
+
+  await prisma.lead.create({
+    data: {
+      name: "Internal demo lead",
+      phone: "9000000001",
+      status: LeadStatus.NEW,
+      companyId: internalCompany.id,
+      createdByUserId: boss.id,
+      assignedTo: telecaller.id,
+      source: "seed",
+      leadCompanyName: "Demo Biz",
+      businessType: "Solar",
+      internalSalesStage: InternalSalesStage.NEW_LEAD,
+      internalCallStatus: InternalCallStatus.NOT_CALLED,
+    },
+  });
 
   const leadsCreated = await prisma.$transaction([
     prisma.lead.create({

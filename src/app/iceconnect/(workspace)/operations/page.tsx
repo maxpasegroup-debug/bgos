@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { IceconnectRoleModulePage } from "@/components/iceconnect/IceconnectRoleModulePage";
+import { IceconnectOperationsHub } from "@/components/iceconnect/IceconnectOperationsHub";
 import { getAuthUserFromHeaders } from "@/lib/auth";
 import { canAccessIceconnectDashboard, getRoleHome } from "@/lib/role-routing";
 
@@ -9,11 +9,5 @@ export default async function IceconnectOperationsPage() {
   if (!canAccessIceconnectDashboard("operations", user.role)) {
     redirect(getRoleHome(user.role));
   }
-  return (
-    <IceconnectRoleModulePage
-      title="Operations Head Workspace"
-      subtitle="Operational planning and execution control."
-      tools={["Installation pipeline", "Site readiness", "Crew coordination", "Risk blockers"]}
-    />
-  );
+  return <IceconnectOperationsHub />;
 }

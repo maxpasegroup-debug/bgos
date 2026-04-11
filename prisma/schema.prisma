@@ -59,6 +59,35 @@ enum LeadStatus {
   LOST
 }
 
+/** BGOS Internal sales pipeline (company with `internalSalesOrg`). */
+enum InternalSalesStage {
+  NEW_LEAD
+  CONTACTED
+  DEMO_SCHEDULED
+  DEMO_DONE
+  INTERESTED
+  FOLLOW_UP
+  CLOSED_WON
+  CLOSED_LOST
+}
+
+enum InternalCallStatus {
+  NOT_CALLED
+  CALLED
+  NO_ANSWER
+  INTERESTED
+  NOT_INTERESTED
+}
+
+/** Tech onboarding queue for internal sales → delivery. */
+enum OnboardingTaskStatus {
+  NEW
+  DATA_RECEIVED
+  SETUP_STARTED
+  SETUP_COMPLETED
+  DELIVERED
+}
+
 enum DealStatus {
   WON
   LOST
@@ -119,6 +148,11 @@ model Company {
   businessTemplate String?
   dashboardConfig  Json?
 
+  /** True for the dedicated BGOS internal sales tenant (“BGOS Internal”). */
+  internalSalesOrg Boolean @default(false)
+  /** Optional default assignee for public / anonymous lead capture. */
+  internalSalesDefaultAssigneeId String?
+
   owner         User            @relation("OwnedCompany", fields: [ownerId], references: [id], onDelete: Restrict)
   memberships   UserCompany[]
   leads         Lead[]
@@ -150,6 +184,10 @@ model Company {
   customerUsers  CustomerPortalUser[]
   complaints     CustomerComplaint[]
   razorpayPayments RazorpayPayment[]
+  onboardingTasks           OnboardingTask[]
+  internalLeadActivities    InternalLeadActivity[]
+  internalInAppNotifications InternalInAppNotification[]
+  internalEmployeeDailyTargets InternalEmployeeDailyTarget[]
 
   @@index([name])
   @@index([ownerId])
@@ -314,6 +352,9 @@ model User {
   assignedSiteVisits     SiteVisit[] @relation("SiteVisitAssignee")
   documentsUploaded      Document[]
   razorpayPayments       RazorpayPayment[]
+  onboardingTasksCreated OnboardingTask[] @relation("OnboardingTaskCreator")
+  internalLeadActivities InternalLeadActivity[]
+  internalInAppNotifications InternalInAppNotification[]
 
   @@index([email])
 }
@@ -353,12 +394,25 @@ model Lead {
   serviceTickets ServiceTicket[]
   siteReport  String? @db.Text
 
+  /** Customer / prospect company name (internal sales). */
+  leadCompanyName    String?
+  businessType       String?
+  internalSalesNotes String?              @db.Text
+  internalSalesStage InternalSalesStage?
+  internalCallStatus InternalCallStatus?
+  lastContactedAt    DateTime?
+  nextFollowUpAt     DateTime?
+
+  onboardingTasks        OnboardingTask[]
+  internalLeadActivities InternalLeadActivity[]
+
   @@index([companyId])
   @@index([status])
   @@index([assignedTo])
   @@index([createdByUserId])
   @@index([partnerId])
   @@index([phone])
+  @@index([companyId, email])
 }
 
 model Deal {
@@ -777,4 +831,86 @@ model ActivityLog {
   @@index([userId])
   @@index([createdAt])
   @@index([type])
+}
+
+/// Internal sales → tech handoff (one row per won lead).
+model OnboardingTask {
+  id                   String               @id @default(cuid())
+  companyId            String
+  leadId               String               @unique
+  status               OnboardingTaskStatus @default(NEW)
+  snapshotCompanyName  String
+  snapshotOwnerName    String
+  snapshotPhone        String
+  snapshotEmail        String?
+  snapshotBusinessType String?
+  snapshotTeamSize     String?
+  snapshotLeadSources  String?              @db.Text
+  snapshotProblems     String?              @db.Text
+  snapshotRequirements String?              @db.Text
+  snapshotPlan         String?
+  snapshotWhatsApp     String?
+  createdByUserId      String
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead    Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  creator User    @relation("OnboardingTaskCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@index([status])
+}
+
+/// Timeline entries for internal CRM leads.
+model InternalLeadActivity {
+  id        String   @id @default(cuid())
+  companyId String
+  leadId    String
+  userId    String?
+  action    String
+  detail    String   @db.Text
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead    Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([leadId, createdAt])
+}
+
+/// In-app notifications for internal sales / onboarding (BGOS Internal company).
+model InternalInAppNotification {
+  id        String    @id @default(cuid())
+  companyId String
+  userId    String
+  type      String
+  title     String
+  body      String    @db.Text
+  readAt    DateTime?
+  dedupeKey String?
+  createdAt DateTime  @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dedupeKey])
+  @@index([companyId, userId, readAt])
+}
+
+/// Manager-set daily targets per rep (internal company).
+model InternalEmployeeDailyTarget {
+  id          String @id @default(cuid())
+  companyId   String
+  userId      String
+  dayKey      String
+  targetCalls Int    @default(0)
+  targetLeads Int    @default(0)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId, dayKey])
+  @@index([companyId])
 }

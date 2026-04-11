@@ -5,15 +5,17 @@
 
 export const ROLE_HOME: Readonly<Record<string, string>> = {
   ADMIN: "/bgos",
-  MANAGER: "/bgos",
-  SALES_EXECUTIVE: "/iceconnect/sales",
-  TELECALLER: "/iceconnect/sales",
+  /** Sales manager — internal pipeline (BGOS Internal). Still privileged for route access. */
+  MANAGER: "/iceconnect/internal-sales",
+  SALES_EXECUTIVE: "/iceconnect/internal-sales",
+  TELECALLER: "/iceconnect/internal-sales",
   SALES_HEAD: "/iceconnect/sales-head",
   CHANNEL_PARTNER: "/iceconnect/partner",
   OPERATIONS_HEAD: "/iceconnect/operations",
-  SITE_ENGINEER: "/iceconnect/site",
-  PRO: "/iceconnect/pro",
-  INSTALLATION_TEAM: "/iceconnect/install",
+  /** Field tech roles default to internal workspace when using BGOS Internal; adjust if you need classic field dashboards. */
+  SITE_ENGINEER: "/iceconnect/internal-sales",
+  PRO: "/iceconnect/internal-sales",
+  INSTALLATION_TEAM: "/iceconnect/internal-sales",
   SERVICE_TEAM: "/iceconnect/service",
   INVENTORY_MANAGER: "/iceconnect/inventory",
   ACCOUNTANT: "/iceconnect/accounts",
@@ -61,6 +63,29 @@ const PAGE_RULES: RouteRule[] = [
   { prefix: "/iceconnect/accounts", roles: new Set(["ACCOUNTANT", "ADMIN", "MANAGER"]) },
   { prefix: "/iceconnect/loan", roles: new Set(["LCO", "ADMIN", "MANAGER"]) },
   { prefix: "/iceconnect/hr", roles: new Set(["HR_MANAGER", "ADMIN", "MANAGER"]) },
+  { prefix: "/iceconnect/internal-sales", roles: new Set(["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER"]) },
+  {
+    prefix: "/iceconnect/internal-onboarding",
+    roles: new Set([
+      "ADMIN",
+      "MANAGER",
+      "OPERATIONS_HEAD",
+      "SITE_ENGINEER",
+      "PRO",
+      "INSTALLATION_TEAM",
+    ]),
+  },
+  {
+    prefix: "/bgos/internal-onboarding",
+    roles: new Set([
+      "ADMIN",
+      "MANAGER",
+      "OPERATIONS_HEAD",
+      "SITE_ENGINEER",
+      "PRO",
+      "INSTALLATION_TEAM",
+    ]),
+  },
   { prefix: "/iceconnect/documents", roles: DOCUMENT_VAULT_ROLES },
 ];
 
@@ -153,6 +178,19 @@ const API_RULES: RouteRule[] = [
     ]),
   },
   {
+    prefix: "/api/internal-sales",
+    roles: new Set([
+      "SALES_EXECUTIVE",
+      "TELECALLER",
+      "ADMIN",
+      "MANAGER",
+      "OPERATIONS_HEAD",
+      "SITE_ENGINEER",
+      "PRO",
+      "INSTALLATION_TEAM",
+    ]),
+  },
+  {
     prefix: "/api/leads",
     roles: new Set(["SALES_EXECUTIVE", "TELECALLER", "SALES_HEAD", "ADMIN", "MANAGER"]),
   },
@@ -225,14 +263,13 @@ export function getRoleHome(role: string): string {
 
 /**
  * After login: honor `from` only if the role may open that path.
- * Default: ADMIN → `/bgos`, all other roles → `/iceconnect` (middleware then sends users to role home if needed).
+ * Otherwise use {@link getRoleHome} (no blank `/iceconnect` landing for known roles).
  */
 export function postLoginDestination(role: string, from: string | null): string {
   if (from && from.startsWith("/") && roleCanAccessPath(role, from)) {
     return from;
   }
-  if (role === "ADMIN") return "/bgos";
-  return "/iceconnect";
+  return getRoleHome(role);
 }
 
 /** Path segment after `/iceconnect/` → roles allowed on that dashboard. */
@@ -249,6 +286,15 @@ export const ICECONNECT_DASHBOARD_ROLES: Record<string, readonly string[]> = {
   accounts: ["ACCOUNTANT", "ADMIN", "MANAGER"],
   loan: ["LCO", "ADMIN", "MANAGER"],
   hr: ["HR_MANAGER", "ADMIN", "MANAGER"],
+  "internal-sales": ["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER"],
+  "internal-onboarding": [
+    "ADMIN",
+    "MANAGER",
+    "OPERATIONS_HEAD",
+    "SITE_ENGINEER",
+    "PRO",
+    "INSTALLATION_TEAM",
+  ],
   documents: [...DOCUMENT_VAULT_ROLES_LIST],
 };
 

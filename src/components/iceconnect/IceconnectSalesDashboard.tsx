@@ -2,6 +2,7 @@
 
 import { LeadStatus, TaskStatus } from "@prisma/client";
 import { motion } from "framer-motion";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useCompanyBranding } from "@/contexts/company-branding-context";
 import { forwardLeadStatuses, leadStatusLabel } from "@/lib/lead-pipeline";
@@ -337,6 +338,22 @@ export function IceconnectSalesDashboard() {
             Welcome back, {welcomeName}
           </h2>
           <p className="mt-1 text-sm text-gray-500">Here’s your work for today</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              href="/iceconnect/internal-sales"
+              className="inline-flex min-h-10 items-center rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-800 shadow-sm transition hover:border-[color:var(--ice-primary)] hover:bg-gray-50"
+            >
+              Team pipeline
+            </Link>
+            <Link
+              href="/lead"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-10 items-center rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-800 shadow-sm transition hover:border-[color:var(--ice-primary)] hover:bg-gray-50"
+            >
+              Add lead
+            </Link>
+          </div>
         </motion.div>
 
         {stats ? (
