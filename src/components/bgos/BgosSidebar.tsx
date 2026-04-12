@@ -4,7 +4,6 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ComponentType } from "react";
-import { prepareAddBusinessNavigation } from "@/lib/bgos-add-business-intent";
 import { useBgosDashboardContext } from "./BgosDataProvider";
 import { useBgosTheme } from "./BgosThemeContext";
 
@@ -94,13 +93,6 @@ export function BgosSidebar() {
               icon={item.icon}
               active={isActive(item)}
               light={light}
-              onBeforeNavigate={
-                item.id === "sb-create"
-                  ? () => {
-                      prepareAddBusinessNavigation();
-                    }
-                  : undefined
-              }
             />
           ))}
         </nav>
@@ -306,13 +298,6 @@ function SalesIcon({ className }: { className?: string }) {
   );
 }
 
-const superBossControlNav: NavDef[] = [
-  { id: "sb-control", label: "BGOS Control", href: "/bgos/control", icon: HomeIcon },
-  { id: "sb-companies", label: "My Companies", href: "/bgos/control#companies", icon: BuildingIcon },
-  { id: "sb-internal", label: "Internal Sales", href: "/iceconnect/internal-sales", icon: SalesIcon },
-  { id: "sb-create", label: "Create Company", href: "/onboarding", icon: PlusCircleIcon },
-];
-
 function BillingIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" aria-hidden>
@@ -501,3 +486,13 @@ function MoreIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+const superBossControlNav: NavDef[] = [
+  { id: "sb-clients", label: "Clients", href: "/bgos/control/clients", icon: BuildingIcon },
+  { id: "sb-team", label: "My Team", href: "/bgos/control/team", icon: TeamIcon },
+  { id: "sb-sales", label: "Sales", href: "/bgos/control/sales", icon: SalesIcon },
+  { id: "sb-tech", label: "Technical Dept", href: "/bgos/control/technical", icon: OpsIcon },
+  { id: "sb-accounts", label: "Accounts", href: "/bgos/control/accounts", icon: BillingIcon },
+  { id: "sb-vision", label: "Vision & Targets", href: "/bgos/control/vision", icon: PricingIcon },
+  { id: "sb-booster", label: "Sales Booster", href: "/bgos/control/sales-booster", icon: LightningIcon },
+];

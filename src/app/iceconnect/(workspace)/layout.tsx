@@ -27,6 +27,9 @@ const SEGMENT_LABEL: Record<string, string> = {
   loan: "Loan Compliance Officer",
   hr: "HR Manager",
   documents: "Documents",
+  "internal-sales": "Internal Sales",
+  "internal-tech": "Internal Tech",
+  "internal-onboarding": "Internal Onboarding",
 };
 
 export default async function IceconnectWorkspaceLayout({

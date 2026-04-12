@@ -5,7 +5,7 @@ import { parseJsonBody, zodValidationErrorResponse } from "@/lib/api-response";
 import { handleApiError } from "@/lib/route-error";
 import { AUTH_ERROR_CODES } from "@/lib/auth-api";
 import { checkLoginRateLimit, getClientIpForRateLimit } from "@/lib/login-rate-limit";
-import { hostTenantFromHeader } from "@/lib/host-routing";
+import { hostTenantFromHeader, type HostTenant } from "@/lib/host-routing";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
 import { signAccessToken } from "@/lib/jwt";
@@ -132,6 +132,18 @@ export async function POST(request: Request) {
     let needsOnboarding: boolean;
 
     if (!membership) {
+      const tenant: HostTenant = hostTenantFromHeader(request.headers.get("host"));
+      if (tenant === "ice") {
+        return NextResponse.json(
+          {
+            success: false as const,
+            ok: false as const,
+            error: "No company is assigned to your account. Contact your administrator.",
+            code: "CONTACT_ADMIN" as const,
+          },
+          { status: 403 },
+        );
+      }
       companyPlan = CompanyPlan.BASIC;
       companyId = null;
       sessionRole = UserRole.ADMIN;

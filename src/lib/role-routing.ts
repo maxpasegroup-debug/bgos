@@ -9,8 +9,8 @@ export const ROLE_HOME: Readonly<Record<string, string>> = {
   MANAGER: "/iceconnect/internal-sales",
   SALES_EXECUTIVE: "/iceconnect/internal-sales",
   TELECALLER: "/iceconnect/internal-sales",
-  TECH_HEAD: "/iceconnect/internal-tech",
-  TECH_EXECUTIVE: "/iceconnect/internal-tech",
+  TECH_HEAD: "/iceconnect/internal-sales",
+  TECH_EXECUTIVE: "/iceconnect/internal-sales",
   SALES_HEAD: "/iceconnect/sales-head",
   CHANNEL_PARTNER: "/iceconnect/partner",
   OPERATIONS_HEAD: "/iceconnect/operations",
@@ -65,7 +65,17 @@ const PAGE_RULES: RouteRule[] = [
   { prefix: "/iceconnect/accounts", roles: new Set(["ACCOUNTANT", "ADMIN", "MANAGER"]) },
   { prefix: "/iceconnect/loan", roles: new Set(["LCO", "ADMIN", "MANAGER"]) },
   { prefix: "/iceconnect/hr", roles: new Set(["HR_MANAGER", "ADMIN", "MANAGER"]) },
-  { prefix: "/iceconnect/internal-sales", roles: new Set(["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER"]) },
+  {
+    prefix: "/iceconnect/internal-sales",
+    roles: new Set([
+      "SALES_EXECUTIVE",
+      "TELECALLER",
+      "ADMIN",
+      "MANAGER",
+      "TECH_HEAD",
+      "TECH_EXECUTIVE",
+    ]),
+  },
   {
     prefix: "/iceconnect/internal-tech",
     roles: new Set(["TECH_HEAD", "TECH_EXECUTIVE", "ADMIN", "MANAGER"]),
@@ -345,7 +355,7 @@ export const ICECONNECT_DASHBOARD_ROLES: Record<string, readonly string[]> = {
   accounts: ["ACCOUNTANT", "ADMIN", "MANAGER"],
   loan: ["LCO", "ADMIN", "MANAGER"],
   hr: ["HR_MANAGER", "ADMIN", "MANAGER"],
-  "internal-sales": ["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER"],
+  "internal-sales": ["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
   "internal-tech": ["TECH_HEAD", "TECH_EXECUTIVE", "ADMIN", "MANAGER"],
   "internal-onboarding": [
     "ADMIN",

@@ -24,6 +24,8 @@ const ROLE_LABEL: Record<string, string> = {
   ACCOUNTANT: "Accountant",
   LCO: "Loan Compliance Officer",
   HR_MANAGER: "HR Manager",
+  TECH_HEAD: "Tech Head",
+  TECH_EXECUTIVE: "Tech Executive",
 };
 
 export type IceconnectNavItem = { seg: string; label: string; href: string };
