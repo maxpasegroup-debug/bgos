@@ -1,10 +1,11 @@
 "use client";
 
-import { UserRole } from "@prisma/client";
+import { UserManualCategory, UserRole } from "@prisma/client";
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BgosAddEmployeeForm } from "@/components/bgos/BgosAddEmployeeForm";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
+import { ViewModuleGuideButton } from "@/components/bgos/ViewModuleGuideButton";
 import {
   INTERNAL_ORG_EMPLOYEE_ROLE_OPTIONS,
   SOLAR_FIELD_EMPLOYEE_ROLE_OPTIONS,
@@ -294,6 +295,7 @@ export function BgosHrCommandCenter() {
               <p className="mt-1 text-sm text-white/60">Manage your people and performance</p>
             </div>
             <div className="flex items-center gap-2">
+              <ViewModuleGuideButton category={UserManualCategory.HR} />
               <button
                 type="button"
                 onClick={() => setAddOpen(true)}

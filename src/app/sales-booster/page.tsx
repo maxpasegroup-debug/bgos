@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { CompanyPlan } from "@prisma/client";
 import { SalesBoosterLandingClient } from "@/components/sales-booster/SalesBoosterLandingClient";
@@ -20,5 +21,13 @@ export default async function SalesBoosterLandingRoute() {
     redirect("/sales-booster/dashboard");
   }
 
-  return <SalesBoosterLandingClient />;
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[40vh] items-center justify-center text-white/60">Loading…</div>
+      }
+    >
+      <SalesBoosterLandingClient />
+    </Suspense>
+  );
 }

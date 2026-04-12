@@ -1,7 +1,6 @@
 import type { NextRequest } from "next/server";
 import { InternalOnboardingApprovalStatus, InternalSalesStage } from "@prisma/client";
-import { z } from "zod";
-import { jsonError, jsonSuccess, parseJsonBodyZod } from "@/lib/api-response";
+import { jsonError, jsonSuccess, parseJsonBody } from "@/lib/api-response";
 import { requireAuthWithCompany } from "@/lib/auth";
 import {
   assertInternalSalesSession,
@@ -10,24 +9,17 @@ import {
 } from "@/lib/internal-sales-org";
 import { INTERNAL_ACTIVITY, logInternalLeadActivity } from "@/lib/internal-sales-activity";
 import { createOnboardingTaskForLead } from "@/lib/internal-sales-onboarding";
+import {
+  formPayloadFromSubmit,
+  internalOnboardingSubmitSchema,
+  leadTypeMatchesTier,
+  prismaOnboardingTypeFromTier,
+  snapshotFromSubmit,
+} from "@/lib/internal-onboarding-form";
 import { listInternalManagerUserIds, notifyInternalUsers } from "@/lib/internal-sales-notifications";
 import { prisma } from "@/lib/prisma";
 import { getBgosBossEmail } from "@/lib/super-boss";
 import { isCompanyBasicTrialExpired, trialExpiredJsonResponse } from "@/lib/trial";
-
-const bodySchema = z.object({
-  companyName: z.string().trim().min(1).max(300),
-  ownerName: z.string().trim().min(1).max(200),
-  phone: z.string().trim().min(1).max(32),
-  email: z.string().trim().email().max(320),
-  businessType: z.string().trim().min(1).max(200),
-  teamSize: z.string().trim().min(1).max(100),
-  leadSources: z.string().trim().min(1).max(2000),
-  problems: z.string().trim().min(1).max(5000),
-  requirements: z.string().trim().min(1).max(5000),
-  plan: z.string().trim().min(1).max(200),
-  whatsApp: z.string().trim().min(1).max(32),
-});
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const session = await requireAuthWithCompany(request);
@@ -44,12 +36,26 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 
   const lead = await prisma.lead.findFirst({
     where: { id: leadId, companyId: internalCtx.companyId },
-    select: { id: true, name: true, assignedTo: true, internalSalesStage: true },
+    select: {
+      id: true,
+      name: true,
+      assignedTo: true,
+      internalSalesStage: true,
+      onboardingType: true,
+    },
   });
   if (!lead) return jsonError(404, "NOT_FOUND", "Lead not found");
 
   if (lead.internalSalesStage !== InternalSalesStage.INTERESTED) {
     return jsonError(400, "INVALID_STAGE", "Onboarding form is only available when the lead is Interested");
+  }
+
+  if (!lead.onboardingType) {
+    return jsonError(
+      400,
+      "ONBOARDING_TYPE_REQUIRED",
+      "Sales must select Basic / Pro / Enterprise before opening the onboarding form",
+    );
   }
 
   const isManager = canManageInternalSalesAssignments(session);
@@ -63,8 +69,27 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
   const existing = await prisma.onboardingTask.findUnique({ where: { leadId } });
   if (existing) return jsonError(409, "DUPLICATE", "Onboarding already started for this lead");
 
-  const parsed = await parseJsonBodyZod(request, bodySchema);
-  if (!parsed.ok) return parsed.response;
+  const raw = await parseJsonBody(request);
+  if (!raw.ok) return raw.response;
+
+  const parsed = internalOnboardingSubmitSchema.safeParse(raw.data);
+  if (!parsed.success) {
+    return jsonError(400, "VALIDATION", "All fields are required", { issues: parsed.error.flatten() });
+  }
+
+  const body = parsed.data;
+  if (!leadTypeMatchesTier(lead.onboardingType, body.tier)) {
+    return jsonError(400, "TIER_MISMATCH", "Submitted form does not match the onboarding type set on this lead");
+  }
+
+  let requirements = body.requirements;
+  if (body.tier === "pro") {
+    requirements = `${requirements}\n\n[Sales Booster / Pro: WhatsApp, social channels, automation needs captured.]`;
+  }
+
+  const snap = snapshotFromSubmit(body);
+  snap.requirements = requirements;
+  const formPayload = formPayloadFromSubmit(body);
 
   const now = new Date();
 
@@ -72,20 +97,10 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     companyId: internalCtx.companyId,
     leadId,
     createdByUserId: session.sub,
-    snapshot: {
-      companyName: parsed.data.companyName,
-      ownerName: parsed.data.ownerName,
-      phone: parsed.data.phone,
-      email: parsed.data.email.trim(),
-      businessType: parsed.data.businessType,
-      teamSize: parsed.data.teamSize,
-      leadSources: parsed.data.leadSources,
-      problems: parsed.data.problems,
-      requirements: parsed.data.requirements,
-      plan: parsed.data.plan,
-      whatsApp: parsed.data.whatsApp,
-    },
+    snapshot: snap,
     closeWon: false,
+    leadOnboardingType: prismaOnboardingTypeFromTier(body.tier),
+    formPayload,
   });
 
   await prisma.lead.update({
@@ -95,8 +110,8 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
       internalOnboardingApprovalStatus: InternalOnboardingApprovalStatus.PENDING,
       status: internalStageToLeadStatus(InternalSalesStage.ONBOARDING_FORM_FILLED),
       internalStageUpdatedAt: now,
-      leadCompanyName: parsed.data.companyName.trim(),
-      email: parsed.data.email.trim(),
+      leadCompanyName: body.companyName.trim(),
+      email: body.email.trim(),
     },
   });
 
@@ -106,7 +121,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     userId: session.sub,
     action: INTERNAL_ACTIVITY.STAGE,
     detail: "Onboarding form submitted — awaiting boss approval",
-    metadata: { onboardingTaskId: task.id },
+    metadata: { onboardingTaskId: task.id, onboardingType: lead.onboardingType },
   });
 
   const recipients = new Set<string>();
@@ -128,7 +143,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
       userIds: [...recipients],
       type: "ONBOARDING_PENDING_APPROVAL",
       title: "Onboarding pending approval",
-      body: `${parsed.data.companyName} — review and approve.`,
+      body: `${body.companyName} — review and approve.`,
       dedupeKey: `onboarding-pending:${leadId}`,
     });
   }

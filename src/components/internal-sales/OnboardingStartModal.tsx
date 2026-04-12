@@ -1,7 +1,25 @@
 "use client";
 
+import { LeadOnboardingType } from "@prisma/client";
+import Link from "next/link";
 import { useState } from "react";
 import type { LeadCard } from "./internal-sales-types";
+
+const TIERS: {
+  id: LeadOnboardingType;
+  label: string;
+  tag: string;
+  path: string;
+}[] = [
+  { id: LeadOnboardingType.BASIC, label: "Basic", tag: "🟢 BASIC", path: "/onboarding/basic" },
+  { id: LeadOnboardingType.PRO, label: "Pro", tag: "🔵 PRO", path: "/onboarding/pro" },
+  {
+    id: LeadOnboardingType.ENTERPRISE,
+    label: "Enterprise",
+    tag: "🟣 ENTERPRISE",
+    path: "/onboarding/enterprise",
+  },
+];
 
 export function OnboardingStartModal({
   lead,
@@ -14,18 +32,8 @@ export function OnboardingStartModal({
   onClose: () => void;
   onDone: () => void;
 }) {
-  const [companyName, setCompanyName] = useState(lead.companyName ?? "");
-  const [ownerName, setOwnerName] = useState(lead.name);
-  const [phone, setPhone] = useState(lead.phone);
-  const [email, setEmail] = useState(lead.email ?? "");
-  const [businessType, setBusinessType] = useState(lead.businessType ?? "");
-  const [teamSize, setTeamSize] = useState("");
-  const [leadSources, setLeadSources] = useState("");
-  const [problems, setProblems] = useState("");
-  const [requirements, setRequirements] = useState("");
-  const [plan, setPlan] = useState("");
-  const [whatsApp, setWhatsApp] = useState(lead.phone);
-  const [busy, setBusy] = useState(false);
+  const [selected, setSelected] = useState<LeadOnboardingType | null>(lead.onboardingType ?? null);
+  const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const panel =
@@ -33,122 +41,94 @@ export function OnboardingStartModal({
       ? "max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/10 bg-[#0f1628] p-5 text-white shadow-2xl"
       : "max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl";
 
-  const inp =
-    theme === "bgos"
-      ? "mt-1 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm"
-      : "mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm";
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function persistType(t: LeadOnboardingType) {
     setErr(null);
-    setBusy(true);
+    setSaving(true);
     try {
-      const res = await fetch(`/api/internal-sales/leads/${lead.id}/onboarding`, {
-        method: "POST",
+      const res = await fetch(`/api/internal-sales/leads/${lead.id}`, {
+        method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          companyName: companyName.trim(),
-          ownerName: ownerName.trim(),
-          phone: phone.trim(),
-          email: email.trim(),
-          businessType: businessType.trim(),
-          teamSize: teamSize.trim(),
-          leadSources: leadSources.trim(),
-          problems: problems.trim(),
-          requirements: requirements.trim(),
-          plan: plan.trim(),
-          whatsApp: whatsApp.trim(),
-        }),
+        body: JSON.stringify({ onboardingType: t }),
       });
       const j = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok) {
-        setErr(typeof j.error === "string" ? j.error : "Could not submit");
+        setErr(typeof j.error === "string" ? j.error : "Could not save type");
         return;
       }
+      setSelected(t);
       onDone();
-      onClose();
     } finally {
-      setBusy(false);
+      setSaving(false);
     }
   }
+
+  const tierMeta = TIERS.find((x) => x.id === selected);
+  const formHref = tierMeta ? `${tierMeta.path}?leadId=${encodeURIComponent(lead.id)}` : null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 p-4 sm:items-center">
       <div className={panel}>
-        <h2 className="text-lg font-semibold">Onboarding form</h2>
+        <h2 className="text-lg font-semibold">Client onboarding</h2>
         <p className={theme === "bgos" ? "mt-1 text-xs text-white/55" : "mt-1 text-xs text-slate-500"}>
-          All fields are required. Submits for boss approval — you cannot skip this step while Interested.
+          1) Sales selects onboarding type after the demo conversation. 2) Open the matching form (all fields
+          required). Pro includes Sales Booster channel capture.
         </p>
         {err ? (
           <p className="mt-3 rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-200">{err}</p>
         ) : null}
-        <form onSubmit={submit} className="mt-4 space-y-3">
-          <label className="block text-xs font-medium">
-            Company name
-            <input className={inp} value={companyName} onChange={(e) => setCompanyName(e.target.value)} required />
-          </label>
-          <label className="block text-xs font-medium">
-            Owner name
-            <input className={inp} value={ownerName} onChange={(e) => setOwnerName(e.target.value)} required />
-          </label>
-          <label className="block text-xs font-medium">
-            Phone
-            <input className={inp} value={phone} onChange={(e) => setPhone(e.target.value)} required inputMode="tel" />
-          </label>
-          <label className="block text-xs font-medium">
-            Email
-            <input className={inp} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          </label>
-          <label className="block text-xs font-medium">
-            Business type
-            <input className={inp} value={businessType} onChange={(e) => setBusinessType(e.target.value)} required />
-          </label>
-          <label className="block text-xs font-medium">
-            Team size (sales / tech)
-            <input className={inp} value={teamSize} onChange={(e) => setTeamSize(e.target.value)} required />
-          </label>
-          <label className="block text-xs font-medium">
-            Lead sources
-            <textarea className={inp} rows={2} value={leadSources} onChange={(e) => setLeadSources(e.target.value)} required />
-          </label>
-          <label className="block text-xs font-medium">
-            Problems
-            <textarea className={inp} rows={2} value={problems} onChange={(e) => setProblems(e.target.value)} required />
-          </label>
-          <label className="block text-xs font-medium">
-            Requirements
-            <textarea className={inp} rows={2} value={requirements} onChange={(e) => setRequirements(e.target.value)} required />
-          </label>
-          <label className="block text-xs font-medium">
-            Plan
-            <input className={inp} value={plan} onChange={(e) => setPlan(e.target.value)} required />
-          </label>
-          <label className="block text-xs font-medium">
-            WhatsApp number
-            <input className={inp} value={whatsApp} onChange={(e) => setWhatsApp(e.target.value)} required inputMode="tel" />
-          </label>
-          <div className="flex flex-wrap gap-2 pt-2">
+
+        <p className="mt-4 text-xs font-medium opacity-80">Onboarding type</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {TIERS.map((t) => (
             <button
-              type="submit"
-              disabled={busy}
-              className="min-h-11 flex-1 rounded-xl bg-emerald-600 text-sm font-semibold text-white disabled:opacity-50"
-            >
-              {busy ? "Saving…" : "Submit for approval"}
-            </button>
-            <button
+              key={t.id}
               type="button"
+              disabled={saving}
+              onClick={() => void persistType(t.id)}
               className={
-                theme === "bgos"
-                  ? "min-h-11 rounded-xl border border-white/20 px-4 text-sm font-medium text-white/80"
-                  : "min-h-11 rounded-xl border border-slate-200 px-4 text-sm font-medium text-slate-700"
+                selected === t.id
+                  ? "rounded-xl border-2 border-amber-400/70 bg-amber-500/15 px-3 py-2 text-xs font-semibold"
+                  : theme === "bgos"
+                    ? "rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium"
+                    : "rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium"
               }
+            >
+              {t.tag}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-6 border-t border-white/10 pt-4 dark:border-white/10">
+          <p className="text-xs font-medium opacity-80">Open form</p>
+          {formHref ? (
+            <Link
+              href={formHref}
+              className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white"
               onClick={onClose}
             >
-              Cancel
-            </button>
-          </div>
-        </form>
+              Open {tierMeta?.label} form →
+            </Link>
+          ) : (
+            <p className={theme === "bgos" ? "mt-2 text-xs text-white/45" : "mt-2 text-xs text-slate-500"}>
+              Choose a type above to enable the form link.
+            </p>
+          )}
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={
+              theme === "bgos"
+                ? "min-h-11 flex-1 rounded-xl border border-white/20 px-4 text-sm font-medium text-white/80"
+                : "min-h-11 flex-1 rounded-xl border border-slate-200 px-4 text-sm font-medium text-slate-700"
+            }
+            onClick={onClose}
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   );

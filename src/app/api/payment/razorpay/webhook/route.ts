@@ -88,10 +88,6 @@ export async function POST(request: NextRequest) {
 
     const userId = notes.userId && notes.userId.length > 0 ? notes.userId : company.ownerId;
 
-    if (!eventId) {
-      return NextResponse.json({ received: true, skipped: "no_event_id" });
-    }
-
     await applySuccessfulRazorpayPayment({
       companyId: notes.companyId,
       userId,
@@ -102,9 +98,8 @@ export async function POST(request: NextRequest) {
       currency: normalized.currency,
     });
 
-    const fresh = await recordRazorpayWebhookDedup(eventId, eventType);
-    if (!fresh) {
-      return NextResponse.json({ received: true, duplicate: true });
+    if (eventId) {
+      await recordRazorpayWebhookDedup(eventId, eventType);
     }
 
     return NextResponse.json({ received: true, applied: true });

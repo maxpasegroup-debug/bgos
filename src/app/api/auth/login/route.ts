@@ -6,7 +6,6 @@ import { handleApiError } from "@/lib/route-error";
 import { AUTH_ERROR_CODES } from "@/lib/auth-api";
 import { checkLoginRateLimit, getClientIpForRateLimit } from "@/lib/login-rate-limit";
 import { hostTenantFromHeader } from "@/lib/host-routing";
-import { mobileLookupVariants } from "@/lib/mobile-login";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
 import { signAccessToken } from "@/lib/jwt";
@@ -14,41 +13,14 @@ import { postLoginDestination } from "@/lib/role-routing";
 import { setActiveCompanyCookie, setSessionCookie } from "@/lib/session-cookie";
 import { isSuperBossEmail } from "@/lib/super-boss";
 
-const bodySchema = z
-  .object({
-    email: z.string().optional(),
-    mobile: z.string().optional(),
-    password: z.string().min(1, "Password is required"),
-    /** When true (e.g. API clients), return JSON instead of 303 redirect. */
-    respondWithJson: z.boolean().optional(),
-    /** Safe return path after sign-in (same-origin flows). */
-    from: z.string().optional(),
-  })
-  .superRefine((data, ctx) => {
-    const email = data.email?.trim();
-    const mobile = data.mobile?.trim();
-    if (email && mobile) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["email"],
-        message: "Use either email or mobile",
-      });
-    }
-    if (!email && !mobile) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["mobile"],
-        message: "Mobile number or email is required",
-      });
-    }
-    if (email && !z.string().email().safeParse(email).success) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["email"],
-        message: "Enter a valid email",
-      });
-    }
-  });
+const bodySchema = z.object({
+  email: z.string().trim().min(1, "Email is required").email("Enter a valid email"),
+  password: z.string().min(1, "Password is required"),
+  /** When true (e.g. API clients), return JSON instead of 303 redirect. */
+  respondWithJson: z.boolean().optional(),
+  /** Safe return path after sign-in (same-origin flows). */
+  from: z.string().optional(),
+});
 
 function isBossRole(role: UserRole): boolean {
   return role === UserRole.ADMIN;
@@ -71,11 +43,11 @@ function internalPostLoginLocation(
   workspaceActivated: boolean,
   userEmail: string,
 ): string {
-  if (needsOnboardingFlow || companyId == null || !workspaceActivated) {
-    return "/onboarding";
-  }
   if (isSuperBossEmail(userEmail)) {
     return "/bgos/control";
+  }
+  if (needsOnboardingFlow || companyId == null || !workspaceActivated) {
+    return "/onboarding";
   }
   return postLoginDestination(String(role), from?.trim() ?? null);
 }
@@ -107,76 +79,34 @@ export async function POST(request: Request) {
       return zodValidationErrorResponse(parsed.error);
     }
 
-    const { password } = parsed.data;
-    const email = parsed.data.email?.trim();
-    const mobileRaw = parsed.data.mobile?.trim();
+    const { password, email: emailRaw } = parsed.data;
+    const email = emailRaw.trim();
 
-    let user;
-    if (email) {
-      user = await prisma.user.findFirst({
-        where: { email: { equals: email, mode: "insensitive" } },
-        include: {
-          memberships: {
-            include: {
-              company: {
-                select: {
-                  id: true,
-                  name: true,
-                  plan: true,
-                  trialEndDate: true,
-                  subscriptionPeriodEnd: true,
-                },
+    const user = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: "insensitive" } },
+      include: {
+        memberships: {
+          include: {
+            company: {
+              select: {
+                id: true,
+                name: true,
+                plan: true,
+                trialEndDate: true,
+                subscriptionPeriodEnd: true,
               },
             },
-            orderBy: { createdAt: "asc" },
           },
+          orderBy: { createdAt: "asc" },
         },
-      });
-    } else {
-      const variants = mobileLookupVariants(mobileRaw ?? "");
-      if (variants.length === 0) {
-        return NextResponse.json(
-          {
-            success: false as const,
-            ok: false as const,
-            error: "Enter a valid mobile number",
-            code: "VALIDATION_ERROR",
-          },
-          { status: 400 },
-        );
-      }
-      user = await prisma.user.findFirst({
-        where: {
-          OR: variants.map((m) => ({
-            mobile: { equals: m, mode: "insensitive" as const },
-          })),
-        },
-        include: {
-          memberships: {
-            include: {
-              company: {
-                select: {
-                  id: true,
-                  name: true,
-                  plan: true,
-                  trialEndDate: true,
-                  subscriptionPeriodEnd: true,
-                },
-              },
-            },
-            orderBy: { createdAt: "asc" },
-          },
-        },
-      });
-    }
+      },
+    });
 
     const authError = NextResponse.json(
       {
         success: false as const,
         ok: false as const,
-        error: email
-          ? "Invalid email or password"
-          : "Invalid mobile number or password",
+        error: "Invalid email or password",
         code: AUTH_ERROR_CODES.INVALID_CREDENTIALS,
       },
       { status: 401 },
@@ -202,17 +132,6 @@ export async function POST(request: Request) {
     let needsOnboarding: boolean;
 
     if (!membership) {
-      if (!email) {
-        return NextResponse.json(
-          {
-            success: false as const,
-            ok: false as const,
-            error: "No company access for this account",
-            code: "NO_MEMBERSHIP",
-          },
-          { status: 403 },
-        );
-      }
       companyPlan = CompanyPlan.BASIC;
       companyId = null;
       sessionRole = UserRole.ADMIN;

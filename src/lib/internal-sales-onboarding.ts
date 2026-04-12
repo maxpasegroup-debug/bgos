@@ -1,7 +1,13 @@
 import "server-only";
 
 import type { Lead, OnboardingTask } from "@prisma/client";
-import { InternalSalesStage, UserRole } from "@prisma/client";
+import {
+  InternalSalesStage,
+  LeadOnboardingType,
+  TechPipelineStage,
+  TechQueuePriority,
+  UserRole,
+} from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { internalStageToLeadStatus } from "@/lib/internal-sales-org";
 import { logInternalLeadActivity } from "@/lib/internal-sales-activity";
@@ -29,6 +35,12 @@ export type OnboardingSnapshotInput = {
   whatsApp?: string | null;
 };
 
+function priorityForOnboardingType(t: LeadOnboardingType | null | undefined): TechQueuePriority {
+  if (t === LeadOnboardingType.ENTERPRISE) return TechQueuePriority.CRITICAL;
+  if (t === LeadOnboardingType.PRO) return TechQueuePriority.HIGH;
+  return TechQueuePriority.LOW;
+}
+
 export async function createOnboardingTaskForLead(params: {
   companyId: string;
   leadId: string;
@@ -36,8 +48,18 @@ export async function createOnboardingTaskForLead(params: {
   snapshot: OnboardingSnapshotInput;
   /** When true, moves lead to Closed Won and syncs CRM status. */
   closeWon: boolean;
+  leadOnboardingType?: LeadOnboardingType | null;
+  formPayload?: Record<string, unknown> | null;
 }) {
-  const { companyId, leadId, createdByUserId, snapshot, closeWon } = params;
+  const {
+    companyId,
+    leadId,
+    createdByUserId,
+    snapshot,
+    closeWon,
+    leadOnboardingType,
+    formPayload,
+  } = params;
 
   const task = await prisma.$transaction(async (tx) => {
     const row = await tx.onboardingTask.create({
@@ -56,6 +78,12 @@ export async function createOnboardingTaskForLead(params: {
         snapshotRequirements: snapshot.requirements?.trim() || null,
         snapshotPlan: snapshot.plan?.trim() || null,
         snapshotWhatsApp: snapshot.whatsApp?.trim() || null,
+        leadOnboardingType: leadOnboardingType ?? null,
+        techQueuePriority: priorityForOnboardingType(leadOnboardingType),
+        pipelineStage: TechPipelineStage.RECEIVED,
+        ...(formPayload !== undefined && formPayload !== null
+          ? { formPayload: formPayload as object }
+          : {}),
         createdByUserId,
       },
     });
@@ -132,6 +160,7 @@ export async function ensureOnboardingOnClosedWon(params: {
     createdByUserId: actorUserId,
     snapshot: snap,
     closeWon: false,
+    leadOnboardingType: lead.onboardingType ?? null,
   });
 }
 

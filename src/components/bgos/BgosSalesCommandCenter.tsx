@@ -4,8 +4,10 @@ import type { LeadStatus } from "@prisma/client";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { UserManualCategory } from "@prisma/client";
 import { BgosAddLeadModal } from "./BgosAddLeadModal";
 import { BGOS_MAIN_PAD } from "./layoutTokens";
+import { ViewModuleGuideButton } from "./ViewModuleGuideButton";
 
 type RangePreset = "today" | "this_month" | "3_months" | "1_year";
 
@@ -202,6 +204,7 @@ export function BgosSalesCommandCenter() {
               <p className="mt-1 text-sm text-white/60">Manage your leads and revenue</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <ViewModuleGuideButton category={UserManualCategory.SALES} />
               <button
                 type="button"
                 onClick={() => setAddLeadOpen(true)}

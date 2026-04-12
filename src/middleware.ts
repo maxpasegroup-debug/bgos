@@ -22,6 +22,7 @@ import { isPlanLockedToBasic } from "@/lib/plan-production-lock";
 import {
   absoluteRoleHomeUrl,
   hostTenantFromHeader,
+  publicBgosOrigin,
   publicIceconnectOrigin,
   type HostTenant,
 } from "@/lib/host-routing";
@@ -450,6 +451,17 @@ export async function middleware(request: NextRequest) {
   }
 
   if (
+    tenant === "ice" &&
+    !pathname.startsWith("/api") &&
+    edgeSuperBoss &&
+    (normalizedPath === "/iceconnect" || normalizedPath.startsWith("/iceconnect/")) &&
+    normalizedPath !== "/iceconnect/login" &&
+    !normalizedPath.startsWith("/iceconnect/login/")
+  ) {
+    return NextResponse.redirect(new URL("/bgos/control", publicBgosOrigin()));
+  }
+
+  if (
     normalizedPath === "/bgos/control" ||
     normalizedPath.startsWith("/bgos/control/")
   ) {
@@ -492,6 +504,7 @@ export async function middleware(request: NextRequest) {
   if (
     tenant === "bgos" &&
     !pathname.startsWith("/api") &&
+    !edgeSuperBoss &&
     (normalizePathname(pathname) === "/bgos" || pathname.startsWith("/bgos/")) &&
     subscriptionExpiredJwt &&
     !billingFunnelPagePath(pathname)
@@ -501,6 +514,7 @@ export async function middleware(request: NextRequest) {
 
   if (
     pathname.startsWith("/api") &&
+    !edgeSuperBoss &&
     subscriptionExpiredJwt &&
     !trialExpiredAllowsApiRequest(normalizedPath, method)
   ) {
@@ -518,6 +532,7 @@ export async function middleware(request: NextRequest) {
   const planTier = jwtCompanyPlanFromUnknown(companyPlan);
   if (
     pathname.startsWith("/api") &&
+    !edgeSuperBoss &&
     pathnameRequiresProPlan(pathname) &&
     !jwtPlanIsProPlus(planTier)
   ) {

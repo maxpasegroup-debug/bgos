@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { InternalSalesStage, InternalTechStage, UserRole } from "@prisma/client";
+import { InternalSalesStage, InternalTechStage, TechPipelineStage, UserRole } from "@prisma/client";
 import { z } from "zod";
 import { jsonError, jsonSuccess, parseJsonBodyZod } from "@/lib/api-response";
 import { requireAuthWithCompany, type AuthUserWithCompany } from "@/lib/auth";
@@ -17,6 +17,7 @@ import {
 } from "@/lib/internal-sales-metro";
 import { notifyInternalUsers } from "@/lib/internal-sales-notifications";
 import { prisma } from "@/lib/prisma";
+import { internalTechToPipelineStage } from "@/lib/tech-pipeline-sync";
 import { getUserCompanyMembership } from "@/lib/user-company";
 import { isCompanyBasicTrialExpired, trialExpiredJsonResponse } from "@/lib/trial";
 
@@ -79,6 +80,13 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     if (tech !== InternalTechStage.READY_FOR_DELIVERY) {
       return jsonError(400, "TECH_NOT_READY", "Complete all tech stages first");
     }
+    const obTask = await prisma.onboardingTask.findUnique({ where: { leadId } });
+    if (obTask) {
+      await prisma.onboardingTask.update({
+        where: { id: obTask.id },
+        data: { pipelineStage: TechPipelineStage.READY },
+      });
+    }
     await prisma.lead.update({
       where: { id: leadId },
       data: {
@@ -124,6 +132,13 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
       internalStageUpdatedAt: now,
     },
   });
+  const obTask = await prisma.onboardingTask.findUnique({ where: { leadId } });
+  if (obTask) {
+    await prisma.onboardingTask.update({
+      where: { id: obTask.id },
+      data: { pipelineStage: internalTechToPipelineStage(nxt) },
+    });
+  }
   await logInternalLeadActivity({
     companyId: internalCtx.companyId,
     leadId,

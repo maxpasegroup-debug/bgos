@@ -2,11 +2,24 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { UserManualCategory } from "@prisma/client";
+import { fetchStripeCheckoutUrl } from "@/lib/stripe-plan-checkout";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
+import { useBgosDashboardContext } from "@/components/bgos/BgosDataProvider";
+import { ViewModuleGuideButton } from "@/components/bgos/ViewModuleGuideButton";
 
 const WA_SALES =
   "https://wa.me/918089239823?text=Hi%20I%20want%20BGOS%20Sales%20Booster";
+
+const RAZORPAY_KEY = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID?.trim();
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
+  }
+}
 
 const CHANNELS = [
   { id: "wa", name: "WhatsApp", color: "from-emerald-500/25 to-emerald-600/10", icon: IconWhatsApp },
@@ -28,14 +41,222 @@ const BENEFITS = [
   "Missed Lead Recovery",
 ];
 
+function loadRazorpayScript(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (window.Razorpay) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://checkout.razorpay.com/v1/checkout.js";
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("Could not load Razorpay checkout"));
+    document.body.appendChild(s);
+  });
+}
+
+function planIsProPlus(plan: string | undefined | null): boolean {
+  return plan === "PRO" || plan === "ENTERPRISE";
+}
+
 export function SalesBoosterLandingClient() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { planLockedToBasic } = useBgosDashboardContext();
+  const [companyPlan, setCompanyPlan] = useState<string | null>(null);
+  const [meLoaded, setMeLoaded] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
+  const [banner, setBanner] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  const hasPro = planIsProPlus(companyPlan);
+
+  const loadMe = useCallback(async () => {
+    try {
+      const res = await fetch("/api/auth/me", { credentials: "include" });
+      const j = (await res.json()) as {
+        authenticated?: boolean;
+        user?: { companyPlan?: string };
+        billing?: { plan?: string };
+      };
+      if (res.ok && j.authenticated) {
+        const p = j.billing?.plan ?? j.user?.companyPlan ?? null;
+        setCompanyPlan(p ?? null);
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setMeLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadMe();
+  }, [loadMe]);
+
+  useEffect(() => {
+    if (searchParams.get("upgraded") === "1") {
+      setBanner({ kind: "ok", text: "Plan activated successfully — Sales Booster is unlocked." });
+      router.replace("/sales-booster", { scroll: false });
+      void loadMe();
+    }
+  }, [searchParams, router, loadMe]);
+
+  const runProUpgrade = useCallback(async () => {
+    if (planLockedToBasic) {
+      setBanner({ kind: "err", text: "Upgrades are not available in this environment." });
+      return;
+    }
+    setUpgrading(true);
+    setBanner(null);
+    try {
+      if (!RAZORPAY_KEY) {
+        const stripe = await fetchStripeCheckoutUrl("PRO");
+        setUpgrading(false);
+        if (!stripe.ok) {
+          setBanner({ kind: "err", text: stripe.message });
+          return;
+        }
+        window.location.assign(stripe.url);
+        return;
+      }
+
+      await loadRazorpayScript();
+      const orderRes = await fetch("/api/payment/razorpay/order", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: "pro" }),
+      });
+      const orderJson = (await orderRes.json()) as {
+        ok?: boolean;
+        message?: string;
+        error?: string;
+        order_id?: string;
+        amount?: number;
+        currency?: string;
+        data?: { order_id?: string; amount?: number; currency?: string };
+      };
+      if (!orderRes.ok) {
+        setUpgrading(false);
+        setBanner({
+          kind: "err",
+          text: orderJson.message ?? orderJson.error ?? "Could not create payment order.",
+        });
+        return;
+      }
+      const orderId = orderJson.order_id ?? orderJson.data?.order_id;
+      const amount = orderJson.amount ?? orderJson.data?.amount;
+      const currency = orderJson.currency ?? orderJson.data?.currency ?? "INR";
+      if (!orderId || typeof amount !== "number") {
+        setUpgrading(false);
+        setBanner({ kind: "err", text: "Invalid order response from server." });
+        return;
+      }
+
+      const meRes = await fetch("/api/auth/me", { credentials: "include" });
+      const meJson = (await meRes.json()) as { user?: { name?: string; email?: string } };
+      const prefillName = (meJson.user?.name ?? "").trim() || "Customer";
+      const prefillEmail = (meJson.user?.email ?? "").trim() || "customer@example.com";
+
+      const RazorpayCtor = window.Razorpay;
+      if (!RazorpayCtor) {
+        setUpgrading(false);
+        setBanner({ kind: "err", text: "Razorpay failed to load. Refresh and try again." });
+        return;
+      }
+
+      const rzp = new RazorpayCtor({
+        key: RAZORPAY_KEY,
+        amount,
+        currency,
+        order_id: orderId,
+        name: "BGOS",
+        description: "Pro — monthly (Sales Booster)",
+        prefill: { name: prefillName, email: prefillEmail },
+        handler: (response: {
+          razorpay_payment_id: string;
+          razorpay_order_id: string;
+          razorpay_signature: string;
+        }) => {
+          void (async () => {
+            try {
+              const vRes = await fetch("/api/payment/razorpay/verify", {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                }),
+              });
+              const vJson = (await vRes.json()) as { message?: string; error?: string };
+              if (!vRes.ok) {
+                setUpgrading(false);
+                setBanner({
+                  kind: "err",
+                  text: vJson.message ?? vJson.error ?? "Payment verification failed.",
+                });
+                return;
+              }
+              await fetch("/api/auth/refresh-session", { method: "POST", credentials: "include" });
+              setUpgrading(false);
+              setUpgradeOpen(false);
+              window.location.assign("/sales-booster?upgraded=1");
+            } catch {
+              setUpgrading(false);
+              setBanner({
+                kind: "err",
+                text: "Could not verify payment. Contact support if you were charged.",
+              });
+            }
+          })();
+        },
+        modal: {
+          ondismiss: () => {
+            setBanner({ kind: "err", text: "Payment cancelled — you can try again when you’re ready." });
+          },
+        },
+      });
+      setUpgrading(false);
+      rzp.open();
+    } catch {
+      setUpgrading(false);
+      setBanner({ kind: "err", text: "Checkout could not start. Try again." });
+    }
+  }, [planLockedToBasic]);
+
   const scrollChannels = useCallback(() => {
     document.getElementById("sales-booster-channels")?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
+  const showConnectGate = meLoaded && !hasPro;
+
   return (
     <div className={`relative min-h-0 flex-1 overflow-y-auto ${BGOS_MAIN_PAD} pb-20 pt-8`}>
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(255,195,0,0.12),transparent)]" />
+
+      {banner ? (
+        <div
+          role="status"
+          className={
+            banner.kind === "ok"
+              ? "relative z-10 mx-auto mb-6 max-w-3xl rounded-xl border border-emerald-500/35 bg-emerald-500/15 px-4 py-3 text-sm text-emerald-100"
+              : "relative z-10 mx-auto mb-6 max-w-3xl rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-3 text-sm text-red-100"
+          }
+        >
+          {banner.text}
+        </div>
+      ) : null}
+
+      {upgrading ? (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/55 backdrop-blur-sm">
+          <div className="rounded-2xl border border-white/15 bg-[#121821] px-8 py-6 text-center shadow-xl">
+            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-[#FFC300]/40 border-t-[#FFC300]" />
+            <p className="mt-4 text-sm font-medium text-white">Upgrading…</p>
+            <p className="mt-1 text-xs text-white/55">Complete payment in the Razorpay window</p>
+          </div>
+        </div>
+      ) : null}
 
       <motion.section
         initial={{ opacity: 0, y: 16 }}
@@ -56,6 +277,7 @@ export function SalesBoosterLandingClient() {
           Connect your channels. Nexa handles leads, follow-ups, and conversions automatically.
         </p>
         <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap">
+          <ViewModuleGuideButton category={UserManualCategory.SALES_BOOSTER} className="justify-center" />
           <button
             type="button"
             onClick={scrollChannels}
@@ -63,12 +285,14 @@ export function SalesBoosterLandingClient() {
           >
             Explore Sales Booster
           </button>
-          <Link
-            href="/bgos/subscription"
-            className="w-full min-w-[200px] rounded-2xl border border-white/15 bg-white/[0.06] px-8 py-4 text-center text-sm font-semibold text-white transition hover:bg-white/[0.1] sm:w-auto"
+          <button
+            type="button"
+            disabled={hasPro || planLockedToBasic}
+            onClick={() => (hasPro ? undefined : setUpgradeOpen(true))}
+            className="w-full min-w-[200px] rounded-2xl border border-white/15 bg-white/[0.06] px-8 py-4 text-sm font-semibold text-white transition hover:bg-white/[0.1] enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
-            Upgrade to Pro
-          </Link>
+            {hasPro ? "You’re on Pro" : "Upgrade to Pro"}
+          </button>
           <a
             href={WA_SALES}
             target="_blank"
@@ -94,34 +318,70 @@ export function SalesBoosterLandingClient() {
         <p className="mx-auto mt-2 max-w-md text-center text-sm text-white/55">
           Link every place customers talk to you. BGOS keeps the story in one place.
         </p>
-        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {CHANNELS.map((ch, i) => (
-            <motion.div
-              key={ch.id}
-              initial={{ opacity: 0, y: 12 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.05, duration: 0.4 }}
-              whileHover={{ y: -4, transition: { duration: 0.2 } }}
-              className={`group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br ${ch.color} p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.06)] backdrop-blur-sm transition-[box-shadow] hover:border-[#FFC300]/35 hover:shadow-[0_0_40px_-12px_rgba(255,195,0,0.35)]`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-black/30 text-white">
-                  <ch.icon className="h-6 w-6" />
-                </div>
-                <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/55">
-                  Not connected
-                </span>
-              </div>
-              <h3 className="mt-4 text-lg font-semibold text-white">{ch.name}</h3>
+
+        {showConnectGate ? (
+          <div className="relative mt-10 rounded-3xl border border-[#FFC300]/25 bg-black/40 p-6 backdrop-blur-md sm:p-8">
+            <div className="pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-br from-[#FFC300]/[0.07] to-transparent" />
+            <div className="relative text-center">
+              <p className="text-lg font-semibold text-white">🔒 Upgrade to Pro to activate Sales Booster</p>
+              <p className="mx-auto mt-2 max-w-lg text-sm text-white/60">
+                Channel connections (WhatsApp, Facebook, Instagram, Email, and more) unlock on Pro. Upgrade to
+                enable Connect actions and the full workspace.
+              </p>
               <button
                 type="button"
-                className="mt-4 w-full rounded-xl border border-white/15 bg-black/25 py-2.5 text-sm font-medium text-white/90 transition group-hover:border-[#FFC300]/40 group-hover:text-[#FFE8A8]"
+                disabled={planLockedToBasic}
+                onClick={() => setUpgradeOpen(true)}
+                className="mt-5 inline-flex min-h-[48px] items-center justify-center rounded-2xl bg-[#FFC300] px-8 text-sm font-bold text-black transition hover:bg-[#ffdb4d] disabled:opacity-50"
               >
-                Connect
+                Upgrade to Pro
               </button>
-            </motion.div>
-          ))}
+            </div>
+          </div>
+        ) : null}
+
+        <div className={`relative mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 ${showConnectGate ? "opacity-45" : ""}`}>
+          {CHANNELS.map((ch, i) => {
+            const locked = showConnectGate;
+            return (
+              <motion.div
+                key={ch.id}
+                initial={{ opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.05, duration: 0.4 }}
+                whileHover={locked ? undefined : { y: -4, transition: { duration: 0.2 } }}
+                className={`group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br ${ch.color} p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.06)] backdrop-blur-sm transition-[box-shadow] ${locked ? "grayscale" : "hover:border-[#FFC300]/35 hover:shadow-[0_0_40px_-12px_rgba(255,195,0,0.35)]"}`}
+              >
+                {locked ? (
+                  <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/50">
+                    <span className="rounded-full bg-black/70 px-3 py-1 text-2xl" aria-hidden>
+                      🔒
+                    </span>
+                  </div>
+                ) : null}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-black/30 text-white">
+                    <ch.icon className="h-6 w-6" />
+                  </div>
+                  <span className="rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/55">
+                    {locked ? "Pro only" : "Not connected"}
+                  </span>
+                </div>
+                <h3 className="mt-4 text-lg font-semibold text-white">{ch.name}</h3>
+                <button
+                  type="button"
+                  disabled={locked}
+                  onClick={() => {
+                    if (locked) setUpgradeOpen(true);
+                  }}
+                  className="mt-4 w-full rounded-xl border border-white/15 bg-black/25 py-2.5 text-sm font-medium text-white/90 transition group-hover:border-[#FFC300]/40 group-hover:text-[#FFE8A8] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {locked ? "Connect (locked)" : "Connect"}
+                </button>
+              </motion.div>
+            );
+          })}
         </div>
       </motion.section>
 
@@ -162,16 +422,18 @@ export function SalesBoosterLandingClient() {
       >
         <h2 className="text-2xl font-bold text-white sm:text-3xl">Activate your Sales Engine</h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-white/65">
-          Move to Pro to open the full Sales Booster workspace — automations, inbox, and performance in
-          one view.
+          Move to Pro to open the full Sales Booster workspace — automations, inbox, and performance in one
+          view.
         </p>
         <div className="mt-8 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
-          <Link
-            href="/bgos/subscription"
-            className="inline-flex min-h-[52px] items-center justify-center rounded-2xl bg-[#FFC300] px-10 text-sm font-bold text-black transition hover:bg-[#ffdb4d]"
+          <button
+            type="button"
+            disabled={hasPro || planLockedToBasic}
+            onClick={() => setUpgradeOpen(true)}
+            className="inline-flex min-h-[52px] items-center justify-center rounded-2xl bg-[#FFC300] px-10 text-sm font-bold text-black transition hover:bg-[#ffdb4d] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Upgrade to Pro
-          </Link>
+            {hasPro ? "Already on Pro" : "Upgrade to Pro"}
+          </button>
           <a
             href={WA_SALES}
             target="_blank"
@@ -182,6 +444,39 @@ export function SalesBoosterLandingClient() {
           </a>
         </div>
       </motion.section>
+
+      {upgradeOpen ? (
+        <div className="fixed inset-0 z-[150] flex items-end justify-center bg-black/60 p-4 sm:items-center">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-white/10 bg-[#121821] p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-white">Upgrade to Pro</h3>
+            <p className="mt-2 text-sm text-white/60">
+              ₹12,000 / month — unlock Sales Booster channel connections and the full workspace. You’ll complete
+              payment securely with Razorpay.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={upgrading}
+                onClick={() => void runProUpgrade()}
+                className="min-h-11 flex-1 rounded-xl bg-[#FFC300] px-4 text-sm font-bold text-black disabled:opacity-60"
+              >
+                {upgrading ? "Opening checkout…" : "Pay with Razorpay"}
+              </button>
+              <button
+                type="button"
+                disabled={upgrading}
+                onClick={() => setUpgradeOpen(false)}
+                className="min-h-11 rounded-xl border border-white/15 px-4 text-sm text-white/80"
+              >
+                Cancel
+              </button>
+            </div>
+            <Link href="/bgos/subscription" className="mt-4 inline-block text-xs text-cyan-300 underline">
+              Or manage plan on Subscription page
+            </Link>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import {
   InternalOnboardingApprovalStatus,
   InternalSalesStage,
   InternalTechStage,
+  LeadOnboardingType,
 } from "@prisma/client";
 import { z } from "zod";
 import { jsonError, jsonSuccess, parseJsonBodyZod } from "@/lib/api-response";
@@ -38,6 +39,7 @@ const patchSchema = z
     lastContactedAt: z.string().datetime().optional(),
     nextFollowUpAt: z.union([z.string().datetime(), z.null()]).optional(),
     assignedToUserId: z.union([z.string().cuid(), z.null()]).optional(),
+    onboardingType: z.nativeEnum(LeadOnboardingType).nullable().optional(),
   })
   .refine((d) => !(d.stage !== undefined && d.advanceInternalSalesStage === true), {
     message: "Send either stage or advanceInternalSalesStage, not both",
@@ -57,6 +59,7 @@ async function serializeLeadFull(
     internalCallStatus: InternalCallStatus | null;
     internalTechStage: InternalTechStage | null;
     internalOnboardingApprovalStatus: InternalOnboardingApprovalStatus | null;
+    onboardingType: LeadOnboardingType | null;
     internalStageUpdatedAt: Date | null;
     lastContactedAt: Date | null;
     nextFollowUpAt: Date | null;
@@ -102,6 +105,7 @@ async function serializeLeadFull(
     pendingBossApproval:
       lead.internalSalesStage === InternalSalesStage.ONBOARDING_FORM_FILLED &&
       lead.internalOnboardingApprovalStatus === InternalOnboardingApprovalStatus.PENDING,
+    onboardingType: lead.onboardingType ?? null,
   };
 }
 
@@ -165,6 +169,26 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
     }
   }
 
+  const lockedOnboardingTypeStages = new Set<InternalSalesStage>([
+    InternalSalesStage.ONBOARDING_FORM_FILLED,
+    InternalSalesStage.BOSS_APPROVAL_PENDING,
+    InternalSalesStage.SENT_TO_TECH,
+    InternalSalesStage.TECH_READY,
+    InternalSalesStage.DELIVERED,
+    InternalSalesStage.CLIENT_LIVE,
+  ]);
+  if (
+    parsed.data.onboardingType !== undefined &&
+    lead.internalSalesStage &&
+    lockedOnboardingTypeStages.has(lead.internalSalesStage)
+  ) {
+    return jsonError(
+      400,
+      "LOCKED",
+      "Cannot change onboarding type after the onboarding form or later milestones",
+    );
+  }
+
   let nextAssign = lead.assignedTo;
   if (parsed.data.assignedToUserId !== undefined) {
     if (parsed.data.assignedToUserId === null) {
@@ -205,6 +229,9 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
   }
 
   const data: Parameters<typeof prisma.lead.update>[0]["data"] = {
+    ...(parsed.data.onboardingType !== undefined
+      ? { onboardingType: parsed.data.onboardingType }
+      : {}),
     ...(parsed.data.notes !== undefined ? { internalSalesNotes: parsed.data.notes || null } : {}),
     ...(parsed.data.callStatus !== undefined ? { internalCallStatus: parsed.data.callStatus } : {}),
     ...(targetStage !== undefined
@@ -300,6 +327,19 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
         parsed.data.nextFollowUpAt === null
           ? "Follow-up date cleared"
           : `Next follow-up: ${parsed.data.nextFollowUpAt}`,
+    });
+  }
+  if (
+    parsed.data.onboardingType !== undefined &&
+    parsed.data.onboardingType !== lead.onboardingType
+  ) {
+    await logInternalLeadActivity({
+      companyId: internalCtx.companyId,
+      leadId,
+      userId: session.sub,
+      action: INTERNAL_ACTIVITY.STAGE,
+      detail: `Onboarding type set: ${parsed.data.onboardingType ?? "cleared"}`,
+      metadata: { onboardingType: parsed.data.onboardingType },
     });
   }
 

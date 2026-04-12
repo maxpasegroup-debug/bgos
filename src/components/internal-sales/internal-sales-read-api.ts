@@ -49,6 +49,7 @@ export type DashboardPayload = {
     noActivityLeads: { id: string; name: string; lastContactedAt: string | null }[];
     dailySummary: { leadsToday: number; callsToday: number; conversionsPercent: number };
   };
+  nexa?: { suggestions: string[] };
   trendRange?: string;
 };
 
@@ -71,6 +72,9 @@ export function readDashboardPayload(j: unknown): DashboardPayload | null {
         : [],
       alerts: Array.isArray(j.alerts) ? (j.alerts as string[]) : [],
       automation: isRecord(j.automation) ? (j.automation as DashboardPayload["automation"]) : undefined,
+      nexa: isRecord(j.nexa) && Array.isArray(j.nexa.suggestions)
+        ? { suggestions: j.nexa.suggestions as string[] }
+        : undefined,
       trendRange: typeof j.trendRange === "string" ? j.trendRange : undefined,
     };
   }
@@ -91,6 +95,9 @@ export function readDashboardPayload(j: unknown): DashboardPayload | null {
         : [],
       alerts: Array.isArray(d.alerts) ? (d.alerts as string[]) : [],
       automation: isRecord(d.automation) ? (d.automation as DashboardPayload["automation"]) : undefined,
+      nexa: isRecord(d.nexa) && Array.isArray(d.nexa.suggestions)
+        ? { suggestions: d.nexa.suggestions as string[] }
+        : undefined,
       trendRange: typeof d.trendRange === "string" ? d.trendRange : undefined,
     };
   }

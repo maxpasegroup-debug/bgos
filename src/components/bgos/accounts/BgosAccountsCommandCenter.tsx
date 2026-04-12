@@ -1,9 +1,11 @@
 "use client";
 
+import { UserManualCategory } from "@prisma/client";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
+import { ViewModuleGuideButton } from "@/components/bgos/ViewModuleGuideButton";
 
 type RangePreset = "today" | "this_month" | "3_months" | "1_year";
 type AccountsData = {
@@ -228,6 +230,7 @@ export function BgosAccountsCommandCenter() {
               <p className="mt-1 text-sm text-white/60">Manage your money and cash flow</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <ViewModuleGuideButton category={UserManualCategory.ACCOUNTS} />
               <Link
                 href="/bgos/money/invoices"
                 className="rounded-xl border border-[#FFC300]/35 bg-[#FFC300]/10 px-4 py-2 text-sm font-semibold text-[#FFE08A]"

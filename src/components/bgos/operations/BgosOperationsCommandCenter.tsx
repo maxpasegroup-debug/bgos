@@ -1,8 +1,10 @@
 "use client";
 
+import { UserManualCategory } from "@prisma/client";
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
+import { ViewModuleGuideButton } from "@/components/bgos/ViewModuleGuideButton";
 
 type RangePreset = "today" | "this_week" | "this_month";
 type WorkflowStage =
@@ -187,6 +189,7 @@ export function BgosOperationsCommandCenter() {
               <p className="mt-1 text-sm text-white/60">Track execution and delivery</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <ViewModuleGuideButton category={UserManualCategory.OPERATIONS} />
               <button
                 type="button"
                 onClick={() => setSiteOpen(true)}

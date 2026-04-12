@@ -5,6 +5,7 @@ import {
   InternalOnboardingApprovalStatus,
   InternalSalesStage,
   InternalTechStage,
+  LeadOnboardingType,
   type OnboardingTaskStatus,
 } from "@prisma/client";
 import { z } from "zod";
@@ -41,6 +42,7 @@ function serializeLead(
     internalSalesStage: InternalSalesStage | null;
     internalOnboardingApprovalStatus: InternalOnboardingApprovalStatus | null;
     internalTechStage: InternalTechStage | null;
+    onboardingType: LeadOnboardingType | null;
     internalCallStatus: InternalCallStatus | null;
     lastContactedAt: Date | null;
     nextFollowUpAt: Date | null;
@@ -76,6 +78,7 @@ function serializeLead(
       stage === InternalSalesStage.ONBOARDING_FORM_FILLED &&
       lead.internalOnboardingApprovalStatus === InternalOnboardingApprovalStatus.PENDING,
     internalTechStage: lead.internalTechStage ?? null,
+    onboardingType: lead.onboardingType ?? null,
   };
 }
 

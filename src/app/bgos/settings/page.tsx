@@ -15,12 +15,20 @@ export default async function BgosCompanySettingsPage() {
   return (
     <div className={`${BGOS_MAIN_PAD} pb-16 pt-8`}>
       <div className="mx-auto max-w-2xl">
-        <Link
-          href="/bgos"
-          className="text-xs font-medium text-white/50 transition hover:text-[#FFC300]"
-        >
-          ← Command center
-        </Link>
+        <div className="flex flex-wrap gap-x-4 gap-y-1">
+          <Link
+            href="/bgos"
+            className="text-xs font-medium text-white/50 transition hover:text-[#FFC300]"
+          >
+            ← Command center
+          </Link>
+          <Link
+            href="/bgos/user-manuals"
+            className="text-xs font-medium text-white/50 transition hover:text-[#FFC300]"
+          >
+            User manuals →
+          </Link>
+        </div>
         <h1 className="mt-4 text-2xl font-semibold tracking-tight text-white">Company settings</h1>
         <p className="mt-1 text-sm text-white/55">
           Business profile used for ICECONNECT branding and future quotations, invoices, and PDFs.

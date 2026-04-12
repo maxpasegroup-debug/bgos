@@ -486,6 +486,17 @@ export function InternalSalesBossHub({ theme }: { theme: "bgos" | "ice" }) {
               </section>
             ) : null}
 
+            {dashboard.nexa?.suggestions?.length ? (
+              <section className={card}>
+                <p className={labelCls}>Nexa · suggested next steps</p>
+                <ul className="mt-2 list-inside list-disc text-sm">
+                  {dashboard.nexa.suggestions.map((s, i) => (
+                    <li key={i}>{s}</li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
             {dashboard.alerts.length > 0 ? (
               <section className={card}>
                 <p className={labelCls}>Risk & alerts</p>
@@ -606,6 +617,10 @@ export function InternalSalesBossHub({ theme }: { theme: "bgos" | "ice" }) {
 
         <section className={card}>
           <p className={labelCls}>Public form default assignee</p>
+          <p className="mt-1 text-[11px] text-amber-200/80">
+            Public /lead capture is disabled — leads are sales-created only. This default is unused until you re-enable
+            a public endpoint.
+          </p>
           <select
             className={`${inputCls} mt-2 max-w-md`}
             value={defaultAssigneeId ?? ""}
@@ -731,6 +746,17 @@ export function InternalSalesBossHub({ theme }: { theme: "bgos" | "ice" }) {
                           <p className="mt-1 text-[11px] opacity-60">
                             Onboarding: {l.onboardingStatus ?? "NOT_STARTED"}
                           </p>
+                          {l.onboardingType ? (
+                            <p className="mt-0.5 text-[10px] font-medium text-amber-100/90">
+                              {l.onboardingType === "BASIC"
+                                ? "🟢 BASIC"
+                                : l.onboardingType === "PRO"
+                                  ? "🔵 PRO"
+                                  : "🟣 ENTERPRISE"}
+                            </p>
+                          ) : (
+                            <p className="mt-0.5 text-[10px] text-amber-200/70">Type not set</p>
+                          )}
                         </div>
                       </div>
                       <div className="mt-2">
@@ -752,8 +778,28 @@ export function InternalSalesBossHub({ theme }: { theme: "bgos" | "ice" }) {
                           }
                           onClick={() => setOnboardLead(l)}
                         >
-                          Onboarding form
+                          Type & form
                         </button>
+                        {l.stage === InternalSalesStage.TECH_READY ? (
+                          <button
+                            type="button"
+                            className="rounded bg-emerald-600/90 px-2 py-1 text-[11px] font-medium text-white disabled:opacity-45"
+                            disabled={busyId === l.id}
+                            onClick={() => void patchLead(l.id, { stage: InternalSalesStage.DELIVERED })}
+                          >
+                            Delivered to client
+                          </button>
+                        ) : null}
+                        {l.stage === InternalSalesStage.DELIVERED ? (
+                          <button
+                            type="button"
+                            className="rounded bg-teal-600/90 px-2 py-1 text-[11px] font-medium text-white disabled:opacity-45"
+                            disabled={busyId === l.id}
+                            onClick={() => void patchLead(l.id, { stage: InternalSalesStage.CLIENT_LIVE })}
+                          >
+                            Client live
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           className="rounded bg-slate-600/90 px-2 py-1 text-[11px] font-medium text-white disabled:opacity-45"

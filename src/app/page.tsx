@@ -18,8 +18,7 @@ export default async function Home() {
       if (verified.ok) {
         const p = verified.payload as Record<string, unknown>;
         const em = typeof p.email === "string" ? p.email : "";
-        const sb = p.superBoss === true && isSuperBossEmail(em);
-        redirect(sb ? "/bgos/control" : "/bgos");
+        redirect(isSuperBossEmail(em) ? "/bgos/control" : "/bgos");
       }
     }
   }

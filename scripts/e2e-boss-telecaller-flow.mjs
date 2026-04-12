@@ -157,7 +157,7 @@ async function main() {
   {
     const { res, json } = await req("/api/auth/login", {
       method: "POST",
-      body: { mobile: mobileDigits, password, respondWithJson: true },
+      body: { email: empEmail, password, respondWithJson: true },
     });
     if (!res.ok || !json.ok) fail("login telecaller", `status ${res.status}`, json);
     empJar = mergeCookieJar("", res);

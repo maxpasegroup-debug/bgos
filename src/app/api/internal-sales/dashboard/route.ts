@@ -4,6 +4,7 @@ import {
   InternalSalesStage,
   LeadStatus,
   OnboardingTaskStatus,
+  TechPipelineStage,
   UserRole,
 } from "@prisma/client";
 import { jsonError, jsonSuccess } from "@/lib/api-response";
@@ -66,6 +67,8 @@ export async function GET(request: NextRequest) {
     targetsToday,
     activeOnboardingTasks,
     techPipelineLeadCount,
+    stuckOnboardingIdle,
+    interestedMissingOnboardingType,
   ] = await Promise.all([
     prisma.lead.count({
       where: { companyId, createdAt: { gte: dayStart, lt: dayEnd } },
@@ -148,6 +151,20 @@ export async function GET(request: NextRequest) {
         internalSalesStage: {
           in: [InternalSalesStage.SENT_TO_TECH, InternalSalesStage.TECH_READY],
         },
+      },
+    }),
+    prisma.onboardingTask.count({
+      where: {
+        companyId,
+        pipelineStage: { not: TechPipelineStage.READY },
+        updatedAt: { lt: new Date(Date.now() - 48 * 3600 * 1000) },
+      },
+    }),
+    prisma.lead.count({
+      where: {
+        companyId,
+        internalSalesStage: InternalSalesStage.INTERESTED,
+        onboardingType: null,
       },
     }),
   ]);
@@ -245,6 +262,22 @@ export async function GET(request: NextRequest) {
   if (automation.noActivityLeads.length > 0) {
     alerts.push(`${automation.noActivityLeads.length} leads with no recent activity`);
   }
+  const nexaSuggestions: string[] = [];
+  if (interestedMissingOnboardingType > 0) {
+    nexaSuggestions.push(
+      `Set onboarding type (Basic / Pro / Enterprise) on ${interestedMissingOnboardingType} interested lead(s)`,
+    );
+    alerts.push(
+      `${interestedMissingOnboardingType} interested lead(s) missing onboarding type — open “Type & form”`,
+    );
+  }
+  if (stuckOnboardingIdle > 0) {
+    nexaSuggestions.push(
+      `${stuckOnboardingIdle} tech onboarding(s) idle 48h+ — open onboarding queue or call the client`,
+    );
+    alerts.push(`${stuckOnboardingIdle} onboardings stuck in tech pipeline (48h+)`);
+  }
+  nexaSuggestions.push("Complete onboarding → boss approval → sent to tech → delivery → client live");
   for (const w of weakPerformers.slice(0, 3)) {
     alerts.push(`Weak performer: ${w.name} (${w.conversions}% wins)`);
   }
@@ -282,6 +315,7 @@ export async function GET(request: NextRequest) {
       noActivityLeads: automation.noActivityLeads,
       dailySummary: automation.dailySummary,
     },
+    nexa: { suggestions: nexaSuggestions },
     trendRange: range,
   });
 }

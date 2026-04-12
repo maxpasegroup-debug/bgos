@@ -13,7 +13,7 @@ function firstValidationMessage(details: unknown): string | null {
   if (!details || typeof details !== "object") return null;
   const fe = (details as { fieldErrors?: Record<string, string[] | undefined> }).fieldErrors;
   if (!fe) return null;
-  for (const key of ["name", "mobile", "email", "password", "role"] as const) {
+  for (const key of ["name", "email", "mobile", "password", "role"] as const) {
     const arr = fe[key];
     if (Array.isArray(arr) && typeof arr[0] === "string" && arr[0]) return arr[0];
   }
@@ -73,13 +73,13 @@ export function BgosAddEmployeeForm() {
     try {
       const body: {
         name: string;
-        mobile: string;
+        email: string;
         password: string;
         role: UserRole;
-        email?: string;
-      } = { name: name.trim(), mobile: mobile.trim(), password, role };
-      const emailTrim = email.trim();
-      if (emailTrim) body.email = emailTrim;
+        mobile?: string;
+      } = { name: name.trim(), email: email.trim(), password, role };
+      const mobileTrim = mobile.trim();
+      if (mobileTrim) body.mobile = mobileTrim;
 
       const res = await fetch("/api/users/create", {
         method: "POST",
@@ -125,7 +125,7 @@ export function BgosAddEmployeeForm() {
       setPassword("");
       setRole(UserRole.SALES_EXECUTIVE);
       setSuccess(true);
-      setMsg("Success — employee added. They can sign in to ICECONNECT with mobile and password.");
+      setMsg("Success — employee added. They can sign in with email and password.");
       refetch();
     } catch {
       setMsg("Network error.");
@@ -157,30 +157,30 @@ export function BgosAddEmployeeForm() {
       </div>
       <div>
         <label className="text-[10px] font-semibold uppercase tracking-wider text-white/45">
-          Mobile <span className="text-[#FF3B3B]">*</span>
+          Email <span className="text-[#FF3B3B]">*</span>
         </label>
         <input
+          type="email"
           required
+          disabled={trialReadOnly}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
+          placeholder="name@company.com"
+          className={inputClass}
+        />
+      </div>
+      <div>
+        <label className="text-[10px] font-semibold uppercase tracking-wider text-white/45">
+          Mobile <span className="text-white/35">(optional)</span>
+        </label>
+        <input
           disabled={trialReadOnly}
           value={mobile}
           onChange={(e) => setMobile(e.target.value)}
           inputMode="tel"
           autoComplete="tel"
           placeholder="10–15 digits"
-          className={inputClass}
-        />
-      </div>
-      <div>
-        <label className="text-[10px] font-semibold uppercase tracking-wider text-white/45">
-          Email <span className="text-white/35">(optional)</span>
-        </label>
-        <input
-          type="email"
-          disabled={trialReadOnly}
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          autoComplete="off"
-          placeholder="Leave blank to auto-generate"
           className={inputClass}
         />
       </div>

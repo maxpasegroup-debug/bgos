@@ -1,17 +1,18 @@
 import type { NextRequest } from "next/server";
-import { OnboardingTaskStatus } from "@prisma/client";
-import { jsonSuccess } from "@/lib/api-response";
+import { InternalSalesStage, TechPipelineStage, UserRole } from "@prisma/client";
+import { jsonError, jsonSuccess } from "@/lib/api-response";
 import { requireAuthWithCompany } from "@/lib/auth";
 import { assertInternalSalesSession } from "@/lib/internal-sales-org";
 import { prisma } from "@/lib/prisma";
 import { isCompanyBasicTrialExpired, trialExpiredJsonResponse } from "@/lib/trial";
-import { UserRole } from "@prisma/client";
-import { jsonError } from "@/lib/api-response";
+import { orderedPipelineStages, pipelineStageLabel, techPriorityLabel } from "@/lib/tech-pipeline-sync";
 
 function canViewOnboardingQueue(role: UserRole) {
   return (
     role === UserRole.ADMIN ||
     role === UserRole.MANAGER ||
+    role === UserRole.TECH_HEAD ||
+    role === UserRole.TECH_EXECUTIVE ||
     role === UserRole.OPERATIONS_HEAD ||
     role === UserRole.SITE_ENGINEER ||
     role === UserRole.PRO ||
@@ -19,13 +20,11 @@ function canViewOnboardingQueue(role: UserRole) {
   );
 }
 
-const STAGES: { key: OnboardingTaskStatus; label: string }[] = [
-  { key: OnboardingTaskStatus.NEW, label: "New" },
-  { key: OnboardingTaskStatus.DATA_RECEIVED, label: "Data Received" },
-  { key: OnboardingTaskStatus.SETUP_STARTED, label: "Setup Started" },
-  { key: OnboardingTaskStatus.SETUP_COMPLETED, label: "Setup Completed" },
-  { key: OnboardingTaskStatus.DELIVERED, label: "Delivered" },
-];
+function prioritySortKey(p: import("@prisma/client").TechQueuePriority): number {
+  if (p === "CRITICAL") return 0;
+  if (p === "HIGH") return 1;
+  return 2;
+}
 
 export async function GET(request: NextRequest) {
   const session = await requireAuthWithCompany(request);
@@ -43,29 +42,46 @@ export async function GET(request: NextRequest) {
   }
 
   const tasks = await prisma.onboardingTask.findMany({
-    where: { companyId: ctx.companyId },
-    orderBy: { updatedAt: "desc" },
+    where: {
+      companyId: ctx.companyId,
+      lead: {
+        internalSalesStage: {
+          in: [InternalSalesStage.SENT_TO_TECH, InternalSalesStage.TECH_READY],
+        },
+      },
+    },
     include: {
       lead: { select: { id: true, name: true, phone: true } },
       creator: { select: { id: true, name: true } },
     },
   });
 
-  const byStage = new Map<OnboardingTaskStatus, typeof tasks>();
-  for (const s of STAGES) byStage.set(s.key, []);
+  tasks.sort((a, b) => {
+    const po = prioritySortKey(a.techQueuePriority) - prioritySortKey(b.techQueuePriority);
+    if (po !== 0) return po;
+    return a.createdAt.getTime() - b.createdAt.getTime();
+  });
+
+  const stageList = orderedPipelineStages();
+  const byStage = new Map<TechPipelineStage, typeof tasks>();
+  for (const s of stageList) byStage.set(s, []);
 
   for (const t of tasks) {
-    const list = byStage.get(t.status);
+    const list = byStage.get(t.pipelineStage);
     if (list) list.push(t);
-    else byStage.get(OnboardingTaskStatus.NEW)!.push(t);
+    else byStage.get(TechPipelineStage.RECEIVED)!.push(t);
   }
 
-  const queue = STAGES.map((s) => ({
-    key: s.key,
-    label: s.label,
-    tasks: (byStage.get(s.key) ?? []).map((t) => ({
+  const queue = stageList.map((key) => ({
+    key,
+    label: pipelineStageLabel(key),
+    tasks: (byStage.get(key) ?? []).map((t) => ({
       id: t.id,
       status: t.status,
+      pipelineStage: t.pipelineStage,
+      techQueuePriority: t.techQueuePriority,
+      priorityLabel: techPriorityLabel(t.techQueuePriority),
+      leadOnboardingType: t.leadOnboardingType,
       companyName: t.snapshotCompanyName,
       ownerName: t.snapshotOwnerName,
       phone: t.snapshotPhone,

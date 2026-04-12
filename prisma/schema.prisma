@@ -103,6 +103,41 @@ enum InternalCallStatus {
   NOT_INTERESTED
 }
 
+/** Category for a single active user manual PDF per company. */
+enum UserManualCategory {
+  SALES
+  OPERATIONS
+  HR
+  ACCOUNTS
+  SALES_BOOSTER
+}
+
+/** Internal CRM: onboarding tier chosen by sales before the client form opens. */
+enum LeadOnboardingType {
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+/** Tech queue sort: Enterprise first, then Pro, then Basic. */
+enum TechQueuePriority {
+  CRITICAL
+  HIGH
+  LOW
+}
+
+/**
+ * Tech delivery steps (no skipping). Synced to {@link InternalTechStage} on the lead when possible.
+ */
+enum TechPipelineStage {
+  RECEIVED
+  SETUP_DASHBOARD
+  ADD_EMPLOYEES
+  CONFIGURE_MODULES
+  TESTING
+  READY
+}
+
 /** Tech onboarding queue for internal sales → delivery. */
 enum OnboardingTaskStatus {
   NEW
@@ -213,6 +248,7 @@ model Company {
   internalInAppNotifications InternalInAppNotification[]
   internalEmployeeDailyTargets InternalEmployeeDailyTarget[]
   internalNexaSupportTickets InternalNexaSupportTicket[]
+  userManuals                UserManual[]
 
   @@index([name])
   @@index([ownerId])
@@ -432,6 +468,9 @@ model Lead {
   internalOnboardingApprovalStatus  InternalOnboardingApprovalStatus?
   /** SLA / escalation: last time sales or tech stage moved. */
   internalStageUpdatedAt            DateTime?
+
+  /** Sales-selected tier before onboarding form is opened (internal org). */
+  onboardingType LeadOnboardingType?
 
   onboardingTasks        OnboardingTask[]
   internalLeadActivities InternalLeadActivity[]
@@ -881,6 +920,12 @@ model OnboardingTask {
   snapshotRequirements String?              @db.Text
   snapshotPlan         String?
   snapshotWhatsApp     String?
+  /** Tier at submit time; drives tech queue priority. */
+  leadOnboardingType   LeadOnboardingType?
+  techQueuePriority    TechQueuePriority    @default(LOW)
+  pipelineStage        TechPipelineStage    @default(RECEIVED)
+  /** Extra onboarding fields (team counts, social, enterprise, etc.). */
+  formPayload          Json?
   createdByUserId      String
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
@@ -891,6 +936,24 @@ model OnboardingTask {
 
   @@index([companyId])
   @@index([status])
+  @@index([companyId, techQueuePriority])
+  @@index([companyId, pipelineStage])
+}
+
+/// One active manual per {@link UserManualCategory} per company (upsert on upload).
+model UserManual {
+  id        String             @id @default(cuid())
+  companyId String
+  category  UserManualCategory
+  title     String
+  fileUrl   String
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, category])
+  @@index([companyId])
 }
 
 /// Nexa support requests (internal org).

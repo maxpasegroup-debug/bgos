@@ -261,9 +261,19 @@ function normalizePathnameRole(pathname: string): string {
   return pathname;
 }
 
+function superBossAllowedPath(p: string): boolean {
+  if (p === "/bgos/control" || p.startsWith("/bgos/control/")) return true;
+  if (p === "/sales-booster" || p.startsWith("/sales-booster/")) return true;
+  if (p === "/onboarding" || p.startsWith("/onboarding/")) return true;
+  if (p.startsWith("/bgos/")) return true;
+  if (p.startsWith("/api")) return true;
+  return false;
+}
+
 /**
  * Whether this role may access this pathname (pages + role-scoped APIs).
- * ADMIN and MANAGER may access all defined areas except `/bgos/control` (super boss only).
+ * Platform boss uses `/bgos/control` as home; `/bgos` and `/iceconnect/*` are blocked on purpose,
+ * while `/bgos/*` still works after opening a company from Control.
  */
 export function roleCanAccessPath(
   role: string,
@@ -271,8 +281,17 @@ export function roleCanAccessPath(
   opts?: RoleAccessOpts,
 ): boolean {
   const p = normalizePathnameRole(pathname);
+
+  if (opts?.superBoss === true) {
+    if (p === "/bgos" || p === "/iceconnect" || p.startsWith("/iceconnect/")) {
+      return false;
+    }
+    if (superBossAllowedPath(p)) return true;
+    return false;
+  }
+
   if (p === "/bgos/control" || p.startsWith("/bgos/control/")) {
-    return opts?.superBoss === true;
+    return false;
   }
 
   if (pathname === "/iceconnect" || pathname === "/iceconnect/") {
@@ -303,6 +322,9 @@ export function postLoginDestination(
   from: string | null,
   opts?: RoleAccessOpts,
 ): string {
+  if (opts?.superBoss === true) {
+    return "/bgos/control";
+  }
   if (from && from.startsWith("/") && roleCanAccessPath(role, from, opts)) {
     return from;
   }

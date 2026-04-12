@@ -7,52 +7,27 @@ import { z } from "zod";
 import { writeStoredCompanyBrand } from "@/contexts/company-branding-context";
 import { resolveAfterLoginNavigation } from "@/lib/cross-domain-login";
 
-const formSchema = z
-  .object({
-    identifier: z.string().trim().min(1, "Enter your mobile number or email"),
-    password: z.string().min(1, "Enter password"),
-  })
-  .superRefine((data, ctx) => {
-    if (data.identifier.includes("@")) {
-      if (!z.string().email().safeParse(data.identifier).success) {
-        ctx.addIssue({
-          code: "custom",
-          path: ["identifier"],
-          message: "Enter a valid email",
-        });
-      }
-      return;
-    }
-    const digits = data.identifier.replace(/\D/g, "");
-    if (digits.length < 10 || digits.length > 15) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["identifier"],
-        message: "Enter a valid mobile number (10–15 digits)",
-      });
-    }
-  });
+const formSchema = z.object({
+  email: z.string().trim().min(1, "Email is required").email("Enter a valid email"),
+  password: z.string().min(1, "Enter password"),
+});
 
-type FieldErrors = { identifier?: string; password?: string };
+type FieldErrors = { email?: string; password?: string };
 
 function flattenZodFieldErrors(details: unknown): FieldErrors {
   if (!details || typeof details !== "object") return {};
   const fieldErrors = (details as { fieldErrors?: Record<string, string[]> }).fieldErrors;
   if (!fieldErrors) return {};
   return {
-    identifier: fieldErrors.mobile?.[0] ?? fieldErrors.email?.[0],
+    email: fieldErrors.email?.[0],
     password: fieldErrors.password?.[0],
   };
-}
-
-function isEmailLike(value: string): boolean {
-  return value.includes("@");
 }
 
 function IceconnectLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [identifier, setIdentifier] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -60,7 +35,7 @@ function IceconnectLoginForm() {
   const [pending, setPending] = useState(false);
   const [logoSrc, setLogoSrc] = useState("/logo.jpg");
 
-  const identifierInvalid = Boolean(fieldErrors.identifier) || credentialsMismatch;
+  const emailInvalid = Boolean(fieldErrors.email) || credentialsMismatch;
   const passwordInvalid = Boolean(fieldErrors.password) || credentialsMismatch;
 
   async function onSubmit(e: React.FormEvent) {
@@ -69,21 +44,22 @@ function IceconnectLoginForm() {
     setFormError(null);
     setCredentialsMismatch(false);
 
-    const parsed = formSchema.safeParse({ identifier, password });
+    const parsed = formSchema.safeParse({ email, password });
     if (!parsed.success) {
       const fe = parsed.error.flatten().fieldErrors;
       setFieldErrors({
-        identifier: fe.identifier?.[0],
+        email: fe.email?.[0],
         password: fe.password?.[0],
       });
       return;
     }
 
     const from = searchParams.get("from");
-    const id = parsed.data.identifier;
-    const loginBody = isEmailLike(id)
-      ? { email: id, password: parsed.data.password, ...(from ? { from } : {}) }
-      : { mobile: id, password: parsed.data.password, ...(from ? { from } : {}) };
+    const loginBody = {
+      email: parsed.data.email,
+      password: parsed.data.password,
+      ...(from ? { from } : {}),
+    };
 
     setPending(true);
     try {
@@ -122,7 +98,7 @@ function IceconnectLoginForm() {
         if (data.code === "VALIDATION_ERROR" && data.details) {
           const fe = flattenZodFieldErrors(data.details);
           setFieldErrors(fe);
-          if (!fe.identifier && !fe.password && data.error) setFormError(data.error);
+          if (!fe.email && !fe.password && data.error) setFormError(data.error);
           return;
         }
         if (data.code === "CONTACT_ADMIN" && typeof data.error === "string") {
@@ -265,10 +241,7 @@ function IceconnectLoginForm() {
               ICECONNECT
             </h1>
             <p className="mt-1 text-center text-sm font-medium text-gray-600">
-              Sign in with mobile and password from your company
-            </p>
-            <p className="mt-0.5 text-center text-xs text-gray-500">
-              You can use email instead if your account has one
+              Sign in with email and password from your company
             </p>
             <p className="mt-1 text-center text-xs text-gray-400">
               Powered by BGOS • Secure • Intelligent
@@ -277,33 +250,33 @@ function IceconnectLoginForm() {
 
           <form className="mt-8 space-y-4" onSubmit={onSubmit} noValidate>
             <div>
-              <label htmlFor="ice-identifier" className="sr-only">
-                Mobile number or email
+              <label htmlFor="ice-email" className="sr-only">
+                Email
               </label>
               <input
-                id="ice-identifier"
-                name="identifier"
-                type="text"
-                autoComplete="tel"
-                placeholder="Mobile number"
-                value={identifier}
+                id="ice-email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                placeholder="Email"
+                value={email}
                 onChange={(e) => {
-                  setIdentifier(e.target.value);
-                  setFieldErrors((p) => ({ ...p, identifier: undefined }));
+                  setEmail(e.target.value);
+                  setFieldErrors((p) => ({ ...p, email: undefined }));
                   setFormError(null);
                   setCredentialsMismatch(false);
                 }}
-                aria-invalid={identifierInvalid}
+                aria-invalid={emailInvalid}
                 aria-busy={pending}
                 className={`${inputBase} ${
-                  identifierInvalid
+                  emailInvalid
                     ? "border-red-400 focus:border-red-400 focus:ring-red-200"
                     : ""
                 }`}
               />
-              {fieldErrors.identifier?.trim() ? (
+              {fieldErrors.email?.trim() ? (
                 <p className="mt-1.5 text-sm text-red-600" role="alert">
-                  {fieldErrors.identifier}
+                  {fieldErrors.email}
                 </p>
               ) : null}
             </div>

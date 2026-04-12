@@ -1,11 +1,15 @@
 "use client";
 
-import { OnboardingTaskStatus } from "@prisma/client";
+import { TechPipelineStage } from "@prisma/client";
 import { useCallback, useEffect, useState } from "react";
 
 type QTask = {
   id: string;
-  status: OnboardingTaskStatus;
+  status: string;
+  pipelineStage: TechPipelineStage;
+  techQueuePriority: string;
+  priorityLabel: string;
+  leadOnboardingType: string | null;
   companyName: string;
   ownerName: string;
   phone: string;
@@ -13,7 +17,7 @@ type QTask = {
   updatedAt: string;
 };
 
-type QCol = { key: OnboardingTaskStatus; label: string; tasks: QTask[] };
+type QCol = { key: TechPipelineStage; label: string; tasks: QTask[] };
 
 function readQueue(j: unknown): QCol[] | null {
   if (typeof j !== "object" || j === null || !("ok" in j) || (j as { ok?: unknown }).ok !== true) {
@@ -61,14 +65,14 @@ export function InternalOnboardingQueue({ theme }: { theme: "bgos" | "ice" }) {
     void load();
   }, [load]);
 
-  async function setStatus(id: string, status: OnboardingTaskStatus) {
+  async function advancePipeline(id: string) {
     setBusy(id);
     try {
       const res = await fetch(`/api/internal-sales/onboarding/${id}`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ advancePipeline: true }),
       });
       if (!res.ok) {
         const j: unknown = await res.json();
@@ -89,25 +93,13 @@ export function InternalOnboardingQueue({ theme }: { theme: "bgos" | "ice" }) {
     );
   }
 
-  const nextStage = (s: OnboardingTaskStatus): OnboardingTaskStatus | null => {
-    const order = [
-      OnboardingTaskStatus.NEW,
-      OnboardingTaskStatus.DATA_RECEIVED,
-      OnboardingTaskStatus.SETUP_STARTED,
-      OnboardingTaskStatus.SETUP_COMPLETED,
-      OnboardingTaskStatus.DELIVERED,
-    ];
-    const i = order.indexOf(s);
-    return i >= 0 && i < order.length - 1 ? order[i + 1]! : null;
-  };
-
   return (
     <div className={shell}>
       <div className="mx-auto max-w-7xl space-y-4">
         <header>
           <h1 className="text-xl font-semibold sm:text-2xl">Onboarding queue</h1>
           <p className={theme === "bgos" ? "text-sm text-white/55" : "text-sm text-slate-500"}>
-            Move cards forward when each step is done
+            Enterprise → Pro → Basic sort. Advance one pipeline step at a time (no skipping). Ready notifies sales.
           </p>
         </header>
         {err ? (
@@ -115,7 +107,7 @@ export function InternalOnboardingQueue({ theme }: { theme: "bgos" | "ice" }) {
         ) : null}
         <div className="flex gap-3 overflow-x-auto pb-4">
           {queue.map((col) => (
-            <div key={col.key} className={`w-[min(100%,280px)] shrink-0 ${card}`}>
+            <div key={col.key} className={`w-[min(100%,300px)] shrink-0 ${card}`}>
               <p className="text-xs font-semibold uppercase opacity-70">{col.label}</p>
               <p className="text-[11px] opacity-50">{col.tasks.length}</p>
               <ul className="mt-2 space-y-2">
@@ -124,24 +116,25 @@ export function InternalOnboardingQueue({ theme }: { theme: "bgos" | "ice" }) {
                     key={t.id}
                     className={
                       theme === "bgos"
-                        ? "rounded-lg border border-white/10 bg-[#0f1628] p-2 text-sm"
-                        : "rounded-lg border border-slate-100 bg-slate-50 p-2 text-sm"
+                        ? "rounded-lg border border-white/10 bg-black/25 p-2 text-xs"
+                        : "rounded-lg border border-slate-100 bg-slate-50 p-2 text-xs"
                     }
                   >
-                    <p className="font-semibold">{t.companyName}</p>
-                    <p className="text-xs opacity-80">{t.ownerName}</p>
-                    <p className="text-xs tabular-nums opacity-70">{t.phone}</p>
-                    {nextStage(t.status) ? (
+                    <p className="font-medium">{t.companyName}</p>
+                    <p className="opacity-70">{t.ownerName}</p>
+                    <p className="mt-1 text-[10px] opacity-60">{t.phone}</p>
+                    <p className="mt-1 text-[10px] font-medium text-amber-200/90">{t.priorityLabel}</p>
+                    {t.pipelineStage !== TechPipelineStage.READY ? (
                       <button
                         type="button"
                         disabled={busy === t.id}
-                        className="mt-2 w-full rounded-lg bg-indigo-600 py-2 text-xs font-semibold text-white disabled:opacity-50"
-                        onClick={() => void setStatus(t.id, nextStage(t.status)!)}
+                        onClick={() => void advancePipeline(t.id)}
+                        className="mt-2 w-full rounded-lg bg-indigo-600 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50"
                       >
-                        Move to next step
+                        {busy === t.id ? "…" : "Complete step →"}
                       </button>
                     ) : (
-                      <p className="mt-2 text-xs text-emerald-400">Delivered</p>
+                      <p className="mt-2 text-[10px] text-emerald-300/90">Handed to sales for delivery</p>
                     )}
                   </li>
                 ))}

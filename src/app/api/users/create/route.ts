@@ -1,4 +1,3 @@
-import { randomBytes } from "node:crypto";
 import { Prisma, UserRole } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
@@ -20,40 +19,30 @@ import {
 import { isAllowedHrEmployeeRole } from "@/lib/internal-hr-roles";
 import { isCompanyBasicTrialExpired, trialExpiredJsonResponse } from "@/lib/trial";
 
-function syntheticEmailFromMobile(mobile: string): string {
-  const digits = mobile.replace(/\D/g, "").slice(-10) || "0000000000";
-  const salt = randomBytes(4).toString("hex");
-  return `employee.${digits}.${salt}@bgos-employee.invalid`;
-}
-
 const createBodySchema = z
   .object({
     name: z.string().trim().min(1, "Name is required").max(200, "Name is too long"),
-    mobile: z
+    email: z
       .string()
       .trim()
-      .min(1, "Mobile is required")
-      .max(32, "Mobile is too long"),
-    email: z.string().trim().optional(),
+      .min(1, "Email is required")
+      .email("Enter a valid email")
+      .max(320, "Email is too long"),
+    mobile: z.string().trim().max(32, "Mobile is too long").optional(),
     password: z.string().min(8, "Password must be at least 8 characters"),
     role: z.nativeEnum(UserRole),
   })
   .superRefine((data, ctx) => {
-    const digits = data.mobile.replace(/\D/g, "");
-    if (digits.length < 10 || digits.length > 15) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["mobile"],
-        message: "Enter a valid mobile number (10–15 digits)",
-      });
-    }
-    const em = data.email?.trim();
-    if (em && em.length > 0 && !z.string().email().safeParse(em).success) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["email"],
-        message: "Enter a valid email or leave blank",
-      });
+    const m = data.mobile?.trim();
+    if (m && m.length > 0) {
+      const digits = m.replace(/\D/g, "");
+      if (digits.length < 10 || digits.length > 15) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["mobile"],
+          message: "Enter a valid mobile number (10–15 digits) or leave blank",
+        });
+      }
     }
   });
 
@@ -85,9 +74,10 @@ export async function POST(request: NextRequest) {
     return jsonError(400, "VALIDATION_ERROR", "Choose a valid employee role for this company");
   }
 
-  const { name, mobile, password, role } = parsed.data;
-  const emailRaw = parsed.data.email?.trim();
-  const email = emailRaw && emailRaw.length > 0 ? emailRaw.toLowerCase() : syntheticEmailFromMobile(mobile);
+  const { name, password, role } = parsed.data;
+  const email = parsed.data.email.trim().toLowerCase();
+  const mobileTrim = parsed.data.mobile?.trim();
+  const mobile = mobileTrim && mobileTrim.length > 0 ? mobileTrim : null;
   const passwordHash = await hashPassword(password);
 
   try {
@@ -122,7 +112,7 @@ export async function POST(request: NextRequest) {
       return jsonError(
         409,
         "DUPLICATE_EMAIL",
-        "That email or mobile is already registered. Use another or reset the existing account.",
+        "That email is already registered. Use another address or contact support.",
       );
     }
     const p = prismaKnownErrorResponse(e);
