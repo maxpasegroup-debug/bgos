@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
   try {
     const start = monthStart(new Date());
     const [booster, wonMonth, lostMonth, openLeads, bySource, pipelineSum] = await Promise.all([
-      buildSalesBoosterPayload(companyId),
+      buildSalesBoosterPayload(companyId, { viewerEmail: user.email }),
       prisma.lead.count({
         where: {
           companyId,

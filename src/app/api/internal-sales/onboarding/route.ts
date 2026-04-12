@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     return jsonError(403, "FORBIDDEN", "Tech or manager access only");
   }
 
-  if (await isCompanyBasicTrialExpired(session.companyId)) {
+  if (await isCompanyBasicTrialExpired(session.companyId, session.email)) {
     return trialExpiredJsonResponse();
   }
 

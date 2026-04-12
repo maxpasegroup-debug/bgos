@@ -162,6 +162,7 @@ export function useBgosData(
   /** Bumped after each successful `/api/dashboard` load so pipeline / lists stay in sync. */
   const [syncGeneration, setSyncGeneration] = useState(0);
   const [isSuperBoss, setIsSuperBoss] = useState(false);
+  const [bossBillingBypass, setBossBillingBypass] = useState(false);
   const okOnce = useRef(false);
 
   const refetch = useCallback(() => {
@@ -177,6 +178,7 @@ export function useBgosData(
           authenticated?: boolean;
           planLockedToBasic?: boolean;
           basicTrialExpired?: boolean;
+          bossBillingBypass?: boolean;
           user?: {
             companyPlan?: CompanyPlan;
             role?: UserRole;
@@ -186,8 +188,10 @@ export function useBgosData(
           if (j?.authenticated === true) {
             setPlanLockedToBasic(j.planLockedToBasic === true);
             setBasicTrialExpired(j.basicTrialExpired === true);
+            setBossBillingBypass(j.bossBillingBypass === true);
           } else {
             setBasicTrialExpired(false);
+            setBossBillingBypass(false);
           }
           setIsSuperBoss(j?.user?.isSuperBoss === true);
           const p = j?.user?.companyPlan;
@@ -344,7 +348,7 @@ export function useBgosData(
 
   const isLoading = !controlShell && dashboard === null && error === null;
 
-  const trialReadOnly = basicTrialExpired;
+  const trialReadOnly = bossBillingBypass ? false : basicTrialExpired;
 
   return {
     dashboard,
@@ -358,5 +362,6 @@ export function useBgosData(
     isLoading,
     syncGeneration,
     isSuperBoss,
+    bossBillingBypass,
   };
 }

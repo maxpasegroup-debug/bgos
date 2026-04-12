@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import {
   CompanyBrandingProvider,
@@ -35,11 +36,14 @@ type ShellInnerProps = {
   email: string;
   role: string;
   companyCount: number;
+  /** Classic ICECONNECT top nav (other modules). */
   nav: IceconnectNavItem[];
+  /** When set, replaces layout with internal sales hub sidebar + minimal header. */
+  salesHubNav?: IceconnectNavItem[] | null;
   children: ReactNode;
 };
 
-function SystemLoading({ companyName }: { companyName: string }) {
+function SystemLoading({ subtle }: { subtle?: boolean }) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#F8FAFC] bg-gradient-to-br from-white via-[#F8FAFC] to-[#EEF2F7] px-6">
       <div
@@ -52,9 +56,9 @@ function SystemLoading({ companyName }: { companyName: string }) {
         aria-hidden
       />
       <p className="mt-5 text-center text-sm font-medium text-gray-600">
-        {companyName} system loading…
+        {subtle ? "Loading workspace…" : "System loading…"}
       </p>
-      <p className="mt-1 text-center text-xs text-gray-400">Securing your workspace</p>
+      {!subtle ? <p className="mt-1 text-center text-xs text-gray-400">Securing your workspace</p> : null}
     </div>
   );
 }
@@ -79,14 +83,117 @@ function HeaderLogo({
   );
 }
 
-function IceconnectWorkspaceChrome({
+function IceconnectSalesHubChrome({
+  employeeName,
+  email,
+  role,
+  companyCount,
+  salesHubNav,
+  children,
+}: Omit<ShellInnerProps, "nav"> & { salesHubNav: IceconnectNavItem[] }) {
+  const pathname = usePathname();
+  const { ready } = useCompanyBranding();
+  const roleDisplay = ROLE_LABEL[role] ?? role;
+  const [badgeCount, setBadgeCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch("/api/nexa/next-action", { credentials: "include" });
+        if (!res.ok) return;
+        const j = (await res.json()) as { ok?: boolean; badgeCount?: number };
+        if (cancelled || j.ok !== true) return;
+        setBadgeCount(typeof j.badgeCount === "number" ? Math.max(0, j.badgeCount) : 0);
+      } catch {
+        /* ignore */
+      }
+    };
+    void load();
+    const id = window.setInterval(() => void load(), 25000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, []);
+
+  if (!ready) {
+    return <SystemLoading subtle />;
+  }
+
+  return (
+    <div className="relative min-h-screen bg-[#F6F7FB] text-gray-900 antialiased">
+      <div className="flex min-h-screen">
+        <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col border-r border-gray-200/90 bg-white shadow-sm">
+          <div className="border-b border-gray-100 px-4 py-5">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-400">ICECONNECT</p>
+            <p className="mt-1 text-sm font-semibold text-gray-900">Sales</p>
+          </div>
+          <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
+            {salesHubNav.map((item) => {
+              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              return (
+                <Link
+                  key={item.seg}
+                  href={item.href}
+                  className={`block rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                    active
+                      ? "bg-[color-mix(in_srgb,var(--ice-primary,#4f46e5)_12%,transparent)] text-[color:var(--ice-primary,#4f46e5)]"
+                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </aside>
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-end gap-3 border-b border-gray-200/90 bg-white/95 px-4 backdrop-blur-sm">
+            {badgeCount > 0 ? (
+              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                Nexa {badgeCount}
+              </span>
+            ) : null}
+            {companyCount > 1 ? (
+              <Link
+                href="/iceconnect/select-company"
+                className="text-xs font-medium text-gray-600 hover:text-gray-900"
+              >
+                Switch company
+              </Link>
+            ) : null}
+            <div className="text-right text-xs">
+              <p className="font-medium text-gray-900">{employeeName}</p>
+              <p className="text-gray-500">
+                {roleDisplay} · <span className="tabular-nums text-gray-400">{email}</span>
+              </p>
+            </div>
+          </header>
+
+          <motion.main
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="relative flex-1 px-4 py-8 sm:px-8"
+          >
+            <div className="mx-auto max-w-3xl">{children}</div>
+          </motion.main>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IceconnectClassicChrome({
   employeeName,
   email,
   role,
   companyCount,
   nav,
   children,
-}: ShellInnerProps) {
+}: Omit<ShellInnerProps, "salesHubNav">) {
   const { company, ready, primaryColor, secondaryColor } = useCompanyBranding();
   const displayCompany = company?.name?.trim() || "Your company";
   const roleDisplay = ROLE_LABEL[role] ?? role;
@@ -122,7 +229,7 @@ function IceconnectWorkspaceChrome({
   }, [toastShownOnce]);
 
   if (!ready) {
-    return <SystemLoading companyName={displayCompany} />;
+    return <SystemLoading />;
   }
 
   return (
@@ -217,6 +324,14 @@ function IceconnectWorkspaceChrome({
       </footer>
     </div>
   );
+}
+
+function IceconnectWorkspaceChrome(props: ShellInnerProps) {
+  const { salesHubNav, nav, ...rest } = props;
+  if (salesHubNav && salesHubNav.length > 0) {
+    return <IceconnectSalesHubChrome {...rest} salesHubNav={salesHubNav} />;
+  }
+  return <IceconnectClassicChrome {...rest} nav={nav} />;
 }
 
 export function IceconnectWorkspaceShell(props: ShellInnerProps) {

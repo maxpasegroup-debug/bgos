@@ -45,7 +45,7 @@ function roleLabel(role: string): string {
 
 export function BgosHeader() {
   const pathname = usePathname();
-  const { trialReadOnly, isSuperBoss } = useBgosDashboardContext();
+  const { trialReadOnly, isSuperBoss, bossBillingBypass } = useBgosDashboardContext();
   const { theme, toggleTheme } = useBgosTheme();
   const light = theme === "light";
   const reduceMotion = useReducedMotion();
@@ -172,7 +172,7 @@ export function BgosHeader() {
             height={32}
           />
         </Link>
-        <BgosCompanySwitcher light={light} />
+        {isSuperBoss || bossBillingBypass ? null : <BgosCompanySwitcher light={light} />}
         <h1
           className={
             light

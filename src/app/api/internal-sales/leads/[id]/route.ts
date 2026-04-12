@@ -116,7 +116,7 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ id: str
   const internalCtx = await assertInternalSalesSession(session);
   if (internalCtx instanceof Response) return internalCtx;
 
-  if (await isCompanyBasicTrialExpired(session.companyId)) {
+  if (await isCompanyBasicTrialExpired(session.companyId, session.email)) {
     return trialExpiredJsonResponse();
   }
 
@@ -143,7 +143,7 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
   const internalCtx = await assertInternalSalesSession(session);
   if (internalCtx instanceof Response) return internalCtx;
 
-  if (await isCompanyBasicTrialExpired(session.companyId)) {
+  if (await isCompanyBasicTrialExpired(session.companyId, session.email)) {
     return trialExpiredJsonResponse();
   }
 

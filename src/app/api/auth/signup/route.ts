@@ -8,6 +8,11 @@ import { hashPassword } from "@/lib/password";
 import { signAccessToken } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 import { setSessionCookie } from "@/lib/session-cookie";
+import {
+  isUserEmailAlreadyRegistered,
+  jsonErrorForUserUniqueViolation,
+} from "@/lib/user-email-availability";
+import { EMAIL_ALREADY_IN_USE_MESSAGE } from "@/lib/user-identity-messages";
 
 const bodySchema = z.object({
   name: z
@@ -39,6 +44,17 @@ export async function POST(request: Request) {
   const { name, password } = parsed.data;
   const email = parsed.data.email.trim().toLowerCase();
 
+  if (await isUserEmailAlreadyRegistered(email)) {
+    return NextResponse.json(
+      {
+        ok: false as const,
+        error: EMAIL_ALREADY_IN_USE_MESSAGE,
+        code: AUTH_ERROR_CODES.EMAIL_IN_USE,
+      },
+      { status: 409 },
+    );
+  }
+
   let user: { id: string; name: string; email: string };
 
   try {
@@ -53,15 +69,9 @@ export async function POST(request: Request) {
     });
     user = u;
   } catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-      return NextResponse.json(
-        {
-          ok: false as const,
-          error: "An account with this email already exists",
-          code: AUTH_ERROR_CODES.EMAIL_TAKEN,
-        },
-        { status: 409 },
-      );
+    if (e instanceof Prisma.PrismaClientKnownRequestError) {
+      const mapped = jsonErrorForUserUniqueViolation(e);
+      if (mapped) return mapped;
     }
     return handleApiError("POST /api/auth/signup", e);
   }

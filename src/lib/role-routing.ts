@@ -5,12 +5,12 @@
 
 export const ROLE_HOME: Readonly<Record<string, string>> = {
   ADMIN: "/bgos",
-  /** Sales manager — internal pipeline (BGOS Internal). Still privileged for route access. */
-  MANAGER: "/iceconnect/internal-sales",
-  SALES_EXECUTIVE: "/iceconnect/internal-sales",
-  TELECALLER: "/iceconnect/internal-sales",
-  TECH_HEAD: "/iceconnect/internal-sales",
-  TECH_EXECUTIVE: "/iceconnect/internal-sales",
+  /** Internal sales org: lands on My Journey (metro + targets). Classic pipeline stays at `/iceconnect/internal-sales`. */
+  MANAGER: "/iceconnect/my-journey",
+  SALES_EXECUTIVE: "/iceconnect/my-journey",
+  TELECALLER: "/iceconnect/my-journey",
+  TECH_HEAD: "/iceconnect/my-journey",
+  TECH_EXECUTIVE: "/iceconnect/my-journey",
   SALES_HEAD: "/iceconnect/sales-head",
   CHANNEL_PARTNER: "/iceconnect/partner",
   OPERATIONS_HEAD: "/iceconnect/operations",
@@ -48,6 +48,16 @@ export const DOCUMENT_VAULT_ROLES = new Set<string>(DOCUMENT_VAULT_ROLES_LIST);
 
 const PRIVILEGED = new Set<string>(["ADMIN", "MANAGER"]);
 
+/** ICECONNECT internal sales hub (My Journey, metro leads, wallet). */
+const ICE_INTERNAL_SALES_HUB = new Set<string>([
+  "SALES_EXECUTIVE",
+  "TELECALLER",
+  "MANAGER",
+  "TECH_HEAD",
+  "TECH_EXECUTIVE",
+  "ADMIN",
+]);
+
 type RouteRule = { prefix: string; roles: Set<string> };
 
 const PAGE_RULES: RouteRule[] = [
@@ -65,6 +75,12 @@ const PAGE_RULES: RouteRule[] = [
   { prefix: "/iceconnect/accounts", roles: new Set(["ACCOUNTANT", "ADMIN", "MANAGER"]) },
   { prefix: "/iceconnect/loan", roles: new Set(["LCO", "ADMIN", "MANAGER"]) },
   { prefix: "/iceconnect/hr", roles: new Set(["HR_MANAGER", "ADMIN", "MANAGER"]) },
+  { prefix: "/iceconnect/my-journey", roles: ICE_INTERNAL_SALES_HUB },
+  { prefix: "/iceconnect/leads", roles: ICE_INTERNAL_SALES_HUB },
+  { prefix: "/iceconnect/customers", roles: ICE_INTERNAL_SALES_HUB },
+  { prefix: "/iceconnect/wallet", roles: ICE_INTERNAL_SALES_HUB },
+  { prefix: "/iceconnect/notifications", roles: ICE_INTERNAL_SALES_HUB },
+  { prefix: "/iceconnect/profile", roles: ICE_INTERNAL_SALES_HUB },
   {
     prefix: "/iceconnect/internal-sales",
     roles: new Set([
@@ -221,6 +237,10 @@ const API_RULES: RouteRule[] = [
     roles: new Set(["SALES_EXECUTIVE", "TELECALLER", "SALES_HEAD", "ADMIN", "MANAGER"]),
   },
   {
+    prefix: "/api/iceconnect/executive",
+    roles: ICE_INTERNAL_SALES_HUB,
+  },
+  {
     prefix: "/api/iceconnect",
     roles: new Set([
       "SALES_HEAD",
@@ -238,6 +258,8 @@ const API_RULES: RouteRule[] = [
       "HR_MANAGER",
       "ADMIN",
       "MANAGER",
+      "TECH_HEAD",
+      "TECH_EXECUTIVE",
     ]),
   },
   {
@@ -343,6 +365,12 @@ export function postLoginDestination(
 
 /** Path segment after `/iceconnect/` → roles allowed on that dashboard. */
 export const ICECONNECT_DASHBOARD_ROLES: Record<string, readonly string[]> = {
+  "my-journey": ["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
+  leads: ["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
+  customers: ["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
+  wallet: ["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
+  notifications: ["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
+  profile: ["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
   sales: ["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER"],
   "sales-head": ["SALES_HEAD", "ADMIN", "MANAGER"],
   partner: ["CHANNEL_PARTNER", "ADMIN", "MANAGER"],

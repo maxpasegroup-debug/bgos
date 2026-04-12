@@ -10,6 +10,7 @@ import { isPlanLockedToBasic } from "@/lib/plan-production-lock";
 import { prisma } from "@/lib/prisma";
 import { syncCompanySubscriptionStatus, trialDaysRemaining } from "@/lib/subscription-status";
 import { isCompanyBasicTrialExpired } from "@/lib/trial";
+import { isBgosProductionBossBypassEmail } from "@/lib/bgos-production-boss-bypass";
 import { jwtSaysSubscriptionExpired } from "@/lib/trial-middleware";
 import { isSuperBossEmail } from "@/lib/super-boss";
 
@@ -62,6 +63,7 @@ export async function GET() {
         { status: 401 },
       );
     case "valid": {
+      const bossBillingBypass = isBgosProductionBossBypassEmail(session.user.email);
       let basicTrialExpired = false;
       let companyName: string | null = null;
       let billing:
@@ -80,35 +82,61 @@ export async function GET() {
           const payload = vr.payload as Record<string, unknown>;
           const tenant = resolveTenantFromJwt(payload, activeCompanyIdCookie ?? undefined);
           if (!tenant.needsCompany && tenant.companyId) {
-            const jwtExp = jwtSaysSubscriptionExpired(
-              payload,
-              activeCompanyIdCookie ?? undefined,
-            );
-            const dbExp = await isCompanyBasicTrialExpired(tenant.companyId);
-            basicTrialExpired = jwtExp || dbExp;
-            await syncCompanySubscriptionStatus(tenant.companyId);
-            const co = await prisma.company.findUnique({
-              where: { id: tenant.companyId },
-              select: {
-                name: true,
-                plan: true,
-                subscriptionStatus: true,
-                trialEndDate: true,
-                subscriptionPeriodEnd: true,
-              },
-            });
-            companyName = co?.name ?? null;
-            if (co) {
+            if (bossBillingBypass) {
+              basicTrialExpired = false;
+              await syncCompanySubscriptionStatus(tenant.companyId);
+              const co = await prisma.company.findUnique({
+                where: { id: tenant.companyId },
+                select: {
+                  name: true,
+                  plan: true,
+                  subscriptionStatus: true,
+                  trialEndDate: true,
+                  subscriptionPeriodEnd: true,
+                },
+              });
+              companyName = co?.name ?? null;
               billing = {
-                plan: co.plan,
-                planLabel: planLabel(co.plan),
-                subscriptionStatus: co.subscriptionStatus,
-                trialDaysRemaining: trialDaysRemaining(co.trialEndDate),
-                renewalDateIso:
-                  co.subscriptionPeriodEnd?.toISOString() ??
-                  co.trialEndDate?.toISOString() ??
-                  null,
+                plan: CompanyPlan.PRO,
+                planLabel: planLabel(CompanyPlan.PRO),
+                subscriptionStatus: "ACTIVE",
+                trialDaysRemaining: null,
+                renewalDateIso: null,
               };
+            } else {
+              const jwtExp = jwtSaysSubscriptionExpired(
+                payload,
+                activeCompanyIdCookie ?? undefined,
+              );
+              const dbExp = await isCompanyBasicTrialExpired(
+                tenant.companyId,
+                session.user.email,
+              );
+              basicTrialExpired = jwtExp || dbExp;
+              await syncCompanySubscriptionStatus(tenant.companyId);
+              const co = await prisma.company.findUnique({
+                where: { id: tenant.companyId },
+                select: {
+                  name: true,
+                  plan: true,
+                  subscriptionStatus: true,
+                  trialEndDate: true,
+                  subscriptionPeriodEnd: true,
+                },
+              });
+              companyName = co?.name ?? null;
+              if (co) {
+                billing = {
+                  plan: co.plan,
+                  planLabel: planLabel(co.plan),
+                  subscriptionStatus: co.subscriptionStatus,
+                  trialDaysRemaining: trialDaysRemaining(co.trialEndDate),
+                  renewalDateIso:
+                    co.subscriptionPeriodEnd?.toISOString() ??
+                    co.trialEndDate?.toISOString() ??
+                    null,
+                };
+              }
             }
           }
         }
@@ -129,8 +157,9 @@ export async function GET() {
         jwtSuperBoss === true && isSuperBossEmail(session.user.email) === true;
       return jsonSuccess({
         authenticated: true as const,
-        planLockedToBasic: isPlanLockedToBasic(),
-        basicTrialExpired,
+        planLockedToBasic: bossBillingBypass ? false : isPlanLockedToBasic(),
+        basicTrialExpired: bossBillingBypass ? false : basicTrialExpired,
+        ...(bossBillingBypass ? { bossBillingBypass: true as const } : {}),
         ...(billing ? { billing } : {}),
         user: {
           id: session.user.sub,
@@ -139,7 +168,7 @@ export async function GET() {
           role: session.user.role,
           companyId: session.user.companyId,
           companyName,
-          companyPlan: session.user.companyPlan,
+          companyPlan: bossBillingBypass ? CompanyPlan.PRO : session.user.companyPlan,
           needsOnboarding: session.user.companyId === null,
           workspaceReady: session.user.workspaceReady,
           needsWorkspaceActivation:

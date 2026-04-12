@@ -3,11 +3,22 @@
 import { UserRole } from "@prisma/client";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { z } from "zod";
+import {
+  EMAIL_ALREADY_IN_USE_MESSAGE,
+  NAME_SIMILARITY_EMAIL_UNIQUE_HINT,
+} from "@/lib/user-identity-messages";
 import {
   INTERNAL_ORG_EMPLOYEE_ROLE_OPTIONS,
   SOLAR_FIELD_EMPLOYEE_ROLE_OPTIONS,
 } from "@/lib/internal-hr-roles";
 import { useBgosDashboardContext } from "./BgosDataProvider";
+
+const addEmployeeClientSchema = z.object({
+  name: z.string().trim().min(1, "Name is required"),
+  email: z.string().trim().min(1, "Email is required").email("Enter a valid email"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
 
 function firstValidationMessage(details: unknown): string | null {
   if (!details || typeof details !== "object") return null;
@@ -71,14 +82,31 @@ export function BgosAddEmployeeForm() {
     setSuccess(false);
     setSubmitting(true);
     try {
+      const mobileTrim = mobile.trim();
+      const parsedFields = addEmployeeClientSchema.safeParse({
+        name,
+        email,
+        password,
+      });
+      if (!parsedFields.success) {
+        const fe = parsedFields.error.flatten().fieldErrors;
+        setMsg(
+          fe.name?.[0] ?? fe.email?.[0] ?? fe.password?.[0] ?? "Check the form and try again.",
+        );
+        return;
+      }
       const body: {
         name: string;
         email: string;
         password: string;
         role: UserRole;
         mobile?: string;
-      } = { name: name.trim(), email: email.trim(), password, role };
-      const mobileTrim = mobile.trim();
+      } = {
+        name: parsedFields.data.name,
+        email: parsedFields.data.email,
+        password: parsedFields.data.password,
+        role,
+      };
       if (mobileTrim) body.mobile = mobileTrim;
 
       const res = await fetch("/api/users/create", {
@@ -114,6 +142,14 @@ export function BgosAddEmployeeForm() {
         if (j.code === "VALIDATION_ERROR" && j.details) {
           const line = firstValidationMessage(j.details);
           setMsg(line ?? (typeof j.error === "string" ? j.error : "Check the form and try again."));
+          return;
+        }
+        if (
+          j.code === "EMAIL_IN_USE" ||
+          j.code === "DUPLICATE_EMAIL" ||
+          j.code === "EMAIL_TAKEN"
+        ) {
+          setMsg(EMAIL_ALREADY_IN_USE_MESSAGE);
           return;
         }
         setMsg(typeof j.error === "string" ? j.error : "Could not create employee — try again.");
@@ -154,6 +190,7 @@ export function BgosAddEmployeeForm() {
           autoComplete="name"
           className={inputClass}
         />
+        <p className="mt-0.5 text-[10px] text-white/40">{NAME_SIMILARITY_EMAIL_UNIQUE_HINT}</p>
       </div>
       <div>
         <label className="text-[10px] font-semibold uppercase tracking-wider text-white/45">

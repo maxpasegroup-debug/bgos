@@ -4,6 +4,7 @@ import { UserRole } from "@prisma/client";
 import { signAccessToken } from "@/lib/jwt";
 import { loadMembershipsForJwt, type JwtMembershipRow } from "@/lib/memberships-for-jwt";
 import { prisma } from "@/lib/prisma";
+import { applyProductionBossJwtMembershipOverrides } from "@/lib/bgos-production-boss-bypass";
 import { isSuperBossEmail } from "@/lib/super-boss";
 
 export type MintSessionTokenErrorCode = "NO_USER" | "NO_MEMBERSHIP" | "NO_COMPANY";
@@ -27,7 +28,7 @@ export async function mintSessionAccessToken(input: {
   email: string;
   activeCompanyId: string;
 }): Promise<string> {
-  const [mems, user] = await Promise.all([
+  const [memsRaw, user] = await Promise.all([
     loadMembershipsForJwt(input.userId),
     prisma.user.findUnique({
       where: { id: input.userId },
@@ -38,6 +39,8 @@ export async function mintSessionAccessToken(input: {
   if (!user) {
     throw new MintSessionTokenError("NO_USER");
   }
+
+  const mems = applyProductionBossJwtMembershipOverrides(input.email, memsRaw);
 
   const row = mems.find((m) => m.companyId === input.activeCompanyId);
   if (!row) {
@@ -91,7 +94,7 @@ export async function mintSessionAccessTokenForUser(input: {
     throw new MintSessionTokenError("NO_USER");
   }
 
-  let rows = [...mems];
+  let rows = applyProductionBossJwtMembershipOverrides(input.email, [...mems]);
   const hasRow = rows.some((m) => m.companyId === input.activeCompanyId);
   if (!hasRow) {
     const co = await prisma.company.findUnique({

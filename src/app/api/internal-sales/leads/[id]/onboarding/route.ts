@@ -28,7 +28,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
   const internalCtx = await assertInternalSalesSession(session);
   if (internalCtx instanceof Response) return internalCtx;
 
-  if (await isCompanyBasicTrialExpired(session.companyId)) {
+  if (await isCompanyBasicTrialExpired(session.companyId, session.email)) {
     return trialExpiredJsonResponse();
   }
 

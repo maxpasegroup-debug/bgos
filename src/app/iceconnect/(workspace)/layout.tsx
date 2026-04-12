@@ -13,6 +13,26 @@ export const metadata: Metadata = {
   description: "ICECONNECT — field and operations workspace.",
 };
 
+const SALES_HUB_ORDER = [
+  "my-journey",
+  "leads",
+  "customers",
+  "wallet",
+  "notifications",
+  "profile",
+] as const;
+
+const SALES_HUB_SIDEBAR_SEGMENTS = new Set<string>(SALES_HUB_ORDER);
+
+const SALES_HUB_LABEL: Record<string, string> = {
+  "my-journey": "My Journey",
+  leads: "Leads",
+  customers: "Customers",
+  wallet: "Wallet",
+  notifications: "Notifications",
+  profile: "Profile",
+};
+
 const SEGMENT_LABEL: Record<string, string> = {
   sales: "Sales",
   "sales-head": "Sales Head",
@@ -53,7 +73,33 @@ export default async function IceconnectWorkspaceLayout({
   const employeeName =
     dbUser?.name?.trim() || user.email.split("@")[0]?.trim() || user.email;
 
+  let salesHubNav: { seg: string; label: string; href: string }[] | null = null;
+  if (user.companyId) {
+    const co = await prisma.company.findUnique({
+      where: { id: user.companyId },
+      select: { internalSalesOrg: true },
+    });
+    const hubRoles = new Set([
+      "SALES_EXECUTIVE",
+      "TELECALLER",
+      "MANAGER",
+      "TECH_HEAD",
+      "TECH_EXECUTIVE",
+      "ADMIN",
+    ]);
+    if (co?.internalSalesOrg === true && hubRoles.has(user.role)) {
+      salesHubNav = SALES_HUB_ORDER.filter((seg) =>
+        canAccessIceconnectDashboard(seg, user.role),
+      ).map((seg) => ({
+        seg,
+        label: SALES_HUB_LABEL[seg] ?? seg,
+        href: `/iceconnect/${seg}`,
+      }));
+    }
+  }
+
   const nav = Object.keys(ICECONNECT_DASHBOARD_ROLES)
+    .filter((seg) => !SALES_HUB_SIDEBAR_SEGMENTS.has(seg))
     .filter((seg) => canAccessIceconnectDashboard(seg, user.role))
     .map((seg) => ({
       seg,
@@ -68,6 +114,7 @@ export default async function IceconnectWorkspaceLayout({
       role={user.role}
       companyCount={companyCount}
       nav={nav}
+      salesHubNav={salesHubNav}
     >
       {children}
     </IceconnectWorkspaceShell>

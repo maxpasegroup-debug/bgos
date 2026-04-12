@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
   const ctx = await assertInternalSalesSession(session);
   if (ctx instanceof Response) return ctx;
 
-  if (await isCompanyBasicTrialExpired(session.companyId)) {
+  if (await isCompanyBasicTrialExpired(session.companyId, session.email)) {
     return trialExpiredJsonResponse();
   }
 
@@ -164,7 +164,7 @@ export async function POST(request: NextRequest) {
   const ctx = await assertInternalSalesSession(session);
   if (ctx instanceof Response) return ctx;
 
-  if (await isCompanyBasicTrialExpired(session.companyId)) {
+  if (await isCompanyBasicTrialExpired(session.companyId, session.email)) {
     return trialExpiredJsonResponse();
   }
 

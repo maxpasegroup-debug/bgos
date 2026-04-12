@@ -18,6 +18,11 @@ import {
 } from "@/lib/plan-seats";
 import { isAllowedHrEmployeeRole } from "@/lib/internal-hr-roles";
 import { isCompanyBasicTrialExpired, trialExpiredJsonResponse } from "@/lib/trial";
+import {
+  isUserEmailAlreadyRegistered,
+  jsonErrorForUserUniqueViolation,
+} from "@/lib/user-email-availability";
+import { EMAIL_ALREADY_IN_USE_MESSAGE } from "@/lib/user-identity-messages";
 
 const createBodySchema = z
   .object({
@@ -50,7 +55,7 @@ export async function POST(request: NextRequest) {
   const session = await requireAuthWithRoles(request, USER_ADMIN_ROLES);
   if (session instanceof NextResponse) return session;
 
-  if (await isCompanyBasicTrialExpired(session.companyId)) {
+  if (await isCompanyBasicTrialExpired(session.companyId, session.email)) {
     return trialExpiredJsonResponse();
   }
 
@@ -78,6 +83,11 @@ export async function POST(request: NextRequest) {
   const email = parsed.data.email.trim().toLowerCase();
   const mobileTrim = parsed.data.mobile?.trim();
   const mobile = mobileTrim && mobileTrim.length > 0 ? mobileTrim : null;
+
+  if (await isUserEmailAlreadyRegistered(email)) {
+    return jsonError(409, "EMAIL_IN_USE", EMAIL_ALREADY_IN_USE_MESSAGE);
+  }
+
   const passwordHash = await hashPassword(password);
 
   try {
@@ -108,12 +118,9 @@ export async function POST(request: NextRequest) {
       { status: 201 },
     );
   } catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-      return jsonError(
-        409,
-        "DUPLICATE_EMAIL",
-        "That email is already registered. Use another address or contact support.",
-      );
+    if (e instanceof Prisma.PrismaClientKnownRequestError) {
+      const mapped = jsonErrorForUserUniqueViolation(e);
+      if (mapped) return mapped;
     }
     const p = prismaKnownErrorResponse(e);
     if (p) return p;

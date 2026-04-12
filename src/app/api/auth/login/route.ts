@@ -10,6 +10,10 @@ import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
 import { signAccessToken } from "@/lib/jwt";
 import { postLoginDestination } from "@/lib/role-routing";
+import {
+  applyProductionBossJwtMembershipOverrides,
+  isBgosProductionBossBypassEmail,
+} from "@/lib/bgos-production-boss-bypass";
 import { setActiveCompanyCookie, setSessionCookie } from "@/lib/session-cookie";
 import { isSuperBossEmail } from "@/lib/super-boss";
 
@@ -166,7 +170,7 @@ export async function POST(request: Request) {
       needsOnboarding = false;
     }
 
-    const mems = !membership
+    const memsRaw = !membership
       ? []
       : user.memberships.map((m) => ({
           companyId: m.companyId,
@@ -175,8 +179,14 @@ export async function POST(request: Request) {
           trialEndsAt: m.company.trialEndDate?.toISOString() ?? null,
           subscriptionPeriodEnd: m.company.subscriptionPeriodEnd?.toISOString() ?? null,
         }));
+    const mems = applyProductionBossJwtMembershipOverrides(user.email, memsRaw);
     const primary = mems[0];
     const effectiveRole = primary?.jobRole ?? sessionRole;
+    const productionBossBypass = isBgosProductionBossBypassEmail(user.email);
+    const jwtCompanyPlan =
+      productionBossBypass && primary
+        ? CompanyPlan.PRO
+        : (primary?.plan ?? companyPlan);
 
     // JWT creation
     const boss = isSuperBossEmail(user.email);
@@ -186,7 +196,7 @@ export async function POST(request: Request) {
       email: user.email,
       role: effectiveRole,
       companyId: primary?.companyId ?? companyId,
-      companyPlan: primary?.plan ?? companyPlan,
+      companyPlan: jwtCompanyPlan,
       workspaceReady: needsOnboarding
         ? false
         : Boolean(user.workspaceActivatedAt),
@@ -207,7 +217,7 @@ export async function POST(request: Request) {
       email: user.email,
       role: effectiveRole,
       companyId,
-      companyPlan,
+      companyPlan: productionBossBypass && companyId ? CompanyPlan.PRO : companyPlan,
       ...(needsOnboarding
         ? { needsOnboarding: true as const }
         : {

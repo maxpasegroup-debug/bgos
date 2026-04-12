@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     return jsonError(403, "FORBIDDEN", "Manager only");
   }
 
-  if (await isCompanyBasicTrialExpired(session.companyId)) {
+  if (await isCompanyBasicTrialExpired(session.companyId, session.email)) {
     return trialExpiredJsonResponse();
   }
 

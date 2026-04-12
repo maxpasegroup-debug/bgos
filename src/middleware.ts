@@ -33,6 +33,7 @@ import {
   TRIAL_EXPIRED_API_MESSAGE,
 } from "@/lib/trial-middleware";
 import { jwtCompanyPlanFromUnknown, jwtPlanIsProPlus } from "@/lib/plan-tier";
+import { isBgosProductionBossBypassEmail } from "@/lib/bgos-production-boss-bypass";
 import { isSuperBossEmail } from "@/lib/super-boss";
 
 function normalizePathname(pathname: string): string {
@@ -337,6 +338,7 @@ export async function middleware(request: NextRequest) {
     typeof verified.payload.email === "string" ? verified.payload.email : "";
   const edgeSuperBoss =
     verified.payload.superBoss === true && isSuperBossEmail(jwtEmailEdge);
+  const productionBossBypass = isBgosProductionBossBypassEmail(jwtEmailEdge);
 
   if (
     !tryAttachUserHeaders(
@@ -499,6 +501,7 @@ export async function middleware(request: NextRequest) {
   const subscriptionExpiredJwt =
     hasCompanyContext &&
     !needsCompany &&
+    !productionBossBypass &&
     jwtSaysSubscriptionExpired(verified.payload, activeCompanyCookie);
 
   if (
@@ -515,6 +518,7 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith("/api") &&
     !edgeSuperBoss &&
+    !productionBossBypass &&
     subscriptionExpiredJwt &&
     !trialExpiredAllowsApiRequest(normalizedPath, method)
   ) {
@@ -533,6 +537,7 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith("/api") &&
     !edgeSuperBoss &&
+    !productionBossBypass &&
     pathnameRequiresProPlan(pathname) &&
     !jwtPlanIsProPlus(planTier)
   ) {

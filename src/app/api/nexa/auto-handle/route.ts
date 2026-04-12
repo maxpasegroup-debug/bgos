@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   const user = await requireAuthWithCompany(request);
   if (user instanceof NextResponse) return user;
 
-  if (await isCompanyBasicTrialExpired(user.companyId)) {
+  if (await isCompanyBasicTrialExpired(user.companyId, user.email)) {
     return trialExpiredJsonResponse();
   }
 

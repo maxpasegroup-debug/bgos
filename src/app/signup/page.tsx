@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { z } from "zod";
+import {
+  EMAIL_ALREADY_IN_USE_MESSAGE,
+  NAME_SIMILARITY_EMAIL_UNIQUE_HINT,
+} from "@/lib/user-identity-messages";
 
 const signupSchema = z.object({
   name: z.string().trim().min(1, "Your name is required"),
@@ -45,17 +49,22 @@ export default function SignupPage() {
       const data = (await res.json()) as {
         ok?: boolean;
         error?: string;
+        message?: string;
         code?: string;
         redirect?: string;
       };
 
       if (!res.ok) {
-        if (typeof data.error === "string" && data.error.trim()) {
-          setError(data.error);
-        } else if (data.code === "VALIDATION_ERROR") {
-          setError("Please check all fields.");
+        if (data.code === "EMAIL_IN_USE" || data.code === "EMAIL_TAKEN") {
+          setError(EMAIL_ALREADY_IN_USE_MESSAGE);
         } else {
-          setError("Could not create account");
+          const apiText =
+            (typeof data.error === "string" && data.error.trim()) ||
+            (typeof data.message === "string" && data.message.trim()) ||
+            "";
+          if (apiText) setError(apiText);
+          else if (data.code === "VALIDATION_ERROR") setError("Please check all fields.");
+          else setError("Could not create account");
         }
         return;
       }
@@ -90,6 +99,7 @@ export default function SignupPage() {
               onChange={(e) => setName(e.target.value)}
               className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none ring-cyan-500/40 focus:ring-2"
             />
+            <p className="mt-1 text-xs text-white/45">{NAME_SIMILARITY_EMAIL_UNIQUE_HINT}</p>
           </div>
           <div>
             <label htmlFor="email" className="block text-xs font-medium text-white/70">

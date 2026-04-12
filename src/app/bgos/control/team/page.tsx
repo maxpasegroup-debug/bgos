@@ -2,9 +2,20 @@
 
 import { UserRole } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { z } from "zod";
 import { useBgosTheme } from "@/components/bgos/BgosThemeContext";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
 import { INTERNAL_ORG_EMPLOYEE_ROLE_OPTIONS } from "@/lib/internal-hr-roles";
+import {
+  EMAIL_ALREADY_IN_USE_MESSAGE,
+  NAME_SIMILARITY_EMAIL_UNIQUE_HINT,
+} from "@/lib/user-identity-messages";
+
+const iceconnectEmployeeSchema = z.object({
+  name: z.string().trim().min(1, "Name is required"),
+  email: z.string().trim().min(1, "Email is required").email("Enter a valid email"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
 
 type Member = { userId: string; name: string; email: string; role: string };
 
@@ -31,6 +42,7 @@ export default function ControlTeamPage() {
   const [role, setRole] = useState<UserRole>(UserRole.SALES_EXECUTIVE);
   const [saving, setSaving] = useState(false);
   const [formMsg, setFormMsg] = useState<string | null>(null);
+  const [formMsgIsError, setFormMsgIsError] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -64,26 +76,52 @@ export default function ControlTeamPage() {
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
     setFormMsg(null);
+    setFormMsgIsError(false);
+    const fields = iceconnectEmployeeSchema.safeParse({ name, email, password });
+    if (!fields.success) {
+      const fe = fields.error.flatten().fieldErrors;
+      setFormMsg(
+        fe.name?.[0] ?? fe.email?.[0] ?? fe.password?.[0] ?? "Check the form and try again.",
+      );
+      setFormMsgIsError(true);
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch("/api/bgos/control/team/employees", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, role }),
+        body: JSON.stringify({ ...fields.data, role }),
       });
-      const j = (await res.json()) as { ok?: boolean; error?: string };
+      const j = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        message?: string;
+        code?: string;
+      };
       if (!res.ok || !j.ok) {
-        setFormMsg(j.error ?? "Could not create employee");
+        const duplicate =
+          j.code === "EMAIL_IN_USE" ||
+          j.code === "DUPLICATE_EMAIL" ||
+          j.code === "EMAIL_TAKEN";
+        const text =
+          (typeof j.error === "string" && j.error.trim()) ||
+          (typeof j.message === "string" && j.message.trim()) ||
+          "";
+        setFormMsg(duplicate ? EMAIL_ALREADY_IN_USE_MESSAGE : text || "Could not create employee");
+        setFormMsgIsError(true);
         return;
       }
       setFormMsg("Created — employee can log in on ICECONNECT with this email.");
+      setFormMsgIsError(false);
       setName("");
       setEmail("");
       setPassword("");
       await load();
     } catch {
       setFormMsg("Network error");
+      setFormMsgIsError(true);
     } finally {
       setSaving(false);
     }
@@ -98,7 +136,11 @@ export default function ControlTeamPage() {
         </div>
         <button
           type="button"
-          onClick={() => setFormOpen((v) => !v)}
+          onClick={() => {
+            setFormOpen((v) => !v);
+            setFormMsg(null);
+            setFormMsgIsError(false);
+          }}
           className={
             light
               ? "rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white"
@@ -116,17 +158,20 @@ export default function ControlTeamPage() {
           <p className={light ? "text-sm font-semibold text-slate-900" : "text-sm font-semibold text-white"}>
             New employee (ICECONNECT)
           </p>
-          <input
-            required
-            className={
-              light
-                ? "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
-                : "w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-white/40"
-            }
-            placeholder="Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
+          <div>
+            <input
+              required
+              className={
+                light
+                  ? "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                  : "w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-white/40"
+              }
+              placeholder="Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <p className={muted + " mt-1"}>{NAME_SIMILARITY_EMAIL_UNIQUE_HINT}</p>
+          </div>
           <input
             required
             type="email"
@@ -175,7 +220,19 @@ export default function ControlTeamPage() {
             {saving ? "Saving…" : "Create & assign company"}
           </button>
           {formMsg ? (
-            <p className={light ? "text-xs text-emerald-700" : "text-xs text-emerald-400"}>{formMsg}</p>
+            <p
+              className={
+                formMsgIsError
+                  ? light
+                    ? "text-xs text-red-600"
+                    : "text-xs text-red-400"
+                  : light
+                    ? "text-xs text-emerald-700"
+                    : "text-xs text-emerald-400"
+              }
+            >
+              {formMsg}
+            </p>
           ) : null}
         </form>
       ) : null}

@@ -8,8 +8,8 @@ import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
 export default function ControlSalesBoosterPage() {
   const { theme } = useBgosTheme();
   const light = theme === "light";
-  const { hasProPlan, planLockedToBasic } = useBgosDashboardContext();
-  const unlocked = !planLockedToBasic && hasProPlan;
+  const { hasProPlan, planLockedToBasic, bossBillingBypass } = useBgosDashboardContext();
+  const unlocked = bossBillingBypass || (!planLockedToBasic && hasProPlan);
 
   const cardShell = light
     ? "rounded-2xl border border-slate-200/90 bg-white/90 p-8 shadow-sm"

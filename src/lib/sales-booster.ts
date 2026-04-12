@@ -2,6 +2,7 @@ import "server-only";
 
 import { CompanyPlan, LeadStatus, TaskStatus } from "@prisma/client";
 import { forwardLeadStatuses, leadStatusLabel } from "@/lib/lead-pipeline";
+import { isBgosProductionBossBypassEmail } from "@/lib/bgos-production-boss-bypass";
 import { isPro } from "@/lib/plan-access";
 import { isPlanLockedToBasic } from "@/lib/plan-production-lock";
 import { prisma } from "@/lib/prisma";
@@ -107,10 +108,20 @@ function leadScore(input: {
   return { score, reason };
 }
 
+export type BuildSalesBoosterPayloadOptions = {
+  /** When set, skip plan / deployment locks (platform boss override only). */
+  viewerEmail?: string | null;
+};
+
 /**
  * Sales Booster / Pro simulation is gated strictly by {@link Company.plan} for this tenant.
  */
-export async function buildSalesBoosterPayload(companyId: string): Promise<SalesBoosterPayload> {
+export async function buildSalesBoosterPayload(
+  companyId: string,
+  options?: BuildSalesBoosterPayloadOptions,
+): Promise<SalesBoosterPayload> {
+  const bypassPlanGate = isBgosProductionBossBypassEmail(options?.viewerEmail);
+
   const company = await prisma.company.findUnique({
     where: { id: companyId },
     select: { plan: true, name: true, dashboardConfig: true },
@@ -124,7 +135,7 @@ export async function buildSalesBoosterPayload(companyId: string): Promise<Sales
     };
   }
 
-  if (isPlanLockedToBasic()) {
+  if (!bypassPlanGate && isPlanLockedToBasic()) {
     return {
       plan: "BASIC",
       featuresUnlocked: false,
@@ -132,7 +143,7 @@ export async function buildSalesBoosterPayload(companyId: string): Promise<Sales
     };
   }
 
-  const entitled = isPro(company.plan);
+  const entitled = bypassPlanGate || isPro(company.plan);
   const sbCfg = parseSalesBoosterFromDashboardConfig(company.dashboardConfig);
 
   if (!entitled) {
@@ -291,7 +302,9 @@ export async function buildSalesBoosterPayload(companyId: string): Promise<Sales
   );
 
   const advancedAddon =
-    company.plan === CompanyPlan.ENTERPRISE || sbCfg.addonEnabled;
+    bypassPlanGate ||
+    company.plan === CompanyPlan.ENTERPRISE ||
+    sbCfg.addonEnabled;
 
   return {
     plan: company.plan === CompanyPlan.ENTERPRISE ? ("ENTERPRISE" as const) : ("PRO" as const),

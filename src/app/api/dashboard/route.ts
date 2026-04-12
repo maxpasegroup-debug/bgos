@@ -16,6 +16,7 @@ import {
 import { buildAutomationCenterDashboardSlice, isAutomationCenterEnabled } from "@/lib/automation-center";
 import { generateInsights } from "@/lib/nexa-insights";
 import { generateNexaInsights, runNexaAutoActions } from "@/lib/nexa-engine";
+import { isBgosProductionBossBypassEmail } from "@/lib/bgos-production-boss-bypass";
 import { isPro, requireLiveProPlan } from "@/lib/plan-access";
 import { isPlanLockedToBasic } from "@/lib/plan-production-lock";
 import { prisma } from "@/lib/prisma";
@@ -28,6 +29,7 @@ export async function GET(request: NextRequest) {
   if (user instanceof NextResponse) return user;
 
   const companyId = user.companyId;
+  const productionBossBypass = isBgosProductionBossBypassEmail(user.email);
 
   const rangeRaw = request.nextUrl.searchParams.get("range");
   const parsedPreset = dashboardRangePresetSchema.safeParse(rangeRaw?.trim() || "this_month");
@@ -41,7 +43,7 @@ export async function GET(request: NextRequest) {
   const { trendStart, trendEnd, allTimeChart } = trendWindowForRange(rangeResolved);
 
   const entitledPro =
-    !isPlanLockedToBasic() && isPro(user.companyPlan);
+    productionBossBypass || (!isPlanLockedToBasic() && isPro(user.companyPlan));
 
   let leads: number;
   let installations: number;
@@ -59,7 +61,7 @@ export async function GET(request: NextRequest) {
     if (
       entitledPro &&
       (await isAutomationCenterEnabled(companyId)) &&
-      !(await isCompanyBasicTrialExpired(companyId))
+      !(await isCompanyBasicTrialExpired(companyId, user.email))
     ) {
       await runNexaAutoActions(companyId, user.sub);
     }
@@ -74,7 +76,7 @@ export async function GET(request: NextRequest) {
           ? generateInsights(companyId, snapshot.nexa)
           : Promise.resolve([]),
         getPipelineStages(companyId),
-        buildSalesBoosterPayload(companyId),
+        buildSalesBoosterPayload(companyId, { viewerEmail: user.email }),
         getFinancialOverview(companyId),
         entitledPro ? generateNexaInsights(companyId) : Promise.resolve([]),
         computeDashboardAnalytics(

@@ -2,6 +2,7 @@ import "server-only";
 
 import { CompanyPlan } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { isBgosProductionBossBypassEmail } from "@/lib/bgos-production-boss-bypass";
 import type { AuthUser } from "./auth";
 import { jwtCompanyPlanFromUnknown, type JwtCompanyPlan } from "./plan-tier";
 import { isPlanLockedToBasic } from "./plan-production-lock";
@@ -80,6 +81,7 @@ export function requireEnterprisePlan(user: AuthUser): NextResponse | null {
  * downgrades apply even if the session token has not been refreshed yet.
  */
 export async function requireLiveProPlan(user: AuthUser): Promise<NextResponse | null> {
+  if (isBgosProductionBossBypassEmail(user.email)) return null;
   if (!user.companyId) return proPlanRequiredResponse();
   if (isPlanLockedToBasic()) return proPlanRequiredResponse();
   const jwt = requireProPlan(user);

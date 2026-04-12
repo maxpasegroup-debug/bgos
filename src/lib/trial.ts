@@ -2,7 +2,7 @@ import "server-only";
 
 import { CompanySubscriptionStatus, CompanyPlan } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { isBgosProductionBossBypassEmail } from "@/lib/bgos-production-boss-bypass";
 import { syncCompanySubscriptionStatus } from "@/lib/subscription-status";
 
 import { TRIAL_EXPIRED_API_MESSAGE } from "@/lib/trial-middleware";
@@ -51,7 +51,11 @@ export function trialExpiredJsonResponse(): NextResponse {
 /**
  * True when the workspace should be read-only / blocked for mutations (Basic trial ended, Pro period ended, etc.).
  */
-export async function isCompanyBasicTrialExpired(companyId: string): Promise<boolean> {
+export async function isCompanyBasicTrialExpired(
+  companyId: string,
+  viewerEmail?: string | null,
+): Promise<boolean> {
+  if (isBgosProductionBossBypassEmail(viewerEmail)) return false;
   const status = await syncCompanySubscriptionStatus(companyId);
   return status === CompanySubscriptionStatus.EXPIRED;
 }

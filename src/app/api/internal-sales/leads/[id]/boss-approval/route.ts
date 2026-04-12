@@ -29,7 +29,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     return jsonError(403, "FORBIDDEN", "Only a manager or admin can approve onboarding");
   }
 
-  if (await isCompanyBasicTrialExpired(session.companyId)) {
+  if (await isCompanyBasicTrialExpired(session.companyId, session.email)) {
     return trialExpiredJsonResponse();
   }
 

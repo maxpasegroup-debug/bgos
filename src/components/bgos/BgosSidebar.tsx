@@ -39,7 +39,7 @@ const moreNav: NavDef[] = [
 
 export function BgosSidebar() {
   const pathname = usePathname();
-  const { hasProPlan, planLockedToBasic, isSuperBoss } = useBgosDashboardContext();
+  const { hasProPlan, planLockedToBasic, isSuperBoss, bossBillingBypass } = useBgosDashboardContext();
   const { theme } = useBgosTheme();
   const light = theme === "light";
   const [moreOpen, setMoreOpen] = useState(false);
@@ -54,7 +54,10 @@ export function BgosSidebar() {
   }, [moreOpen]);
 
   function resolveHref(item: NavDef): string {
-    if (item.id === "sales-booster" && !planLockedToBasic && hasProPlan) {
+    if (
+      item.id === "sales-booster" &&
+      (bossBillingBypass || (!planLockedToBasic && hasProPlan))
+    ) {
       return "/sales-booster/dashboard";
     }
     return item.href;
@@ -135,7 +138,10 @@ export function BgosSidebar() {
         </button>
         {moreOpen ? (
           <div className="mt-1 space-y-0.5 pb-1">
-            {moreNav.map((item) => (
+            {(bossBillingBypass
+              ? moreNav.filter((item) => item.id !== "billing" && item.id !== "subscription")
+              : moreNav
+            ).map((item) => (
               <SidebarLink
                 key={item.id}
                 href={item.href}

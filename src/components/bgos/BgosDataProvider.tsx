@@ -27,6 +27,8 @@ type Ctx = {
   sessionRole: UserRole | null;
   /** Platform owner ({@link process.env.BGOS_BOSS_EMAIL} + session). */
   isSuperBoss: boolean;
+  /** Permanent Pro / trial bypass for the platform boss email only (server-flagged). */
+  bossBillingBypass: boolean;
   refetch: () => void;
   isLoading: boolean;
   /** Increments after each successful `/api/dashboard` load — use to sync child fetches. */
@@ -54,6 +56,7 @@ export function BgosDataProvider({ children }: { children: ReactNode }) {
     trialReadOnly,
     sessionRole,
     isSuperBoss,
+    bossBillingBypass,
     refetch,
     isLoading,
     syncGeneration,
@@ -61,20 +64,22 @@ export function BgosDataProvider({ children }: { children: ReactNode }) {
 
   const hasProPlan = useMemo(
     () =>
-      !planLockedToBasic &&
-      (companyPlan === CompanyPlan.PRO || companyPlan === CompanyPlan.ENTERPRISE),
-    [planLockedToBasic, companyPlan],
+      bossBillingBypass ||
+      (!planLockedToBasic &&
+        (companyPlan === CompanyPlan.PRO || companyPlan === CompanyPlan.ENTERPRISE)),
+    [bossBillingBypass, planLockedToBasic, companyPlan],
   );
 
   const setAnalyticsRangePreset = useCallback(
     (preset: DashboardRangePreset) => {
       const pro =
-        !planLockedToBasic &&
-        (companyPlan === CompanyPlan.PRO || companyPlan === CompanyPlan.ENTERPRISE);
+        bossBillingBypass ||
+        (!planLockedToBasic &&
+          (companyPlan === CompanyPlan.PRO || companyPlan === CompanyPlan.ENTERPRISE));
       if (!pro && dashboardRangeRequiresPro(preset)) return;
       setAnalyticsRangePresetState(preset);
     },
-    [planLockedToBasic, companyPlan],
+    [bossBillingBypass, planLockedToBasic, companyPlan],
   );
 
   useEffect(() => {
@@ -95,6 +100,7 @@ export function BgosDataProvider({ children }: { children: ReactNode }) {
       trialReadOnly,
       sessionRole,
       isSuperBoss,
+      bossBillingBypass,
       refetch,
       isLoading,
       syncGeneration,
@@ -111,6 +117,7 @@ export function BgosDataProvider({ children }: { children: ReactNode }) {
       trialReadOnly,
       sessionRole,
       isSuperBoss,
+      bossBillingBypass,
       refetch,
       isLoading,
       syncGeneration,

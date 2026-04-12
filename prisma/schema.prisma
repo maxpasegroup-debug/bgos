@@ -103,6 +103,24 @@ enum InternalCallStatus {
   NOT_INTERESTED
 }
 
+/** ICECONNECT sales executive metro pipeline (internal org). SUBSCRIPTION counts toward monthly targets. */
+enum IceconnectMetroStage {
+  LEAD_CREATED
+  INTRO_CALL
+  DEMO_DONE
+  FOLLOW_UP
+  ONBOARDING
+  SUBSCRIPTION
+}
+
+/** Plan tier for executive targets and converted ICECONNECT customers. */
+enum IceconnectCustomerPlan {
+  FREE
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
 /** Category for a single active user manual PDF per company. */
 enum UserManualCategory {
   SALES
@@ -249,6 +267,7 @@ model Company {
   internalEmployeeDailyTargets InternalEmployeeDailyTarget[]
   internalNexaSupportTickets InternalNexaSupportTicket[]
   userManuals                UserManual[]
+  salesExecutiveMonthlyTargets SalesExecutiveMonthlyTarget[]
 
   @@index([name])
   @@index([ownerId])
@@ -389,6 +408,7 @@ model UserCompany {
 model User {
   id        String    @id @default(cuid())
   name      String
+  /** Globally unique login identity (boss, employees, ICECONNECT). */
   email     String    @unique
   password  String
   mobile    String?   @unique
@@ -417,8 +437,31 @@ model User {
   internalLeadActivities InternalLeadActivity[]
   internalInAppNotifications InternalInAppNotification[]
   internalNexaSupportTicketsCreated InternalNexaSupportTicket[] @relation("NexaSupportCreator")
+  salesExecutiveMonthlyTargets SalesExecutiveMonthlyTarget[]
 
   @@index([email])
+}
+
+/** Monthly sales target + salary for ICECONNECT executives (internal org). */
+model SalesExecutiveMonthlyTarget {
+  id           String   @id @default(cuid())
+  companyId    String
+  userId       String
+  periodYear   Int
+  periodMonth  Int
+  targetCount  Int
+  targetPlan   IceconnectCustomerPlan
+  /** Monthly salary in INR (eligible portion scales with target progress). */
+  salaryRupees Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId, periodYear, periodMonth])
+  @@index([companyId])
+  @@index([userId])
 }
 
 model Lead {
@@ -472,6 +515,12 @@ model Lead {
   /** Sales-selected tier before onboarding form is opened (internal org). */
   onboardingType LeadOnboardingType?
 
+  /** ICECONNECT executive metro (internal org). */
+  iceconnectLocation         String?
+  iceconnectMetroStage      IceconnectMetroStage?
+  iceconnectCustomerPlan    IceconnectCustomerPlan?
+  iceconnectSubscribedAt    DateTime?
+
   onboardingTasks        OnboardingTask[]
   internalLeadActivities InternalLeadActivity[]
   nexaSupportTickets     InternalNexaSupportTicket[]
@@ -483,6 +532,7 @@ model Lead {
   @@index([partnerId])
   @@index([phone])
   @@index([companyId, email])
+  @@index([companyId, assignedTo, iceconnectMetroStage])
 }
 
 model Deal {
