@@ -14,6 +14,7 @@ import {
   AUTH_HEADER_USER_ID,
   AUTH_HEADER_USER_ROLE,
   AUTH_HEADER_PREFIX,
+  AUTH_HEADER_SUPER_BOSS,
   AUTH_JWT_ISSUER,
   pathnameRequiresProPlan,
 } from "@/lib/auth-config";
@@ -31,6 +32,7 @@ import {
   TRIAL_EXPIRED_API_MESSAGE,
 } from "@/lib/trial-middleware";
 import { jwtCompanyPlanFromUnknown, jwtPlanIsProPlus } from "@/lib/plan-tier";
+import { isSuperBossEmail } from "@/lib/super-boss";
 
 function normalizePathname(pathname: string): string {
   if (pathname.length > 1 && pathname.endsWith("/")) {
@@ -185,6 +187,12 @@ function tryAttachUserHeaders(
     headers.delete(AUTH_HEADER_NEEDS_COMPANY);
     headers.set(AUTH_HEADER_WORKSPACE_READY, tenant.workspaceReady ? "1" : "0");
   }
+  const jwtSuperBoss = payload.superBoss === true && isSuperBossEmail(email);
+  if (jwtSuperBoss) {
+    headers.set(AUTH_HEADER_SUPER_BOSS, "1");
+  } else {
+    headers.delete(AUTH_HEADER_SUPER_BOSS);
+  }
   return true;
 }
 
@@ -272,7 +280,10 @@ export async function middleware(request: NextRequest) {
         iceVerified.ok &&
         typeof iceVerified.payload.role === "string"
       ) {
-        const homePath = getRoleHome(String(iceVerified.payload.role));
+        const p = iceVerified.payload as Record<string, unknown>;
+        const em = typeof p.email === "string" ? p.email : "";
+        const sb = p.superBoss === true && isSuperBossEmail(em);
+        const homePath = sb ? "/bgos/control" : getRoleHome(String(p.role));
         return NextResponse.redirect(absoluteRoleHomeUrl(tenant, homePath, request.url));
       }
       return NextResponse.next();
@@ -285,7 +296,10 @@ export async function middleware(request: NextRequest) {
           loginVerified.ok &&
           typeof loginVerified.payload.role === "string"
         ) {
-          const homePath = getRoleHome(String(loginVerified.payload.role));
+          const p = loginVerified.payload as Record<string, unknown>;
+          const em = typeof p.email === "string" ? p.email : "";
+          const sb = p.superBoss === true && isSuperBossEmail(em);
+          const homePath = sb ? "/bgos/control" : getRoleHome(String(p.role));
           return NextResponse.redirect(absoluteRoleHomeUrl(tenant, homePath, request.url));
         }
       }
@@ -317,6 +331,11 @@ export async function middleware(request: NextRequest) {
     }
     return NextResponse.redirect(loginRedirectUrl(request, pathname, tenant));
   }
+
+  const jwtEmailEdge =
+    typeof verified.payload.email === "string" ? verified.payload.email : "";
+  const edgeSuperBoss =
+    verified.payload.superBoss === true && isSuperBossEmail(jwtEmailEdge);
 
   if (
     !tryAttachUserHeaders(
@@ -350,7 +369,10 @@ export async function middleware(request: NextRequest) {
       normalizedPath === "/api/auth/me" ||
       normalizedPath === "/api/auth/logout" ||
       normalizedPath === "/api/company/create" ||
-      (normalizedPath === "/api/company/list" && request.method === "GET");
+      (normalizedPath === "/api/company/list" && request.method === "GET") ||
+      (edgeSuperBoss &&
+        (normalizedPath === "/bgos/control" || normalizedPath.startsWith("/bgos/control/"))) ||
+      (edgeSuperBoss && normalizedPath.startsWith("/api/bgos/control/"));
     if (!allowed) {
       if (pathname.startsWith("/api")) {
         return NextResponse.json(
@@ -387,7 +409,10 @@ export async function middleware(request: NextRequest) {
         normalizedPath === "/api/auth/me" ||
         normalizedPath === "/api/auth/logout" ||
         (normalizedPath === "/api/auth/refresh-session" && request.method === "POST") ||
-        (normalizedPath === "/api/company/list" && request.method === "GET");
+        (normalizedPath === "/api/company/list" && request.method === "GET") ||
+        (edgeSuperBoss &&
+          (normalizedPath === "/bgos/control" || normalizedPath.startsWith("/bgos/control/"))) ||
+        (edgeSuperBoss && normalizedPath.startsWith("/api/bgos/control/"));
       if (!allowedActivation) {
         if (pathname.startsWith("/api")) {
           return NextResponse.json(
@@ -407,13 +432,40 @@ export async function middleware(request: NextRequest) {
   const role = String(verified.payload.role);
 
   if (pathname === "/iceconnect" || pathname === "/iceconnect/") {
-    const homePath = getRoleHome(role);
+    const homePath = edgeSuperBoss ? "/bgos/control" : getRoleHome(role);
     if (normalizePathname(homePath) !== normalizePathname(pathname)) {
       return NextResponse.redirect(absoluteRoleHomeUrl(tenant, homePath, request.url));
     }
   }
 
-  if (!roleCanAccessPath(role, pathname)) {
+  if (pathname.startsWith("/api/bgos/control") && !edgeSuperBoss) {
+    return NextResponse.json(
+      { ok: false, error: "Forbidden", code: "FORBIDDEN" },
+      { status: 403 },
+    );
+  }
+
+  if (!pathname.startsWith("/api") && tenant === "bgos" && edgeSuperBoss && normalizedPath === "/bgos") {
+    return NextResponse.redirect(new URL("/bgos/control", request.url));
+  }
+
+  if (
+    normalizedPath === "/bgos/control" ||
+    normalizedPath.startsWith("/bgos/control/")
+  ) {
+    if (!edgeSuperBoss) {
+      if (pathname.startsWith("/api")) {
+        return NextResponse.json(
+          { ok: false, error: "Forbidden", code: "FORBIDDEN" },
+          { status: 403 },
+        );
+      }
+      const homePath = getRoleHome(role);
+      return NextResponse.redirect(absoluteRoleHomeUrl(tenant, homePath, request.url));
+    }
+  }
+
+  if (!roleCanAccessPath(role, pathname, { superBoss: edgeSuperBoss })) {
     if (pathname.startsWith("/api")) {
       return NextResponse.json(
         { ok: false, error: "Forbidden", code: "FORBIDDEN" },

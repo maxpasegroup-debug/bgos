@@ -9,6 +9,8 @@ export const ROLE_HOME: Readonly<Record<string, string>> = {
   MANAGER: "/iceconnect/internal-sales",
   SALES_EXECUTIVE: "/iceconnect/internal-sales",
   TELECALLER: "/iceconnect/internal-sales",
+  TECH_HEAD: "/iceconnect/internal-tech",
+  TECH_EXECUTIVE: "/iceconnect/internal-tech",
   SALES_HEAD: "/iceconnect/sales-head",
   CHANNEL_PARTNER: "/iceconnect/partner",
   OPERATIONS_HEAD: "/iceconnect/operations",
@@ -64,6 +66,14 @@ const PAGE_RULES: RouteRule[] = [
   { prefix: "/iceconnect/loan", roles: new Set(["LCO", "ADMIN", "MANAGER"]) },
   { prefix: "/iceconnect/hr", roles: new Set(["HR_MANAGER", "ADMIN", "MANAGER"]) },
   { prefix: "/iceconnect/internal-sales", roles: new Set(["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER"]) },
+  {
+    prefix: "/iceconnect/internal-tech",
+    roles: new Set(["TECH_HEAD", "TECH_EXECUTIVE", "ADMIN", "MANAGER"]),
+  },
+  {
+    prefix: "/bgos/internal-tech",
+    roles: new Set(["TECH_HEAD", "TECH_EXECUTIVE", "ADMIN", "MANAGER"]),
+  },
   {
     prefix: "/iceconnect/internal-onboarding",
     roles: new Set([
@@ -184,6 +194,8 @@ const API_RULES: RouteRule[] = [
       "TELECALLER",
       "ADMIN",
       "MANAGER",
+      "TECH_HEAD",
+      "TECH_EXECUTIVE",
       "OPERATIONS_HEAD",
       "SITE_ENGINEER",
       "PRO",
@@ -237,11 +249,32 @@ function allowedByRules(pathname: string, role: string, rules: RouteRule[]): boo
   return null;
 }
 
+export type RoleAccessOpts = {
+  /** Platform owner only — see {@link process.env.BGOS_BOSS_EMAIL} + JWT `superBoss`. */
+  superBoss?: boolean;
+};
+
+function normalizePathnameRole(pathname: string): string {
+  if (pathname.length > 1 && pathname.endsWith("/")) {
+    return pathname.replace(/\/+$/, "");
+  }
+  return pathname;
+}
+
 /**
  * Whether this role may access this pathname (pages + role-scoped APIs).
- * ADMIN and MANAGER may access all defined areas.
+ * ADMIN and MANAGER may access all defined areas except `/bgos/control` (super boss only).
  */
-export function roleCanAccessPath(role: string, pathname: string): boolean {
+export function roleCanAccessPath(
+  role: string,
+  pathname: string,
+  opts?: RoleAccessOpts,
+): boolean {
+  const p = normalizePathnameRole(pathname);
+  if (p === "/bgos/control" || p.startsWith("/bgos/control/")) {
+    return opts?.superBoss === true;
+  }
+
   if (pathname === "/iceconnect" || pathname === "/iceconnect/") {
     return PRIVILEGED.has(role);
   }
@@ -265,8 +298,12 @@ export function getRoleHome(role: string): string {
  * After login: honor `from` only if the role may open that path.
  * Otherwise use {@link getRoleHome} (no blank `/iceconnect` landing for known roles).
  */
-export function postLoginDestination(role: string, from: string | null): string {
-  if (from && from.startsWith("/") && roleCanAccessPath(role, from)) {
+export function postLoginDestination(
+  role: string,
+  from: string | null,
+  opts?: RoleAccessOpts,
+): string {
+  if (from && from.startsWith("/") && roleCanAccessPath(role, from, opts)) {
     return from;
   }
   return getRoleHome(role);
@@ -287,6 +324,7 @@ export const ICECONNECT_DASHBOARD_ROLES: Record<string, readonly string[]> = {
   loan: ["LCO", "ADMIN", "MANAGER"],
   hr: ["HR_MANAGER", "ADMIN", "MANAGER"],
   "internal-sales": ["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER"],
+  "internal-tech": ["TECH_HEAD", "TECH_EXECUTIVE", "ADMIN", "MANAGER"],
   "internal-onboarding": [
     "ADMIN",
     "MANAGER",

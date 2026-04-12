@@ -1,4 +1,4 @@
-import type { InternalCallStatus, InternalSalesStage } from "@prisma/client";
+import type { InternalCallStatus, InternalSalesStage, InternalTechStage } from "@prisma/client";
 
 export type LeadCard = {
   id: string;
@@ -18,6 +18,8 @@ export type LeadCard = {
   assignee: { id: string; name: string; email: string } | null;
   createdAt: string;
   onboardingStatus?: string;
+  pendingBossApproval?: boolean;
+  internalTechStage?: InternalTechStage | null;
 };
 
 export type PipelineCol = { key: InternalSalesStage; label: string; leads: LeadCard[] };

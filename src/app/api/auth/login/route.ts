@@ -12,6 +12,7 @@ import { verifyPassword } from "@/lib/password";
 import { signAccessToken } from "@/lib/jwt";
 import { postLoginDestination } from "@/lib/role-routing";
 import { setActiveCompanyCookie, setSessionCookie } from "@/lib/session-cookie";
+import { isSuperBossEmail } from "@/lib/super-boss";
 
 const bodySchema = z
   .object({
@@ -68,9 +69,13 @@ function internalPostLoginLocation(
   needsOnboardingFlow: boolean,
   companyId: string | null,
   workspaceActivated: boolean,
+  userEmail: string,
 ): string {
   if (needsOnboardingFlow || companyId == null || !workspaceActivated) {
     return "/onboarding";
+  }
+  if (isSuperBossEmail(userEmail)) {
+    return "/bgos/control";
   }
   return postLoginDestination(String(role), from?.trim() ?? null);
 }
@@ -243,6 +248,8 @@ export async function POST(request: Request) {
     const effectiveRole = primary?.jobRole ?? sessionRole;
 
     // JWT creation
+    const boss = isSuperBossEmail(user.email);
+
     const token = signAccessToken({
       sub: user.id,
       email: user.email,
@@ -253,6 +260,7 @@ export async function POST(request: Request) {
         ? false
         : Boolean(user.workspaceActivatedAt),
       ...(mems.length ? { memberships: mems } : {}),
+      ...(boss ? { superBoss: true as const } : {}),
     });
 
     const companiesPayload =
@@ -294,6 +302,7 @@ export async function POST(request: Request) {
       needsOnboarding,
       companyId,
       Boolean(user.workspaceActivatedAt),
+      user.email,
     );
 
     // Cookie setting
@@ -302,9 +311,10 @@ export async function POST(request: Request) {
       ok: true as const,
       user: userPayload,
       companies: companiesPayload,
-      needsCompanySelection: companiesPayload.length > 1,
+      needsCompanySelection: boss ? false : companiesPayload.length > 1,
       needsCrossDomainHandoff,
       nextPath,
+      isSuperBoss: boss,
     });
     setSessionCookie(res, token);
     if (companyId) {

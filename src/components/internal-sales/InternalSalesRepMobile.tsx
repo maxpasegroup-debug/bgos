@@ -8,11 +8,14 @@ import {
   readPipelinePayload,
 } from "@/components/internal-sales/internal-sales-read-api";
 import type { LeadCard, PipelineCol } from "@/components/internal-sales/internal-sales-types";
+import { InternalSalesMetroStrip } from "./InternalSalesMetroStrip";
+import { NexaSupportModal } from "./NexaSupportModal";
 
 function nextActionHint(l: LeadCard): string {
   if (l.callStatus === InternalCallStatus.NOT_CALLED) return "Next: make the first call";
   if (l.stage === InternalSalesStage.FOLLOW_UP) return "Next: follow up";
-  if (l.stage === InternalSalesStage.DEMO_SCHEDULED) return "Next: confirm demo";
+  if (l.stage === InternalSalesStage.DEMO_ORIENTATION) return "Next: demo / orientation";
+  if (l.stage === InternalSalesStage.TECH_READY) return "Ready for delivery — hand off to client";
   return "Next: update pipeline";
 }
 
@@ -21,6 +24,7 @@ export function InternalSalesRepMobile({ theme }: { theme: "bgos" | "ice" }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [nexaForLead, setNexaForLead] = useState<string | null>(null);
 
   const shell =
     theme === "bgos"
@@ -133,6 +137,14 @@ export function InternalSalesRepMobile({ theme }: { theme: "bgos" | "ice" }) {
             <p className="text-lg font-semibold">{l.name}</p>
             <p className="text-sm tabular-nums opacity-80">{l.phone}</p>
             <p className="mt-2 text-sm font-medium text-amber-300/90">{nextActionHint(l)}</p>
+            <div className="mt-2">
+              <InternalSalesMetroStrip
+                stage={l.stage}
+                pendingBossApproval={l.pendingBossApproval}
+                theme={theme}
+                compact
+              />
+            </div>
             <label className="mt-3 block text-xs font-medium opacity-70">
               Next follow-up date
               <input
@@ -164,6 +176,24 @@ export function InternalSalesRepMobile({ theme }: { theme: "bgos" | "ice" }) {
                 if (v !== (l.notes ?? "").trim()) void patch(l.id, { notes: v });
               }}
             />
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={busyId === l.id}
+                className="min-h-11 flex-1 rounded-xl bg-slate-500 text-sm font-semibold text-white disabled:opacity-50"
+                onClick={() => void patch(l.id, { advanceInternalSalesStage: true })}
+              >
+                Complete stage
+              </button>
+              <button
+                type="button"
+                disabled={busyId === l.id}
+                className="min-h-11 flex-1 rounded-xl bg-cyan-600 text-sm font-semibold text-white disabled:opacity-50"
+                onClick={() => setNexaForLead(l.id)}
+              >
+                Nexa Support
+              </button>
+            </div>
             <div className="mt-4 grid grid-cols-2 gap-2">
               <button
                 type="button"
@@ -209,6 +239,15 @@ export function InternalSalesRepMobile({ theme }: { theme: "bgos" | "ice" }) {
         <p className={theme === "bgos" ? "py-12 text-center text-white/45" : "py-12 text-center text-slate-500"}>
           No leads assigned to you yet.
         </p>
+      ) : null}
+
+      {nexaForLead ? (
+        <NexaSupportModal
+          theme={theme}
+          leadId={nexaForLead}
+          onClose={() => setNexaForLead(null)}
+          onDone={() => void load()}
+        />
       ) : null}
     </div>
   );

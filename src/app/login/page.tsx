@@ -62,6 +62,7 @@ function LoginForm() {
         nextPath?: string;
         needsCompanySelection?: boolean;
         companies?: unknown[];
+        isSuperBoss?: boolean;
         user?: {
           role: string;
           companyId?: string | null;
@@ -95,6 +96,20 @@ function LoginForm() {
       const role = data.user?.role;
       if (!role) {
         setError("Invalid sign-in response");
+        return;
+      }
+
+      if (data.isSuperBoss === true) {
+        try {
+          await fetch("/api/auth/refresh-session", {
+            method: "POST",
+            credentials: "include",
+          }).catch(() => undefined);
+        } catch {
+          /* non-fatal */
+        }
+        router.push("/bgos/control");
+        router.refresh();
         return;
       }
 

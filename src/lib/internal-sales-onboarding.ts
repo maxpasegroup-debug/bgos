@@ -64,8 +64,9 @@ export async function createOnboardingTaskForLead(params: {
       await tx.lead.update({
         where: { id: leadId },
         data: {
-          internalSalesStage: InternalSalesStage.CLOSED_WON,
-          status: internalStageToLeadStatus(InternalSalesStage.CLOSED_WON),
+          internalSalesStage: InternalSalesStage.CLIENT_LIVE,
+          status: internalStageToLeadStatus(InternalSalesStage.CLIENT_LIVE),
+          internalStageUpdatedAt: new Date(),
         },
       });
     }

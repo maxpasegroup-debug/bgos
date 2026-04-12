@@ -25,6 +25,8 @@ type Ctx = {
   basicTrialExpired: boolean;
   trialReadOnly: boolean;
   sessionRole: UserRole | null;
+  /** Platform owner ({@link process.env.BGOS_BOSS_EMAIL} + session). */
+  isSuperBoss: boolean;
   refetch: () => void;
   isLoading: boolean;
   /** Increments after each successful `/api/dashboard` load — use to sync child fetches. */
@@ -51,6 +53,7 @@ export function BgosDataProvider({ children }: { children: ReactNode }) {
     basicTrialExpired,
     trialReadOnly,
     sessionRole,
+    isSuperBoss,
     refetch,
     isLoading,
     syncGeneration,
@@ -91,6 +94,7 @@ export function BgosDataProvider({ children }: { children: ReactNode }) {
       basicTrialExpired,
       trialReadOnly,
       sessionRole,
+      isSuperBoss,
       refetch,
       isLoading,
       syncGeneration,
@@ -106,6 +110,7 @@ export function BgosDataProvider({ children }: { children: ReactNode }) {
       basicTrialExpired,
       trialReadOnly,
       sessionRole,
+      isSuperBoss,
       refetch,
       isLoading,
       syncGeneration,

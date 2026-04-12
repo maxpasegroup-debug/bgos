@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BgosAddLeadModal } from "./BgosAddLeadModal";
 import { BgosCompanySwitcher } from "./BgosCompanySwitcher";
@@ -43,7 +44,8 @@ function roleLabel(role: string): string {
 }
 
 export function BgosHeader() {
-  const { trialReadOnly } = useBgosDashboardContext();
+  const pathname = usePathname();
+  const { trialReadOnly, isSuperBoss } = useBgosDashboardContext();
   const { theme, toggleTheme } = useBgosTheme();
   const light = theme === "light";
   const reduceMotion = useReducedMotion();
@@ -58,6 +60,7 @@ export function BgosHeader() {
     companyName: null,
     billing: null,
   });
+  const logoHref = isSuperBoss ? "/bgos/control" : "/bgos";
   const profileRef = useRef<HTMLDivElement | null>(null);
   const notifRef = useRef<HTMLDivElement | null>(null);
 
@@ -156,7 +159,7 @@ export function BgosHeader() {
         className={`flex h-14 min-h-14 items-center gap-2 sm:gap-4 ${BGOS_MAIN_PAD}`}
       >
         <Link
-          href="/bgos"
+          href={logoHref}
           className="flex shrink-0 items-center gap-2 transition-opacity hover:opacity-90"
           aria-label="BGOS Home"
         >
@@ -177,7 +180,9 @@ export function BgosHeader() {
               : "min-w-0 flex-1 truncate text-center text-xs font-semibold tracking-wide text-white/90 sm:text-sm"
           }
         >
-          Business overview
+          {pathname === "/bgos/control" || pathname.startsWith("/bgos/control/")
+            ? "BGOS Control"
+            : "Business overview"}
         </h1>
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
           <motion.button

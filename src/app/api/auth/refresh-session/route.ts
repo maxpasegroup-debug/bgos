@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { jsonSuccess } from "@/lib/api-response";
 import { requireActiveCompanyMembership } from "@/lib/auth";
-import { MintSessionTokenError, mintSessionAccessToken } from "@/lib/mint-session-token";
+import { MintSessionTokenError, mintSessionAccessTokenForUser } from "@/lib/mint-session-token";
 import { handleApiError } from "@/lib/route-error";
 import { setSessionCookie } from "@/lib/session-cookie";
 
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
   if (session instanceof NextResponse) return session;
 
   try {
-    const token = await mintSessionAccessToken({
+    const token = await mintSessionAccessTokenForUser({
       userId: session.sub,
       email: session.email,
       activeCompanyId: session.companyId,

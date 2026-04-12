@@ -111,8 +111,13 @@ export function BgosCompanySwitcher({ light = false }: { light?: boolean }) {
         await load();
         return;
       }
+      const j = (await res.json()) as { ok?: boolean; redirectPath?: string };
       setOpen(false);
       refetch();
+      if (typeof j.redirectPath === "string" && j.redirectPath.startsWith("/")) {
+        window.location.assign(j.redirectPath);
+        return;
+      }
       router.refresh();
     } finally {
       setSwitchingId(null);

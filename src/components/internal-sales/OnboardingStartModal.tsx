@@ -51,19 +51,19 @@ export function OnboardingStartModal({
           companyName: companyName.trim(),
           ownerName: ownerName.trim(),
           phone: phone.trim(),
-          email: email.trim() || undefined,
-          businessType: businessType.trim() || undefined,
-          teamSize: teamSize.trim() || undefined,
-          leadSources: leadSources.trim() || undefined,
-          problems: problems.trim() || undefined,
-          requirements: requirements.trim() || undefined,
-          plan: plan.trim() || undefined,
-          whatsApp: whatsApp.trim() || undefined,
+          email: email.trim(),
+          businessType: businessType.trim(),
+          teamSize: teamSize.trim(),
+          leadSources: leadSources.trim(),
+          problems: problems.trim(),
+          requirements: requirements.trim(),
+          plan: plan.trim(),
+          whatsApp: whatsApp.trim(),
         }),
       });
       const j = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok) {
-        setErr(typeof j.error === "string" ? j.error : "Could not start");
+        setErr(typeof j.error === "string" ? j.error : "Could not submit");
         return;
       }
       onDone();
@@ -76,9 +76,9 @@ export function OnboardingStartModal({
   return (
     <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 p-4 sm:items-center">
       <div className={panel}>
-        <h2 className="text-lg font-semibold">Start onboarding</h2>
+        <h2 className="text-lg font-semibold">Onboarding form</h2>
         <p className={theme === "bgos" ? "mt-1 text-xs text-white/55" : "mt-1 text-xs text-slate-500"}>
-          Sends this to the tech queue and marks the deal won.
+          All fields are required. Submits for boss approval — you cannot skip this step while Interested.
         </p>
         {err ? (
           <p className="mt-3 rounded-lg bg-red-500/15 px-3 py-2 text-sm text-red-200">{err}</p>
@@ -98,35 +98,35 @@ export function OnboardingStartModal({
           </label>
           <label className="block text-xs font-medium">
             Email
-            <input className={inp} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <input className={inp} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </label>
           <label className="block text-xs font-medium">
             Business type
-            <input className={inp} value={businessType} onChange={(e) => setBusinessType(e.target.value)} />
+            <input className={inp} value={businessType} onChange={(e) => setBusinessType(e.target.value)} required />
           </label>
           <label className="block text-xs font-medium">
-            Team size
-            <input className={inp} value={teamSize} onChange={(e) => setTeamSize(e.target.value)} />
+            Team size (sales / tech)
+            <input className={inp} value={teamSize} onChange={(e) => setTeamSize(e.target.value)} required />
           </label>
           <label className="block text-xs font-medium">
             Lead sources
-            <textarea className={inp} rows={2} value={leadSources} onChange={(e) => setLeadSources(e.target.value)} />
+            <textarea className={inp} rows={2} value={leadSources} onChange={(e) => setLeadSources(e.target.value)} required />
           </label>
           <label className="block text-xs font-medium">
             Problems
-            <textarea className={inp} rows={2} value={problems} onChange={(e) => setProblems(e.target.value)} />
+            <textarea className={inp} rows={2} value={problems} onChange={(e) => setProblems(e.target.value)} required />
           </label>
           <label className="block text-xs font-medium">
             Requirements
-            <textarea className={inp} rows={2} value={requirements} onChange={(e) => setRequirements(e.target.value)} />
+            <textarea className={inp} rows={2} value={requirements} onChange={(e) => setRequirements(e.target.value)} required />
           </label>
           <label className="block text-xs font-medium">
             Plan
-            <input className={inp} value={plan} onChange={(e) => setPlan(e.target.value)} />
+            <input className={inp} value={plan} onChange={(e) => setPlan(e.target.value)} required />
           </label>
           <label className="block text-xs font-medium">
             WhatsApp number
-            <input className={inp} value={whatsApp} onChange={(e) => setWhatsApp(e.target.value)} inputMode="tel" />
+            <input className={inp} value={whatsApp} onChange={(e) => setWhatsApp(e.target.value)} required inputMode="tel" />
           </label>
           <div className="flex flex-wrap gap-2 pt-2">
             <button
@@ -134,7 +134,7 @@ export function OnboardingStartModal({
               disabled={busy}
               className="min-h-11 flex-1 rounded-xl bg-emerald-600 text-sm font-semibold text-white disabled:opacity-50"
             >
-              {busy ? "Saving…" : "Submit"}
+              {busy ? "Saving…" : "Submit for approval"}
             </button>
             <button
               type="button"

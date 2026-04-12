@@ -1,8 +1,12 @@
 "use client";
 
 import { CompanyPlan, UserRole } from "@prisma/client";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { normalizeFinancialOverview } from "@/lib/dashboard-client-defaults";
+import {
+  emptyFinancialOverview,
+  normalizeFinancialOverview,
+} from "@/lib/dashboard-client-defaults";
 import type {
   DashboardAnalytics,
   DashboardAnalyticsRangeMeta,
@@ -140,6 +144,10 @@ export function useBgosData(
   analyticsRangePreset: string = "this_month",
   onPlanProRequired?: () => void,
 ) {
+  const pathname = usePathname();
+  const controlShell =
+    typeof pathname === "string" &&
+    (pathname === "/bgos/control" || pathname.startsWith("/bgos/control/"));
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [companyPlan, setCompanyPlan] = useState<CompanyPlan | null>(null);
@@ -153,6 +161,7 @@ export function useBgosData(
   const [reloadToken, setReloadToken] = useState(0);
   /** Bumped after each successful `/api/dashboard` load so pipeline / lists stay in sync. */
   const [syncGeneration, setSyncGeneration] = useState(0);
+  const [isSuperBoss, setIsSuperBoss] = useState(false);
   const okOnce = useRef(false);
 
   const refetch = useCallback(() => {
@@ -168,7 +177,11 @@ export function useBgosData(
           authenticated?: boolean;
           planLockedToBasic?: boolean;
           basicTrialExpired?: boolean;
-          user?: { companyPlan?: CompanyPlan; role?: UserRole };
+          user?: {
+            companyPlan?: CompanyPlan;
+            role?: UserRole;
+            isSuperBoss?: boolean;
+          };
         } | null) => {
           if (j?.authenticated === true) {
             setPlanLockedToBasic(j.planLockedToBasic === true);
@@ -176,6 +189,7 @@ export function useBgosData(
           } else {
             setBasicTrialExpired(false);
           }
+          setIsSuperBoss(j?.user?.isSuperBoss === true);
           const p = j?.user?.companyPlan;
           if (
             p === CompanyPlan.BASIC ||
@@ -194,6 +208,37 @@ export function useBgosData(
     let cancelled = false;
 
     const load = async () => {
+      if (controlShell) {
+        if (!cancelled) {
+          setDashboard(
+            normalizeDashboard({
+              leads: 0,
+              revenue: 0,
+              installations: 0,
+              pendingPayments: 0,
+              pipeline: [],
+              insights: [],
+              salesBooster: { plan: "BASIC", featuresUnlocked: false, companyName: "" },
+              automationCenter: null,
+              nexa: EMPTY_NEXA,
+              operations: EMPTY_OPS,
+              revenueBreakdown: EMPTY_REV,
+              risks: EMPTY_RISKS,
+              health: EMPTY_HEALTH,
+              hr: EMPTY_HR,
+              inventory: EMPTY_INVENTORY,
+              partner: EMPTY_PARTNER,
+              team: [],
+              financial: emptyFinancialOverview(),
+              analytics: EMPTY_ANALYTICS,
+              analyticsRange: EMPTY_ANALYTICS_RANGE,
+            }),
+          );
+          setError(null);
+          okOnce.current = true;
+        }
+        return;
+      }
       try {
         const dashUrl = `/api/dashboard?range=${encodeURIComponent(analyticsRangePreset)}`;
         const res = await fetch(dashUrl, { credentials: "include" });
@@ -285,14 +330,19 @@ export function useBgosData(
     };
 
     void load();
+    if (controlShell) {
+      return () => {
+        cancelled = true;
+      };
+    }
     const id = window.setInterval(() => void load(), pollMs);
     return () => {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [pollMs, reloadToken, analyticsRangePreset, onPlanProRequired]);
+  }, [pollMs, reloadToken, analyticsRangePreset, onPlanProRequired, controlShell]);
 
-  const isLoading = dashboard === null && error === null;
+  const isLoading = !controlShell && dashboard === null && error === null;
 
   const trialReadOnly = basicTrialExpired;
 
@@ -307,5 +357,6 @@ export function useBgosData(
     refetch,
     isLoading,
     syncGeneration,
+    isSuperBoss,
   };
 }

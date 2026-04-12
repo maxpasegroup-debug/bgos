@@ -5,6 +5,10 @@ import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BgosAddEmployeeForm } from "@/components/bgos/BgosAddEmployeeForm";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
+import {
+  INTERNAL_ORG_EMPLOYEE_ROLE_OPTIONS,
+  SOLAR_FIELD_EMPLOYEE_ROLE_OPTIONS,
+} from "@/lib/internal-hr-roles";
 
 type HrFilter = "all" | "active" | "on_leave";
 
@@ -87,17 +91,6 @@ type EmployeeDetail = {
   }[];
 };
 
-const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
-  { value: UserRole.SALES_HEAD, label: "Sales Head" },
-  { value: UserRole.SALES_EXECUTIVE, label: "Sales Executive" },
-  { value: UserRole.TELECALLER, label: "Telecaller" },
-  { value: UserRole.OPERATIONS_HEAD, label: "Operations Head" },
-  { value: UserRole.SITE_ENGINEER, label: "Engineer" },
-  { value: UserRole.INSTALLATION_TEAM, label: "Installer" },
-  { value: UserRole.ACCOUNTANT, label: "Accounts" },
-  { value: UserRole.HR_MANAGER, label: "HR Manager" },
-];
-
 function fDate(iso: string | null) {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -106,6 +99,7 @@ function fDate(iso: string | null) {
 }
 
 export function BgosHrCommandCenter() {
+  const [internalOrg, setInternalOrg] = useState(false);
   const [filter, setFilter] = useState<HrFilter>("all");
   const [data, setData] = useState<HrData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -117,6 +111,27 @@ export function BgosHrCommandCenter() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [nexaLine, setNexaLine] = useState<string | null>(null);
+
+  const roleOptions = useMemo(
+    () => (internalOrg ? INTERNAL_ORG_EMPLOYEE_ROLE_OPTIONS : SOLAR_FIELD_EMPLOYEE_ROLE_OPTIONS),
+    [internalOrg],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/company/current", { credentials: "include" });
+        const j = (await res.json()) as { ok?: boolean; company?: { internalSalesOrg?: boolean } };
+        if (!cancelled && res.ok && j.ok && j.company?.internalSalesOrg) setInternalOrg(true);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [leaveForm, setLeaveForm] = useState({ fromDate: "", toDate: "", reason: "" });
   const [pipForm, setPipForm] = useState({ goal: "", dueDate: "" });
@@ -550,7 +565,7 @@ export function BgosHrCommandCenter() {
                       value={detail.employee.role}
                       onChange={(e) => void updateRole(e.target.value as UserRole)}
                     >
-                      {ROLE_OPTIONS.map((r) => (
+                      {roleOptions.map((r) => (
                         <option key={r.value} value={r.value}>
                           {r.label}
                         </option>

@@ -7,6 +7,7 @@ import { handleApiError } from "@/lib/route-error";
 import { prisma } from "@/lib/prisma";
 import { setActiveCompanyCookie, setSessionCookie } from "@/lib/session-cookie";
 import { signAccessToken } from "@/lib/jwt";
+import { isSuperBossEmail } from "@/lib/super-boss";
 
 /**
  * Completes onboarding step 2 (NEXA activation). Sets `workspaceActivatedAt` and re-issues JWT with `workspaceReady: true`.
@@ -37,6 +38,7 @@ export async function POST(request: NextRequest) {
         companyPlan: primary.plan,
         workspaceReady: true,
         memberships: mems,
+        ...(isSuperBossEmail(session.email) ? { superBoss: true as const } : {}),
       });
     } catch {
       return NextResponse.json(
@@ -79,6 +81,7 @@ export async function POST(request: NextRequest) {
       companyPlan: primary.plan,
       workspaceReady: true,
       memberships: mems,
+      ...(isSuperBossEmail(session.email) ? { superBoss: true as const } : {}),
     });
   } catch {
     return NextResponse.json(

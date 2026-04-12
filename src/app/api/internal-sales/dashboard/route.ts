@@ -1,5 +1,11 @@
 import type { NextRequest } from "next/server";
-import { InternalCallStatus, InternalSalesStage, LeadStatus, UserRole } from "@prisma/client";
+import {
+  InternalCallStatus,
+  InternalSalesStage,
+  LeadStatus,
+  OnboardingTaskStatus,
+  UserRole,
+} from "@prisma/client";
 import { jsonError, jsonSuccess } from "@/lib/api-response";
 import { requireAuthWithCompany } from "@/lib/auth";
 import { assertInternalSalesSession } from "@/lib/internal-sales-org";
@@ -58,6 +64,8 @@ export async function GET(request: NextRequest) {
     leadsWeek,
     leadsMonth,
     targetsToday,
+    activeOnboardingTasks,
+    techPipelineLeadCount,
   ] = await Promise.all([
     prisma.lead.count({
       where: { companyId, createdAt: { gte: dayStart, lt: dayEnd } },
@@ -70,17 +78,17 @@ export async function GET(request: NextRequest) {
       },
     }),
     prisma.lead.count({
-      where: { companyId, internalSalesStage: InternalSalesStage.DEMO_SCHEDULED },
+      where: { companyId, internalSalesStage: InternalSalesStage.DEMO_ORIENTATION },
     }),
     prisma.lead.count({
-      where: { companyId, internalSalesStage: InternalSalesStage.CLOSED_WON },
+      where: { companyId, internalSalesStage: InternalSalesStage.CLIENT_LIVE },
     }),
     prisma.lead.count({
       where: {
         companyId,
         internalCallStatus: InternalCallStatus.NOT_CALLED,
         internalSalesStage: {
-          notIn: [InternalSalesStage.CLOSED_WON, InternalSalesStage.CLOSED_LOST],
+          notIn: [InternalSalesStage.CLIENT_LIVE, InternalSalesStage.CLOSED_LOST],
         },
       },
     }),
@@ -98,6 +106,8 @@ export async function GET(request: NextRequest) {
           in: [
             UserRole.SALES_EXECUTIVE,
             UserRole.TELECALLER,
+            UserRole.TECH_HEAD,
+            UserRole.TECH_EXECUTIVE,
             UserRole.MANAGER,
             UserRole.ADMIN,
           ],
@@ -129,6 +139,17 @@ export async function GET(request: NextRequest) {
     prisma.internalEmployeeDailyTarget.findMany({
       where: { companyId, dayKey: utcDayKey() },
     }),
+    prisma.onboardingTask.count({
+      where: { companyId, status: { not: OnboardingTaskStatus.DELIVERED } },
+    }),
+    prisma.lead.count({
+      where: {
+        companyId,
+        internalSalesStage: {
+          in: [InternalSalesStage.SENT_TO_TECH, InternalSalesStage.TECH_READY],
+        },
+      },
+    }),
   ]);
 
   const perfMap = new Map<
@@ -148,7 +169,7 @@ export async function GET(request: NextRequest) {
     if (l.internalCallStatus && l.internalCallStatus !== InternalCallStatus.NOT_CALLED) {
       row.calls += 1;
     }
-    if (l.internalSalesStage === InternalSalesStage.CLOSED_WON || l.status === LeadStatus.WON) {
+    if (l.internalSalesStage === InternalSalesStage.CLIENT_LIVE || l.status === LeadStatus.WON) {
       row.won += 1;
     }
   }
@@ -190,20 +211,23 @@ export async function GET(request: NextRequest) {
     if (s === InternalSalesStage.CLOSED_LOST) continue;
     funnelLeads += 1;
     if (
-      s === InternalSalesStage.DEMO_SCHEDULED ||
-      s === InternalSalesStage.DEMO_DONE ||
+      s === InternalSalesStage.DEMO_ORIENTATION ||
       s === InternalSalesStage.INTERESTED ||
-      s === InternalSalesStage.FOLLOW_UP ||
-      s === InternalSalesStage.CLOSED_WON
+      s === InternalSalesStage.ONBOARDING_FORM_FILLED ||
+      s === InternalSalesStage.BOSS_APPROVAL_PENDING ||
+      s === InternalSalesStage.SENT_TO_TECH ||
+      s === InternalSalesStage.TECH_READY ||
+      s === InternalSalesStage.DELIVERED ||
+      s === InternalSalesStage.CLIENT_LIVE
     ) {
       funnelDemo += 1;
     }
-    if (s === InternalSalesStage.CLOSED_WON) funnelClosed += 1;
+    if (s === InternalSalesStage.CLIENT_LIVE) funnelClosed += 1;
   }
 
   const openCount = leadsForPerf.filter(
     (l) =>
-      l.internalSalesStage !== InternalSalesStage.CLOSED_WON &&
+      l.internalSalesStage !== InternalSalesStage.CLIENT_LIVE &&
       l.internalSalesStage !== InternalSalesStage.CLOSED_LOST,
   ).length;
   const conversionOverall =
@@ -237,6 +261,9 @@ export async function GET(request: NextRequest) {
       closedDeals: closedWon,
       conversionPercent: conversionOverall,
       rangeLeads,
+      activeOnboarding: activeOnboardingTasks,
+      techPipelineLeads: techPipelineLeadCount,
+      delaysCount: automation.delayedLeads.length + automation.stuckFollowUp.length,
     },
     funnel: {
       leads: funnelLeads,

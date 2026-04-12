@@ -14,7 +14,7 @@ export type NoActivityLead = { id: string; name: string; lastContactedAt: string
 function openStagesFilter() {
   return {
     internalSalesStage: {
-      notIn: [InternalSalesStage.CLOSED_WON, InternalSalesStage.CLOSED_LOST],
+      notIn: [InternalSalesStage.CLIENT_LIVE, InternalSalesStage.CLOSED_LOST],
     },
   };
 }
@@ -109,12 +109,12 @@ export async function runInternalSalesAutomation(companyId: string) {
     ) {
       callsToday += 1;
     }
-    if (l.internalSalesStage === InternalSalesStage.DEMO_SCHEDULED) demos += 1;
-    if (l.internalSalesStage === InternalSalesStage.CLOSED_WON) won += 1;
+    if (l.internalSalesStage === InternalSalesStage.DEMO_ORIENTATION) demos += 1;
+    if (l.internalSalesStage === InternalSalesStage.CLIENT_LIVE) won += 1;
   }
   const open = leadsForSummary.filter(
     (l) =>
-      l.internalSalesStage !== InternalSalesStage.CLOSED_WON &&
+      l.internalSalesStage !== InternalSalesStage.CLIENT_LIVE &&
       l.internalSalesStage !== InternalSalesStage.CLOSED_LOST,
   ).length;
   const conversionPct = open + won > 0 ? Math.round((won / (open + won)) * 100) : 0;

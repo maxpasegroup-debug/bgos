@@ -19,7 +19,14 @@ export async function listInternalTechUserIds(companyId: string): Promise<string
     where: {
       companyId,
       jobRole: {
-        in: [UserRole.OPERATIONS_HEAD, UserRole.SITE_ENGINEER, UserRole.PRO, UserRole.INSTALLATION_TEAM],
+        in: [
+          UserRole.TECH_HEAD,
+          UserRole.TECH_EXECUTIVE,
+          UserRole.OPERATIONS_HEAD,
+          UserRole.SITE_ENGINEER,
+          UserRole.PRO,
+          UserRole.INSTALLATION_TEAM,
+        ],
       },
     },
     include: { user: { select: { isActive: true } } },

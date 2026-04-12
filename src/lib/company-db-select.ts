@@ -12,6 +12,7 @@ export const companyCurrentApiSelect = {
   billingAddress: true,
   gstNumber: true,
   bankDetails: true,
+  internalSalesOrg: true,
 } as const;
 
 export type CompanyCurrentApiRow = {
@@ -24,4 +25,5 @@ export type CompanyCurrentApiRow = {
   billingAddress: string | null;
   gstNumber: string | null;
   bankDetails: string | null;
+  internalSalesOrg: boolean;
 };

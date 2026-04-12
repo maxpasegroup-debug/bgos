@@ -14,6 +14,7 @@ import { prisma } from "@/lib/prisma";
 import { companyMembershipClass } from "@/lib/user-company";
 import type { AuthUserWithCompany } from "@/lib/auth";
 import { isIceconnectPrivileged } from "@/lib/iceconnect-scope";
+import { salesMetroLabel, SALES_METRO_STAGES } from "@/lib/internal-sales-metro";
 
 export const INTERNAL_SALES_COMPANY_NAME = "BGOS Internal";
 
@@ -21,13 +22,7 @@ export const INTERNAL_SALES_STAGES: {
   key: InternalSalesStage;
   label: string;
 }[] = [
-  { key: InternalSalesStage.NEW_LEAD, label: "New Lead" },
-  { key: InternalSalesStage.CONTACTED, label: "Contacted" },
-  { key: InternalSalesStage.DEMO_SCHEDULED, label: "Demo Scheduled" },
-  { key: InternalSalesStage.DEMO_DONE, label: "Demo Done" },
-  { key: InternalSalesStage.INTERESTED, label: "Interested" },
-  { key: InternalSalesStage.FOLLOW_UP, label: "Follow-up" },
-  { key: InternalSalesStage.CLOSED_WON, label: "Closed Won" },
+  ...SALES_METRO_STAGES,
   { key: InternalSalesStage.CLOSED_LOST, label: "Closed Lost" },
 ];
 
@@ -45,19 +40,25 @@ export function normalizeInternalSalesPhone(phone: string): string {
 
 export function internalStageToLeadStatus(stage: InternalSalesStage): LeadStatus {
   switch (stage) {
-    case InternalSalesStage.NEW_LEAD:
+    case InternalSalesStage.LEAD_ADDED:
       return LeadStatus.NEW;
-    case InternalSalesStage.CONTACTED:
+    case InternalSalesStage.INTRO_CALL:
       return LeadStatus.CONTACTED;
-    case InternalSalesStage.DEMO_SCHEDULED:
+    case InternalSalesStage.DEMO_ORIENTATION:
       return LeadStatus.SITE_VISIT_SCHEDULED;
-    case InternalSalesStage.DEMO_DONE:
-      return LeadStatus.SITE_VISIT_COMPLETED;
-    case InternalSalesStage.INTERESTED:
-      return LeadStatus.QUALIFIED;
     case InternalSalesStage.FOLLOW_UP:
       return LeadStatus.NEGOTIATION;
-    case InternalSalesStage.CLOSED_WON:
+    case InternalSalesStage.INTERESTED:
+    case InternalSalesStage.ONBOARDING_FORM_FILLED:
+      return LeadStatus.QUALIFIED;
+    case InternalSalesStage.BOSS_APPROVAL_PENDING:
+      return LeadStatus.QUALIFIED;
+    case InternalSalesStage.SENT_TO_TECH:
+    case InternalSalesStage.TECH_READY:
+      return LeadStatus.PROPOSAL_SENT;
+    case InternalSalesStage.DELIVERED:
+      return LeadStatus.PROPOSAL_WON;
+    case InternalSalesStage.CLIENT_LIVE:
       return LeadStatus.WON;
     case InternalSalesStage.CLOSED_LOST:
       return LeadStatus.LOST;
@@ -233,7 +234,8 @@ export async function findDuplicateInternalLeadDetailed(
 export const INTERNAL_SALES_ASSIGNEE_ROLES: readonly UserRole[] = [
   UserRole.MANAGER,
   UserRole.SALES_EXECUTIVE,
-  UserRole.TELECALLER,
+  UserRole.TECH_HEAD,
+  UserRole.TECH_EXECUTIVE,
 ];
 
 export function isInternalSalesAssignableRole(role: UserRole): boolean {
@@ -257,5 +259,5 @@ export async function listInternalSalesTeamMembers(companyId: string) {
 }
 
 export function stageLabel(stage: InternalSalesStage): string {
-  return INTERNAL_SALES_STAGES.find((s) => s.key === stage)?.label ?? stage;
+  return salesMetroLabel(stage);
 }

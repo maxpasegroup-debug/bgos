@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
       companyPhone: company.companyPhone,
       billingAddress: company.billingAddress,
       gstNumber: company.gstNumber,
+      internalSalesOrg: company.internalSalesOrg,
     },
   });
 }

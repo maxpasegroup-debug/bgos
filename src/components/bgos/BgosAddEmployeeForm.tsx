@@ -2,19 +2,12 @@
 
 import { UserRole } from "@prisma/client";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  INTERNAL_ORG_EMPLOYEE_ROLE_OPTIONS,
+  SOLAR_FIELD_EMPLOYEE_ROLE_OPTIONS,
+} from "@/lib/internal-hr-roles";
 import { useBgosDashboardContext } from "./BgosDataProvider";
-
-const EMPLOYEE_ROLES: { value: UserRole; label: string }[] = [
-  { value: UserRole.SALES_HEAD, label: "Sales Head" },
-  { value: UserRole.SALES_EXECUTIVE, label: "Sales Executive" },
-  { value: UserRole.TELECALLER, label: "Telecaller" },
-  { value: UserRole.OPERATIONS_HEAD, label: "Operations Head" },
-  { value: UserRole.SITE_ENGINEER, label: "Engineer" },
-  { value: UserRole.INSTALLATION_TEAM, label: "Installer" },
-  { value: UserRole.ACCOUNTANT, label: "Accounts" },
-  { value: UserRole.HR_MANAGER, label: "HR Manager" },
-];
 
 function firstValidationMessage(details: unknown): string | null {
   if (!details || typeof details !== "object") return null;
@@ -31,6 +24,7 @@ function firstValidationMessage(details: unknown): string | null {
 
 export function BgosAddEmployeeForm() {
   const { refetch, trialReadOnly } = useBgosDashboardContext();
+  const [internalOrg, setInternalOrg] = useState(false);
   const [name, setName] = useState("");
   const [mobile, setMobile] = useState("");
   const [email, setEmail] = useState("");
@@ -40,6 +34,32 @@ export function BgosAddEmployeeForm() {
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [seatGateOpen, setSeatGateOpen] = useState(false);
+
+  const employeeRoles = useMemo(
+    () => (internalOrg ? INTERNAL_ORG_EMPLOYEE_ROLE_OPTIONS : SOLAR_FIELD_EMPLOYEE_ROLE_OPTIONS),
+    [internalOrg],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/company/current", { credentials: "include" });
+        const j = (await res.json()) as { ok?: boolean; company?: { internalSalesOrg?: boolean } };
+        if (!cancelled && res.ok && j.ok && j.company?.internalSalesOrg) setInternalOrg(true);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const allowed = employeeRoles.some((r) => r.value === role);
+    if (!allowed && employeeRoles[0]) setRole(employeeRoles[0].value);
+  }, [employeeRoles, role]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -174,7 +194,7 @@ export function BgosAddEmployeeForm() {
           onChange={(e) => setRole(e.target.value as UserRole)}
           className={inputClass}
         >
-          {EMPLOYEE_ROLES.map((r) => (
+          {employeeRoles.map((r) => (
             <option key={r.value} value={r.value}>
               {r.label}
             </option>

@@ -1,6 +1,12 @@
 import type { NextRequest } from "next/server";
 import type { Prisma } from "@prisma/client";
-import { InternalCallStatus, InternalSalesStage, type OnboardingTaskStatus } from "@prisma/client";
+import {
+  InternalCallStatus,
+  InternalOnboardingApprovalStatus,
+  InternalSalesStage,
+  InternalTechStage,
+  type OnboardingTaskStatus,
+} from "@prisma/client";
 import { z } from "zod";
 import { jsonError, jsonSuccess, parseJsonBodyZod } from "@/lib/api-response";
 import { requireAuthWithCompany } from "@/lib/auth";
@@ -33,6 +39,8 @@ function serializeLead(
     businessType: string | null;
     internalSalesNotes: string | null;
     internalSalesStage: InternalSalesStage | null;
+    internalOnboardingApprovalStatus: InternalOnboardingApprovalStatus | null;
+    internalTechStage: InternalTechStage | null;
     internalCallStatus: InternalCallStatus | null;
     lastContactedAt: Date | null;
     nextFollowUpAt: Date | null;
@@ -43,7 +51,7 @@ function serializeLead(
   },
   onboardingTask: { status: OnboardingTaskStatus } | null,
 ) {
-  const stage = lead.internalSalesStage ?? InternalSalesStage.NEW_LEAD;
+  const stage = lead.internalSalesStage ?? InternalSalesStage.LEAD_ADDED;
   const call = lead.internalCallStatus ?? InternalCallStatus.NOT_CALLED;
   return {
     id: lead.id,
@@ -64,6 +72,10 @@ function serializeLead(
     createdAt: lead.createdAt.toISOString(),
     updatedAt: lead.updatedAt.toISOString(),
     onboardingStatus: onboardingUiStatus(onboardingTask),
+    pendingBossApproval:
+      stage === InternalSalesStage.ONBOARDING_FORM_FILLED &&
+      lead.internalOnboardingApprovalStatus === InternalOnboardingApprovalStatus.PENDING,
+    internalTechStage: lead.internalTechStage ?? null,
   };
 }
 
@@ -123,13 +135,13 @@ export async function GET(request: NextRequest) {
   for (const s of INTERNAL_SALES_STAGES) byStage.set(s.key, []);
 
   for (const lead of leads) {
-    const stage = lead.internalSalesStage ?? InternalSalesStage.NEW_LEAD;
+    const stage = lead.internalSalesStage ?? InternalSalesStage.LEAD_ADDED;
     const ob = taskByLead.get(lead.id) ?? null;
     const card = serializeLead(lead, ob);
     const list = byStage.get(stage);
     if (list) list.push(card);
     else {
-      byStage.get(InternalSalesStage.NEW_LEAD)!.push(card);
+      byStage.get(InternalSalesStage.LEAD_ADDED)!.push(card);
     }
   }
 
@@ -185,7 +197,11 @@ export async function POST(request: NextRequest) {
     if (!u) return jsonError(404, "NOT_FOUND", "Team member not found");
     const mem = await getUserCompanyMembership(parsed.data.assignedToUserId, ctx.companyId);
     if (!mem || !isInternalSalesAssignableRole(mem.jobRole)) {
-      return jsonError(400, "INVALID_ASSIGNEE", "Lead can only be assigned to sales manager, sales executive, or telecaller");
+      return jsonError(
+        400,
+        "INVALID_ASSIGNEE",
+        "Lead can only be assigned to manager, sales executive, or tech roles (internal org)",
+      );
     }
     assignedTo = u.id;
   }
@@ -205,9 +221,10 @@ export async function POST(request: NextRequest) {
       assignedTo,
       createdByUserId: session.sub,
       source: "internal",
-      status: internalStageToLeadStatus(InternalSalesStage.NEW_LEAD),
-      internalSalesStage: InternalSalesStage.NEW_LEAD,
+      status: internalStageToLeadStatus(InternalSalesStage.LEAD_ADDED),
+      internalSalesStage: InternalSalesStage.LEAD_ADDED,
       internalCallStatus: InternalCallStatus.NOT_CALLED,
+      internalStageUpdatedAt: new Date(),
     },
     include: { assignee: { select: { id: true, name: true, email: true } } },
   });

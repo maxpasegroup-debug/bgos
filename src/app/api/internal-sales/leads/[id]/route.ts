@@ -1,5 +1,10 @@
 import type { NextRequest } from "next/server";
-import { InternalCallStatus, InternalSalesStage } from "@prisma/client";
+import {
+  InternalCallStatus,
+  InternalOnboardingApprovalStatus,
+  InternalSalesStage,
+  InternalTechStage,
+} from "@prisma/client";
 import { z } from "zod";
 import { jsonError, jsonSuccess, parseJsonBodyZod } from "@/lib/api-response";
 import { requireAuthWithCompany } from "@/lib/auth";
@@ -13,20 +18,30 @@ import {
   stageLabel,
 } from "@/lib/internal-sales-org";
 import { INTERNAL_ACTIVITY, logInternalLeadActivity } from "@/lib/internal-sales-activity";
-import { ensureOnboardingOnClosedWon, onboardingUiStatus } from "@/lib/internal-sales-onboarding";
+import { onboardingUiStatus } from "@/lib/internal-sales-onboarding";
+import { techMetroLabel } from "@/lib/internal-sales-metro";
+import {
+  resolveAdvanceSalesStage,
+  validateSalesStageChange,
+} from "@/lib/internal-sales-stage-mutations";
 import { notifyInternalUsers } from "@/lib/internal-sales-notifications";
 import { prisma } from "@/lib/prisma";
 import { findUserInCompany, getUserCompanyMembership } from "@/lib/user-company";
 import { isCompanyBasicTrialExpired, trialExpiredJsonResponse } from "@/lib/trial";
 
-const patchSchema = z.object({
-  stage: z.nativeEnum(InternalSalesStage).optional(),
-  callStatus: z.nativeEnum(InternalCallStatus).optional(),
-  notes: z.string().trim().max(5000).optional(),
-  lastContactedAt: z.string().datetime().optional(),
-  nextFollowUpAt: z.union([z.string().datetime(), z.null()]).optional(),
-  assignedToUserId: z.union([z.string().cuid(), z.null()]).optional(),
-});
+const patchSchema = z
+  .object({
+    stage: z.nativeEnum(InternalSalesStage).optional(),
+    advanceInternalSalesStage: z.literal(true).optional(),
+    callStatus: z.nativeEnum(InternalCallStatus).optional(),
+    notes: z.string().trim().max(5000).optional(),
+    lastContactedAt: z.string().datetime().optional(),
+    nextFollowUpAt: z.union([z.string().datetime(), z.null()]).optional(),
+    assignedToUserId: z.union([z.string().cuid(), z.null()]).optional(),
+  })
+  .refine((d) => !(d.stage !== undefined && d.advanceInternalSalesStage === true), {
+    message: "Send either stage or advanceInternalSalesStage, not both",
+  });
 
 async function serializeLeadFull(
   leadId: string,
@@ -40,6 +55,9 @@ async function serializeLeadFull(
     internalSalesNotes: string | null;
     internalSalesStage: InternalSalesStage | null;
     internalCallStatus: InternalCallStatus | null;
+    internalTechStage: InternalTechStage | null;
+    internalOnboardingApprovalStatus: InternalOnboardingApprovalStatus | null;
+    internalStageUpdatedAt: Date | null;
     lastContactedAt: Date | null;
     nextFollowUpAt: Date | null;
     assignedTo: string | null;
@@ -48,7 +66,7 @@ async function serializeLeadFull(
     assignee: { id: string; name: string; email: string } | null;
   },
 ) {
-  const stage = lead.internalSalesStage ?? InternalSalesStage.NEW_LEAD;
+  const stage = lead.internalSalesStage ?? InternalSalesStage.LEAD_ADDED;
   const call = lead.internalCallStatus ?? InternalCallStatus.NOT_CALLED;
   const task = await prisma.onboardingTask.findUnique({
     where: { leadId },
@@ -75,6 +93,15 @@ async function serializeLeadFull(
     onboardingStatus: onboardingUiStatus(task),
     onboardingTaskId: task?.id ?? null,
     onboardingTaskStage: task?.status ?? null,
+    internalTechStage: lead.internalTechStage,
+    internalTechStageLabel: lead.internalTechStage
+      ? techMetroLabel(lead.internalTechStage)
+      : null,
+    internalOnboardingApprovalStatus: lead.internalOnboardingApprovalStatus,
+    internalStageUpdatedAt: lead.internalStageUpdatedAt?.toISOString() ?? null,
+    pendingBossApproval:
+      lead.internalSalesStage === InternalSalesStage.ONBOARDING_FORM_FILLED &&
+      lead.internalOnboardingApprovalStatus === InternalOnboardingApprovalStatus.PENDING,
   };
 }
 
@@ -147,19 +174,44 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
       if (!u) return jsonError(404, "NOT_FOUND", "Team member not found");
       const mem = await getUserCompanyMembership(parsed.data.assignedToUserId, internalCtx.companyId);
       if (!mem || !isInternalSalesAssignableRole(mem.jobRole)) {
-        return jsonError(400, "INVALID_ASSIGNEE", "Lead can only be assigned to sales manager, sales executive, or telecaller");
+        return jsonError(
+          400,
+          "INVALID_ASSIGNEE",
+          "Lead can only be assigned to internal sales/tech roles",
+        );
       }
       nextAssign = u.id;
+    }
+  }
+
+  let targetStage: InternalSalesStage | undefined = parsed.data.stage;
+  if (parsed.data.advanceInternalSalesStage === true) {
+    const nextSt = resolveAdvanceSalesStage(lead);
+    if (!nextSt) {
+      return jsonError(
+        400,
+        "NO_ADVANCE",
+        "Use the onboarding form, boss approval, or tech handover before advancing this stage",
+      );
+    }
+    targetStage = nextSt;
+  }
+
+  if (targetStage !== undefined) {
+    const v = validateSalesStageChange(session, lead, targetStage);
+    if (v) {
+      return jsonError(400, v.code, v.message);
     }
   }
 
   const data: Parameters<typeof prisma.lead.update>[0]["data"] = {
     ...(parsed.data.notes !== undefined ? { internalSalesNotes: parsed.data.notes || null } : {}),
     ...(parsed.data.callStatus !== undefined ? { internalCallStatus: parsed.data.callStatus } : {}),
-    ...(parsed.data.stage !== undefined
+    ...(targetStage !== undefined
       ? {
-          internalSalesStage: parsed.data.stage,
-          status: internalStageToLeadStatus(parsed.data.stage),
+          internalSalesStage: targetStage,
+          status: internalStageToLeadStatus(targetStage),
+          internalStageUpdatedAt: new Date(),
         }
       : {}),
     ...(parsed.data.lastContactedAt !== undefined
@@ -188,13 +240,13 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
     include: { assignee: { select: { id: true, name: true, email: true } } },
   });
 
-  if (parsed.data.stage !== undefined && parsed.data.stage !== lead.internalSalesStage) {
+  if (targetStage !== undefined && targetStage !== lead.internalSalesStage) {
     await logInternalLeadActivity({
       companyId: internalCtx.companyId,
       leadId,
       userId: session.sub,
       action: INTERNAL_ACTIVITY.STAGE,
-      detail: `Pipeline: ${stageLabel(parsed.data.stage)}`,
+      detail: `Pipeline: ${stageLabel(targetStage)}`,
     });
   }
   if (parsed.data.callStatus !== undefined && parsed.data.callStatus !== lead.internalCallStatus) {
@@ -248,14 +300,6 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
         parsed.data.nextFollowUpAt === null
           ? "Follow-up date cleared"
           : `Next follow-up: ${parsed.data.nextFollowUpAt}`,
-    });
-  }
-
-  if (parsed.data.stage === InternalSalesStage.CLOSED_WON) {
-    await ensureOnboardingOnClosedWon({
-      companyId: internalCtx.companyId,
-      lead: updated,
-      actorUserId: session.sub,
     });
   }
 

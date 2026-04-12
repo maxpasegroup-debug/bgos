@@ -79,6 +79,7 @@ function payloadToUser(decoded: Record<string, unknown>): AuthUser | null {
           : CompanyPlan.BASIC,
     jobRole: m.jobRole as UserRole,
   }));
+  const superBoss = decoded.superBoss === true;
   return {
     sub,
     email,
@@ -87,6 +88,7 @@ function payloadToUser(decoded: Record<string, unknown>): AuthUser | null {
     companyPlan,
     workspaceReady,
     ...(memberships?.length ? { memberships } : {}),
+    ...(superBoss ? { superBoss: true as const } : {}),
   };
 }
 

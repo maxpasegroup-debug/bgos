@@ -14,6 +14,8 @@ import {
 import type { DashboardPayload } from "@/components/internal-sales/internal-sales-read-api";
 import type { LeadCard, PipelineCol, TeamMember } from "@/components/internal-sales/internal-sales-types";
 import { InternalNotificationsBell } from "./InternalNotificationsBell";
+import { InternalSalesMetroStrip } from "./InternalSalesMetroStrip";
+import { NexaSupportModal } from "./NexaSupportModal";
 import { OnboardingStartModal } from "./OnboardingStartModal";
 
 export function InternalSalesBossHub({ theme }: { theme: "bgos" | "ice" }) {
@@ -43,6 +45,10 @@ export function InternalSalesBossHub({ theme }: { theme: "bgos" | "ice" }) {
   const [addNotes, setAddNotes] = useState("");
   const [addAssignee, setAddAssignee] = useState("");
   const [dupExisting, setDupExisting] = useState<{ id: string; name: string } | null>(null);
+  const [approvalRows, setApprovalRows] = useState<
+    { id: string; name: string; phone: string; companyName: string | null; assignee: { name: string } | null }[]
+  >([]);
+  const [nexaOpen, setNexaOpen] = useState(false);
 
   const shell =
     theme === "bgos"
@@ -69,11 +75,12 @@ export function InternalSalesBossHub({ theme }: { theme: "bgos" | "ice" }) {
       else if (filterEmployee) q.set("employeeId", filterEmployee);
       if (filterStage) q.set("stage", filterStage);
       const qs = q.toString();
-      const [plRes, dashRes, teamRes, setRes] = await Promise.all([
+      const [plRes, dashRes, teamRes, setRes, apprRes] = await Promise.all([
         fetch(`/api/internal-sales/leads${qs ? `?${qs}` : ""}`, { credentials: "include" }),
         fetch(`/api/internal-sales/dashboard?range=${range}`, { credentials: "include" }),
         fetch("/api/internal-sales/team", { credentials: "include" }),
         fetch("/api/internal-sales/settings", { credentials: "include" }),
+        fetch("/api/internal-sales/onboarding-approvals", { credentials: "include" }),
       ]);
       const plJson: unknown = await plRes.json();
       if (!plRes.ok) {
@@ -88,6 +95,12 @@ export function InternalSalesBossHub({ theme }: { theme: "bgos" | "ice" }) {
       setTeam(teamRes.ok ? readTeamPayload(tj) ?? [] : []);
       const sj: unknown = await setRes.json();
       if (setRes.ok) setDefaultAssigneeId(readDefaultAssigneePayload(sj));
+      const aj: unknown = await apprRes.json();
+      if (apprRes.ok && aj && typeof aj === "object" && "leads" in aj && Array.isArray((aj as { leads: unknown }).leads)) {
+        setApprovalRows((aj as { leads: typeof approvalRows }).leads);
+      } else {
+        setApprovalRows([]);
+      }
     } catch {
       setErr("Network error.");
     } finally {
@@ -121,6 +134,23 @@ export function InternalSalesBossHub({ theme }: { theme: "bgos" | "ice" }) {
         body: JSON.stringify(body),
       });
       if (!res.ok) setErr(readError(await res.json(), "Update failed."));
+      else await load();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function bossDecision(leadId: string, decision: "approve" | "reject") {
+    setBusyId(leadId);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/internal-sales/leads/${leadId}/boss-approval`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision }),
+      });
+      if (!res.ok) setErr(readError(await res.json(), "Approval update failed."));
       else await load();
     } finally {
       setBusyId(null);
@@ -271,6 +301,19 @@ export function InternalSalesBossHub({ theme }: { theme: "bgos" | "ice" }) {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <InternalNotificationsBell theme={theme} />
+            <button
+              type="button"
+              onClick={() => setNexaOpen(true)}
+              className="rounded-lg border border-cyan-400/40 bg-cyan-500/15 px-3 py-2 text-sm font-medium text-cyan-100"
+            >
+              Nexa Support
+            </button>
+            <Link
+              href={theme === "bgos" ? "/bgos/internal-tech" : "/iceconnect/internal-tech"}
+              className="rounded-lg border border-slate-400/40 px-3 py-2 text-sm font-medium opacity-90"
+            >
+              Tech pipeline
+            </Link>
             <Link
               href={onboardingHref}
               className="rounded-lg border border-indigo-400/50 bg-indigo-500/20 px-3 py-2 text-sm font-medium text-indigo-100"
@@ -298,6 +341,53 @@ export function InternalSalesBossHub({ theme }: { theme: "bgos" | "ice" }) {
           >
             {err}
           </div>
+        ) : null}
+
+        {approvalRows.length > 0 ? (
+          <section className={card}>
+            <p className={labelCls}>Boss approval · onboarding</p>
+            <ul className="mt-3 space-y-2 text-sm">
+              {approvalRows.map((r) => (
+                <li
+                  key={r.id}
+                  className={
+                    theme === "bgos"
+                      ? "flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2"
+                      : "flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                  }
+                >
+                  <div>
+                    <p className="font-medium">{r.name}</p>
+                    <p className="text-xs opacity-70">
+                      {r.companyName ?? "—"} · {r.assignee?.name ?? "Unassigned"}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={busyId === r.id}
+                      className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                      onClick={() => void bossDecision(r.id, "approve")}
+                    >
+                      Approve
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busyId === r.id}
+                      className={
+                        theme === "bgos"
+                          ? "rounded-lg border border-white/20 px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                          : "rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-800 disabled:opacity-50"
+                      }
+                      onClick={() => void bossDecision(r.id, "reject")}
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
         ) : null}
 
         <section className={`${card} flex flex-wrap gap-2`}>
@@ -643,14 +733,34 @@ export function InternalSalesBossHub({ theme }: { theme: "bgos" | "ice" }) {
                           </p>
                         </div>
                       </div>
+                      <div className="mt-2">
+                        <InternalSalesMetroStrip
+                          stage={l.stage}
+                          pendingBossApproval={l.pendingBossApproval}
+                          theme={theme}
+                          compact
+                        />
+                      </div>
                       <div className="mt-2 flex flex-wrap gap-1">
                         <button
                           type="button"
-                          className="rounded bg-indigo-600/80 px-2 py-1 text-[11px] font-medium text-white"
-                          disabled={l.onboardingStatus === "COMPLETED"}
+                          className="rounded bg-indigo-600/80 px-2 py-1 text-[11px] font-medium text-white disabled:opacity-45"
+                          disabled={
+                            l.stage !== InternalSalesStage.INTERESTED ||
+                            l.onboardingStatus === "COMPLETED" ||
+                            l.onboardingStatus === "IN_PROGRESS"
+                          }
                           onClick={() => setOnboardLead(l)}
                         >
-                          Start onboarding
+                          Onboarding form
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded bg-slate-600/90 px-2 py-1 text-[11px] font-medium text-white disabled:opacity-45"
+                          disabled={busyId === l.id}
+                          onClick={() => void patchLead(l.id, { advanceInternalSalesStage: true })}
+                        >
+                          Complete stage
                         </button>
                         <button
                           type="button"
@@ -731,6 +841,15 @@ export function InternalSalesBossHub({ theme }: { theme: "bgos" | "ice" }) {
           lead={onboardLead}
           theme={theme}
           onClose={() => setOnboardLead(null)}
+          onDone={() => void load()}
+        />
+      ) : null}
+
+      {nexaOpen ? (
+        <NexaSupportModal
+          theme={theme}
+          leadId={null}
+          onClose={() => setNexaOpen(false)}
           onDone={() => void load()}
         />
       ) : null}

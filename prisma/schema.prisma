@@ -16,6 +16,10 @@ enum UserRole {
   SALES_EXECUTIVE
   /** Field sales / dialling — same workspace capabilities as sales executive. */
   TELECALLER
+  /** BGOS Internal tech lead (delivery pipeline). */
+  TECH_HEAD
+  /** BGOS Internal tech execution (delivery pipeline). */
+  TECH_EXECUTIVE
   CHANNEL_PARTNER
   OPERATIONS_HEAD
   SITE_ENGINEER
@@ -59,16 +63,36 @@ enum LeadStatus {
   LOST
 }
 
-/** BGOS Internal sales pipeline (company with `internalSalesOrg`). */
+/** BGOS Internal sales metro pipeline (company with `internalSalesOrg`). Linear order — no skips. */
 enum InternalSalesStage {
-  NEW_LEAD
-  CONTACTED
-  DEMO_SCHEDULED
-  DEMO_DONE
-  INTERESTED
+  LEAD_ADDED
+  INTRO_CALL
+  DEMO_ORIENTATION
   FOLLOW_UP
-  CLOSED_WON
+  INTERESTED
+  ONBOARDING_FORM_FILLED
+  BOSS_APPROVAL_PENDING
+  SENT_TO_TECH
+  TECH_READY
+  DELIVERED
+  CLIENT_LIVE
   CLOSED_LOST
+}
+
+/** Tech delivery metro (after Sent to Tech). */
+enum InternalTechStage {
+  ONBOARDING_RECEIVED
+  DATA_VERIFIED
+  DASHBOARD_SETUP
+  EMPLOYEE_SETUP
+  SYSTEM_TESTING
+  READY_FOR_DELIVERY
+}
+
+enum InternalOnboardingApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum InternalCallStatus {
@@ -188,6 +212,7 @@ model Company {
   internalLeadActivities    InternalLeadActivity[]
   internalInAppNotifications InternalInAppNotification[]
   internalEmployeeDailyTargets InternalEmployeeDailyTarget[]
+  internalNexaSupportTickets InternalNexaSupportTicket[]
 
   @@index([name])
   @@index([ownerId])
@@ -355,6 +380,7 @@ model User {
   onboardingTasksCreated OnboardingTask[] @relation("OnboardingTaskCreator")
   internalLeadActivities InternalLeadActivity[]
   internalInAppNotifications InternalInAppNotification[]
+  internalNexaSupportTicketsCreated InternalNexaSupportTicket[] @relation("NexaSupportCreator")
 
   @@index([email])
 }
@@ -402,9 +428,14 @@ model Lead {
   internalCallStatus InternalCallStatus?
   lastContactedAt    DateTime?
   nextFollowUpAt     DateTime?
+  internalTechStage                 InternalTechStage?
+  internalOnboardingApprovalStatus  InternalOnboardingApprovalStatus?
+  /** SLA / escalation: last time sales or tech stage moved. */
+  internalStageUpdatedAt            DateTime?
 
   onboardingTasks        OnboardingTask[]
   internalLeadActivities InternalLeadActivity[]
+  nexaSupportTickets     InternalNexaSupportTicket[]
 
   @@index([companyId])
   @@index([status])
@@ -860,6 +891,31 @@ model OnboardingTask {
 
   @@index([companyId])
   @@index([status])
+}
+
+/// Nexa support requests (internal org).
+model InternalNexaSupportTicket {
+  id               String   @id @default(cuid())
+  companyId        String
+  leadId           String?
+  createdByUserId  String
+  /** CALLBACK | MEETING | ISSUE */
+  option           String
+  /** TECHNICAL | TRAINING | PAYMENT | OTHER */
+  category         String
+  message          String   @db.Text
+  assignedToUserId String?
+  status           String   @default("OPEN")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead    Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  creator User    @relation("NexaSupportCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@index([leadId])
+  @@index([companyId, status])
 }
 
 /// Timeline entries for internal CRM leads.

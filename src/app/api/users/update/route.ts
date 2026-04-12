@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuthWithRoles } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isAllowedHrEmployeeRole } from "@/lib/internal-hr-roles";
 import {
   companyMembershipClass,
   findUserInCompany,
@@ -68,6 +69,19 @@ export async function PATCH(request: NextRequest) {
       { ok: false as const, error: "User not found", code: "NOT_FOUND" },
       { status: 404 },
     );
+  }
+
+  if (fields.role !== undefined) {
+    const co = await prisma.company.findUnique({
+      where: { id: session.companyId },
+      select: { internalSalesOrg: true },
+    });
+    if (!co || !isAllowedHrEmployeeRole(co.internalSalesOrg, fields.role)) {
+      return NextResponse.json(
+        { ok: false as const, error: "Invalid role for this company", code: "VALIDATION_ERROR" },
+        { status: 400 },
+      );
+    }
   }
 
   const updateData: Prisma.UserUpdateInput = {};

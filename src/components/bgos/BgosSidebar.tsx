@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ComponentType } from "react";
+import { prepareAddBusinessNavigation } from "@/lib/bgos-add-business-intent";
 import { useBgosDashboardContext } from "./BgosDataProvider";
 import { useBgosTheme } from "./BgosThemeContext";
 
@@ -39,7 +40,7 @@ const moreNav: NavDef[] = [
 
 export function BgosSidebar() {
   const pathname = usePathname();
-  const { hasProPlan, planLockedToBasic } = useBgosDashboardContext();
+  const { hasProPlan, planLockedToBasic, isSuperBoss } = useBgosDashboardContext();
   const { theme } = useBgosTheme();
   const light = theme === "light";
   const [moreOpen, setMoreOpen] = useState(false);
@@ -64,13 +65,49 @@ export function BgosSidebar() {
     if (item.id === "sales-booster") {
       return pathname === "/sales-booster" || pathname.startsWith("/sales-booster/");
     }
+    if (item.href.startsWith("/bgos/control#")) {
+      return pathname === "/bgos/control";
+    }
     if (item.href === "/bgos") return pathname === "/bgos";
     return pathname === item.href || pathname.startsWith(`${item.href}/`);
   }
 
+  const controlShell =
+    isSuperBoss &&
+    (pathname === "/bgos/control" || pathname.startsWith("/bgos/control/"));
+
   const shell = light
     ? "border-slate-200/90 bg-white/90 shadow-[4px_0_24px_-8px_rgba(15,23,42,0.08)]"
     : "border-[var(--bgos-border)]/90 bg-[#121821]/90 shadow-[4px_0_40px_-12px_rgba(0,0,0,0.45)]";
+
+  if (controlShell) {
+    return (
+      <aside
+        className={`fixed bottom-0 left-0 top-0 z-40 flex w-16 flex-col border-r backdrop-blur-xl md:w-[240px] ${shell}`}
+      >
+        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-1.5 py-3 md:px-2">
+          {superBossControlNav.map((item) => (
+            <SidebarLink
+              key={item.id}
+              href={item.href}
+              label={item.label}
+              icon={item.icon}
+              active={isActive(item)}
+              light={light}
+              onBeforeNavigate={
+                item.id === "sb-create"
+                  ? () => {
+                      prepareAddBusinessNavigation();
+                    }
+                  : undefined
+              }
+            />
+          ))}
+        </nav>
+        <div className="border-t border-inherit px-1.5 py-2 md:px-2" />
+      </aside>
+    );
+  }
 
   return (
     <aside
@@ -132,6 +169,7 @@ function SidebarLink({
   booster,
   light,
   compact,
+  onBeforeNavigate,
 }: {
   href: string;
   label: string;
@@ -140,6 +178,7 @@ function SidebarLink({
   booster?: boolean;
   light?: boolean;
   compact?: boolean;
+  onBeforeNavigate?: () => void;
 }) {
   const base =
     light
@@ -156,7 +195,14 @@ function SidebarLink({
 
   return (
     <div className="group relative flex w-full justify-center md:block">
-      <Link href={href} title={label} className="relative w-full">
+      <Link
+        href={href}
+        title={label}
+        className="relative w-full"
+        onClick={() => {
+          onBeforeNavigate?.();
+        }}
+      >
         <motion.span
           className={`flex min-h-[2.5rem] w-full items-center justify-center gap-3 rounded-xl border px-2 py-2 transition-colors duration-200 md:justify-start md:px-3 ${
             active ? activeCls : base
@@ -218,6 +264,34 @@ function HomeIcon({ className }: { className?: string }) {
   );
 }
 
+function BuildingIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" aria-hidden>
+      <path
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.75}
+        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+      />
+    </svg>
+  );
+}
+
+function PlusCircleIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" aria-hidden>
+      <path
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.75}
+        d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"
+      />
+    </svg>
+  );
+}
+
 function SalesIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" aria-hidden>
@@ -231,6 +305,13 @@ function SalesIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+const superBossControlNav: NavDef[] = [
+  { id: "sb-control", label: "BGOS Control", href: "/bgos/control", icon: HomeIcon },
+  { id: "sb-companies", label: "My Companies", href: "/bgos/control#companies", icon: BuildingIcon },
+  { id: "sb-internal", label: "Internal Sales", href: "/iceconnect/internal-sales", icon: SalesIcon },
+  { id: "sb-create", label: "Create Company", href: "/onboarding", icon: PlusCircleIcon },
+];
 
 function BillingIcon({ className }: { className?: string }) {
   return (

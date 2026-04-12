@@ -80,9 +80,10 @@ export async function POST(request: NextRequest) {
       assignedTo: assignedTo ?? undefined,
       createdByUserId: undefined,
       source: "public",
-      status: internalStageToLeadStatus(InternalSalesStage.NEW_LEAD),
-      internalSalesStage: InternalSalesStage.NEW_LEAD,
+      status: internalStageToLeadStatus(InternalSalesStage.LEAD_ADDED),
+      internalSalesStage: InternalSalesStage.LEAD_ADDED,
       internalCallStatus: InternalCallStatus.NOT_CALLED,
+      internalStageUpdatedAt: new Date(),
     },
     select: { id: true },
   });

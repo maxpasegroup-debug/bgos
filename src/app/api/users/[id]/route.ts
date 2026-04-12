@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuthWithRoles } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isAllowedHrEmployeeRole } from "@/lib/internal-hr-roles";
 import {
   companyMembershipClass,
   findUserInCompany,
@@ -63,6 +64,20 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 
   const data = parsed.data;
+
+  if (data.role !== undefined) {
+    const co = await prisma.company.findUnique({
+      where: { id: session.companyId },
+      select: { internalSalesOrg: true },
+    });
+    if (!co || !isAllowedHrEmployeeRole(co.internalSalesOrg, data.role)) {
+      return NextResponse.json(
+        { ok: false as const, error: "Invalid role for this company", code: "VALIDATION_ERROR" as const },
+        { status: 400 },
+      );
+    }
+  }
+
   const updateData: Prisma.UserUpdateInput = {};
   if (data.name !== undefined) updateData.name = data.name;
   if (data.mobile !== undefined) updateData.mobile = data.mobile;

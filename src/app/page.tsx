@@ -4,6 +4,7 @@ import { Landing } from "@/components/landing/Landing";
 import { AUTH_COOKIE_NAME } from "@/lib/auth-config";
 import { hostTenantFromHeader } from "@/lib/host-routing";
 import { verifyAccessTokenResult } from "@/lib/jwt";
+import { isSuperBossEmail } from "@/lib/super-boss";
 
 export default async function Home() {
   const host = (await headers()).get("host") ?? "";
@@ -15,7 +16,10 @@ export default async function Home() {
     if (token) {
       const verified = verifyAccessTokenResult(token);
       if (verified.ok) {
-        redirect("/bgos");
+        const p = verified.payload as Record<string, unknown>;
+        const em = typeof p.email === "string" ? p.email : "";
+        const sb = p.superBoss === true && isSuperBossEmail(em);
+        redirect(sb ? "/bgos/control" : "/bgos");
       }
     }
   }

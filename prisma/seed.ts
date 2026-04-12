@@ -148,7 +148,7 @@ async function main() {
       source: "seed",
       leadCompanyName: "Demo Biz",
       businessType: "Solar",
-      internalSalesStage: InternalSalesStage.NEW_LEAD,
+      internalSalesStage: InternalSalesStage.LEAD_ADDED,
       internalCallStatus: InternalCallStatus.NOT_CALLED,
     },
   });

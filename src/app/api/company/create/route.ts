@@ -14,6 +14,7 @@ import { signAccessToken } from "@/lib/jwt";
 import { normalizeLogoUrl } from "@/lib/company-profile";
 import { companyMembershipClass } from "@/lib/user-company";
 import { trialEndDateFromStart } from "@/lib/trial";
+import { isSuperBossEmail } from "@/lib/super-boss";
 
 const bodySchema = z.object({
   name: z
@@ -103,6 +104,7 @@ export async function POST(request: NextRequest) {
             companyPlan: primary.plan,
             workspaceReady: Boolean(u?.workspaceActivatedAt),
             memberships: mems,
+            ...(isSuperBossEmail(user.email) ? { superBoss: true as const } : {}),
           });
         } catch {
           return NextResponse.json(
@@ -205,6 +207,7 @@ export async function POST(request: NextRequest) {
         companyPlan: jwtCompany.plan,
         workspaceReady: addingAnotherBusiness,
         memberships: mems,
+        ...(isSuperBossEmail(user.email) ? { superBoss: true as const } : {}),
       });
       const res = NextResponse.json({
         ok: true as const,
@@ -275,6 +278,7 @@ export async function POST(request: NextRequest) {
         companyPlan: jwtCompany.plan,
         workspaceReady,
         memberships: mems,
+        ...(isSuperBossEmail(user.email) ? { superBoss: true as const } : {}),
       });
     } catch {
       return NextResponse.json(

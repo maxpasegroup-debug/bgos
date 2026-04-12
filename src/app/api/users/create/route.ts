@@ -17,19 +17,8 @@ import {
   BASIC_PLAN_MAX_MEMBERS,
   basicPlanMemberLimitReached,
 } from "@/lib/plan-seats";
+import { isAllowedHrEmployeeRole } from "@/lib/internal-hr-roles";
 import { isCompanyBasicTrialExpired, trialExpiredJsonResponse } from "@/lib/trial";
-
-/** Roles the Add Employee form may assign (field staff bound to the boss company). */
-const ASSIGNABLE_EMPLOYEE_ROLES: ReadonlySet<UserRole> = new Set([
-  UserRole.SALES_HEAD,
-  UserRole.SALES_EXECUTIVE,
-  UserRole.TELECALLER,
-  UserRole.OPERATIONS_HEAD,
-  UserRole.SITE_ENGINEER,
-  UserRole.INSTALLATION_TEAM,
-  UserRole.ACCOUNTANT,
-  UserRole.HR_MANAGER,
-]);
 
 function syntheticEmailFromMobile(mobile: string): string {
   const digits = mobile.replace(/\D/g, "").slice(-10) || "0000000000";
@@ -58,13 +47,6 @@ const createBodySchema = z
         message: "Enter a valid mobile number (10–15 digits)",
       });
     }
-    if (!ASSIGNABLE_EMPLOYEE_ROLES.has(data.role)) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["role"],
-        message: "Choose a valid employee role",
-      });
-    }
     const em = data.email?.trim();
     if (em && em.length > 0 && !z.string().email().safeParse(em).success) {
       ctx.addIssue({
@@ -85,7 +67,7 @@ export async function POST(request: NextRequest) {
 
   const companyRow = await prisma.company.findUnique({
     where: { id: session.companyId },
-    select: { plan: true },
+    select: { plan: true, internalSalesOrg: true },
   });
   if (companyRow && (await basicPlanMemberLimitReached(session.companyId, companyRow.plan))) {
     return jsonError(
@@ -97,6 +79,11 @@ export async function POST(request: NextRequest) {
 
   const parsed = await parseJsonBodyZod(request, createBodySchema);
   if (!parsed.ok) return parsed.response;
+
+  const internalSalesOrg = companyRow?.internalSalesOrg ?? false;
+  if (!isAllowedHrEmployeeRole(internalSalesOrg, parsed.data.role)) {
+    return jsonError(400, "VALIDATION_ERROR", "Choose a valid employee role for this company");
+  }
 
   const { name, mobile, password, role } = parsed.data;
   const emailRaw = parsed.data.email?.trim();

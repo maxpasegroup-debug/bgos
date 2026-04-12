@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { syncCompanySubscriptionStatus, trialDaysRemaining } from "@/lib/subscription-status";
 import { isCompanyBasicTrialExpired } from "@/lib/trial";
 import { jwtSaysSubscriptionExpired } from "@/lib/trial-middleware";
+import { isSuperBossEmail } from "@/lib/super-boss";
 
 function planLabel(plan: CompanyPlan): string {
   switch (plan) {
@@ -117,6 +118,15 @@ export async function GET() {
         where: { id: session.user.sub },
         select: { name: true },
       });
+      let jwtSuperBoss = false;
+      if (token) {
+        const vr = verifyAccessTokenResult(token);
+        if (vr.ok) {
+          jwtSuperBoss = (vr.payload as Record<string, unknown>).superBoss === true;
+        }
+      }
+      const isSuperBoss =
+        jwtSuperBoss === true && isSuperBossEmail(session.user.email) === true;
       return jsonSuccess({
         authenticated: true as const,
         planLockedToBasic: isPlanLockedToBasic(),
@@ -136,6 +146,7 @@ export async function GET() {
             session.user.companyId !== null && !session.user.workspaceReady,
           activeCompanyIdCookie,
           memberships: session.user.memberships ?? null,
+          isSuperBoss,
         },
       });
     }

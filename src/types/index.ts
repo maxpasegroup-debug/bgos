@@ -28,6 +28,8 @@ export type AccessTokenPayload = {
     plan: CompanyPlan;
     jobRole: UserRole;
   }>;
+  /** Set only for {@link process.env.BGOS_BOSS_EMAIL} at login / token mint — do not trust from clients. */
+  superBoss?: boolean;
   iat?: number;
   exp?: number;
 };
