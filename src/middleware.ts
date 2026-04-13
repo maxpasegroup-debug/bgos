@@ -126,18 +126,37 @@ function bgosAllowsPagePath(pathname: string): boolean {
 }
 
 function iceAllowsPagePath(pathname: string): boolean {
-  if (normalizePathname(pathname) === "/lead") return true;
+  const p = normalizePathname(pathname);
+  if (p === "/lead") return true;
+  /** Onboarding runs on the same app; ICECONNECT host must not force login for these paths. */
+  if (p === "/onboarding" || p.startsWith("/onboarding/")) return true;
   return pathname === "/iceconnect" || pathname.startsWith("/iceconnect/");
 }
 
+/** APIs that belong to the BGOS boss app host only — everything else under `/api/*` is allowed on iceconnect.in. */
+const BGOS_HOST_ONLY_API_PREFIXES = [
+  "/api/bgos",
+  "/api/dashboard",
+  "/api/activity",
+  "/api/automation",
+  "/api/pipeline",
+  "/api/quotation",
+  "/api/invoice",
+  "/api/expense",
+  "/api/users",
+  "/api/sales-booster",
+] as const;
+
+function matchesApiPrefix(pathname: string, prefix: string): boolean {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
 function iceAllowsApiPath(pathname: string): boolean {
-  return (
-    pathname.startsWith("/api/auth") ||
-    pathname.startsWith("/api/customer") ||
-    pathname.startsWith("/api/iceconnect") ||
-    pathname.startsWith("/api/internal-sales") ||
-    pathname.startsWith("/api/tasks/complete")
-  );
+  if (!pathname.startsWith("/api/")) return false;
+  for (const prefix of BGOS_HOST_ONLY_API_PREFIXES) {
+    if (matchesApiPrefix(pathname, prefix)) return false;
+  }
+  return true;
 }
 
 function billingFunnelPagePath(pathname: string): boolean {

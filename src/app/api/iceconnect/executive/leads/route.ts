@@ -1,12 +1,18 @@
-import { IceconnectMetroStage, LeadStatus, UserRole } from "@prisma/client";
+import { CompanyPlan, IceconnectMetroStage, LeadStatus, UserRole } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { jsonError, parseJsonBodyZod, prismaKnownErrorResponse } from "@/lib/api-response";
 import { handleApiError } from "@/lib/route-error";
 import { requireIceconnectRole } from "@/lib/iceconnect-route-guard";
+import {
+  flowV3StageFromDb,
+  LEAD_FLOW_V3_LABEL,
+  onboardingFormStatusLabel,
+  techStatusLabel,
+} from "@/lib/iceconnect-lead-flow-v3";
 import { leadPhonesDuplicate } from "@/lib/iceconnect-executive-leads";
-import { currentPeriod, METRO_STAGE_LABEL, monthBoundsUTC } from "@/lib/iceconnect-sales-hub";
+import { currentPeriod, monthBoundsUTC } from "@/lib/iceconnect-sales-hub";
 import { isIceconnectPrivileged } from "@/lib/iceconnect-scope";
 import { prisma } from "@/lib/prisma";
 import { assertIceconnectInternalSalesOrg } from "@/lib/require-iceconnect-internal-org";
@@ -55,6 +61,13 @@ function rangeFromPreset(preset: string | null): { start: Date; end: Date } | nu
   return null;
 }
 
+function livePlanLabel(plan: CompanyPlan, isTrialActive: boolean): string {
+  if (isTrialActive) return "Free Trial";
+  if (plan === CompanyPlan.ENTERPRISE) return "Enterprise";
+  if (plan === CompanyPlan.PRO) return "Pro";
+  return "Basic";
+}
+
 export async function GET(request: NextRequest) {
   const session = await requireIceconnectRole(request, ROLES);
   if (session instanceof NextResponse) return session;
@@ -66,7 +79,7 @@ export async function GET(request: NextRequest) {
   const preset = searchParams.get("range")?.trim() ?? null;
   const fromQ = parseDateParam(searchParams.get("from"));
   const toQ = parseDateParam(searchParams.get("to"));
-  const pipeline = searchParams.get("pipeline")?.trim() ?? "open";
+  const statusFilter = searchParams.get("statusFilter")?.trim() ?? "active";
   const q = searchParams.get("q")?.trim() ?? "";
 
   let range: { start: Date; end: Date } | null = null;
@@ -87,18 +100,9 @@ export async function GET(request: NextRequest) {
     ...assigneeScope,
   };
 
-  const openPipelineWhere = {
+  const nonLostWhere = {
     ...baseWhere,
-    status: { notIn: [LeadStatus.WON, LeadStatus.LOST] as LeadStatus[] },
-    OR: [
-      { iceconnectMetroStage: null },
-      { iceconnectMetroStage: { not: IceconnectMetroStage.SUBSCRIPTION } },
-    ],
-  };
-
-  const lostWhere = {
-    ...baseWhere,
-    status: LeadStatus.LOST,
+    status: { not: LeadStatus.LOST as LeadStatus },
   };
 
   const searchClause =
@@ -107,6 +111,7 @@ export async function GET(request: NextRequest) {
           OR: [
             { name: { contains: q, mode: "insensitive" as const } },
             { phone: { contains: q, mode: "insensitive" as const } },
+            { leadCompanyName: { contains: q, mode: "insensitive" as const } },
           ],
         }
       : {};
@@ -114,15 +119,20 @@ export async function GET(request: NextRequest) {
   const dateClause = range ? { createdAt: { gte: range.start, lte: range.end } } : {};
 
   const listWhere =
-    pipeline === "lost"
-      ? { ...lostWhere, ...dateClause, ...searchClause }
-      : { ...openPipelineWhere, ...dateClause, ...searchClause };
+    statusFilter === "lost"
+      ? { ...baseWhere, status: LeadStatus.LOST as LeadStatus, ...dateClause, ...searchClause }
+      : { ...nonLostWhere, ...dateClause, ...searchClause };
 
   try {
     const { year: periodYear, month: periodMonth } = currentPeriod();
     const { start: monthStart, end: monthEnd } = monthBoundsUTC(periodYear, periodMonth);
 
     const personalWhere = { companyId: session.companyId, assignedTo: session.sub };
+    const co = await prisma.company.findUnique({
+      where: { id: session.companyId },
+      select: { plan: true, isTrialActive: true },
+    });
+    const currentPlanLabel = livePlanLabel(co?.plan ?? CompanyPlan.BASIC, Boolean(co?.isTrialActive));
 
     const [leads, conversionsThisMonth, openTotal] = await Promise.all([
       prisma.lead.findMany({
@@ -134,6 +144,8 @@ export async function GET(request: NextRequest) {
           name: true,
           phone: true,
           status: true,
+          leadCompanyName: true,
+          businessType: true,
           internalSalesNotes: true,
           iceconnectLocation: true,
           iceconnectMetroStage: true,
@@ -142,6 +154,15 @@ export async function GET(request: NextRequest) {
           updatedAt: true,
           assignedTo: true,
           assignee: { select: { id: true, name: true } },
+          onboardingWorkflowSubmission: {
+            select: {
+              id: true,
+              category: true,
+              status: true,
+              filledByUserId: true,
+              techTask: { select: { status: true } },
+            },
+          },
         },
       }),
       prisma.lead.count({
@@ -152,7 +173,16 @@ export async function GET(request: NextRequest) {
           iceconnectSubscribedAt: { gte: monthStart, lte: monthEnd },
         },
       }),
-      prisma.lead.count({ where: openPipelineWhere }),
+      prisma.lead.count({
+        where: {
+          ...baseWhere,
+          status: { not: LeadStatus.LOST as LeadStatus },
+          OR: [
+            { iceconnectMetroStage: null },
+            { iceconnectMetroStage: { not: IceconnectMetroStage.SUBSCRIPTION } },
+          ],
+        },
+      }),
     ]);
 
     const target = await prisma.salesExecutiveMonthlyTarget.findUnique({
@@ -170,31 +200,71 @@ export async function GET(request: NextRequest) {
     const conversionPct =
       targetCount > 0 ? Math.min(100, Math.round((conversionsThisMonth / targetCount) * 100)) : 0;
 
+    const deliveredToLive = leads
+      .filter(
+        (l) =>
+          l.onboardingWorkflowSubmission?.status === "DELIVERED" &&
+          l.status !== LeadStatus.LOST &&
+          (l.iceconnectMetroStage ?? IceconnectMetroStage.LEAD_CREATED) !==
+            IceconnectMetroStage.SUBSCRIPTION,
+      )
+      .map((l) => l.id);
+    if (deliveredToLive.length > 0) {
+      await prisma.lead.updateMany({
+        where: { id: { in: deliveredToLive } },
+        data: {
+          iceconnectMetroStage: IceconnectMetroStage.SUBSCRIPTION,
+          iceconnectSubscribedAt: new Date(),
+          status: LeadStatus.WON,
+        },
+      });
+    }
+
+    const mapped = leads.map((l) => {
+      const effectiveDbStage =
+        deliveredToLive.includes(l.id)
+          ? IceconnectMetroStage.SUBSCRIPTION
+          : (l.iceconnectMetroStage ?? IceconnectMetroStage.LEAD_CREATED);
+      const stageKey = flowV3StageFromDb(effectiveDbStage);
+      const canEdit =
+        l.assignedTo === session.sub || isIceconnectPrivileged(session.role);
+      return {
+        id: l.id,
+        name: l.name,
+        phone: l.phone,
+        companyName: l.leadCompanyName ?? "",
+        industry: l.onboardingWorkflowSubmission?.category ?? l.businessType ?? "",
+        location: l.iceconnectLocation ?? "",
+        notes: l.internalSalesNotes ?? "",
+        stage: stageKey,
+        stageLabel: LEAD_FLOW_V3_LABEL[stageKey],
+        status: l.status,
+        nextFollowUpAt: l.nextFollowUpAt?.toISOString() ?? null,
+        createdAt: l.createdAt.toISOString(),
+        updatedAt: l.updatedAt.toISOString(),
+        assigneeName: l.assignee?.name?.trim() || "—",
+        assigneeId: l.assignedTo,
+        canEdit,
+        won: stageKey === "LIVE",
+        lost: l.status === LeadStatus.LOST,
+        livePlanLabel: stageKey === "LIVE" ? currentPlanLabel : null,
+        onboardingFormId: l.onboardingWorkflowSubmission?.id ?? null,
+        onboardingIndustry: l.onboardingWorkflowSubmission?.category ?? null,
+        formStatus: onboardingFormStatusLabel(l.onboardingWorkflowSubmission?.status ?? null),
+        techStatus: techStatusLabel(l.onboardingWorkflowSubmission?.techTask?.status ?? null),
+      };
+    });
+
+    const filtered = mapped.filter((l) => {
+      if (statusFilter === "lost") return l.lost;
+      if (statusFilter === "live") return l.stage === "LIVE" && !l.lost;
+      if (statusFilter === "onboarding") return l.stage === "ONBOARDING" && !l.lost;
+      return l.stage !== "LIVE" && l.stage !== "ONBOARDING" && !l.lost;
+    });
+
     return NextResponse.json({
       ok: true as const,
-      leads: leads.map((l) => {
-        const stage = l.iceconnectMetroStage ?? IceconnectMetroStage.LEAD_CREATED;
-        const canEdit =
-          l.assignedTo === session.sub || isIceconnectPrivileged(session.role);
-        return {
-          id: l.id,
-          name: l.name,
-          phone: l.phone,
-          location: l.iceconnectLocation ?? "",
-          notes: l.internalSalesNotes ?? "",
-          stage,
-          stageLabel: METRO_STAGE_LABEL[stage],
-          status: l.status,
-          nextFollowUpAt: l.nextFollowUpAt?.toISOString() ?? null,
-          createdAt: l.createdAt.toISOString(),
-          updatedAt: l.updatedAt.toISOString(),
-          assigneeName: l.assignee?.name?.trim() || "—",
-          assigneeId: l.assignedTo,
-          canEdit,
-          won: l.status === LeadStatus.WON,
-          lost: l.status === LeadStatus.LOST,
-        };
-      }),
+      leads: filtered,
       stats: {
         openPipelineCount: openTotal,
         conversionsThisMonth,
@@ -258,7 +328,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const stage = lead.iceconnectMetroStage ?? IceconnectMetroStage.LEAD_CREATED;
+    const stage = flowV3StageFromDb(lead.iceconnectMetroStage ?? IceconnectMetroStage.LEAD_CREATED);
 
     return NextResponse.json(
       {
@@ -267,17 +337,26 @@ export async function POST(request: NextRequest) {
           id: lead.id,
           name: lead.name,
           phone: lead.phone,
+          companyName: "",
+          industry: "",
           location: lead.iceconnectLocation ?? "",
           notes: lead.internalSalesNotes ?? "",
           stage,
-          stageLabel: METRO_STAGE_LABEL[stage],
+          stageLabel: LEAD_FLOW_V3_LABEL[stage],
           status: LeadStatus.NEW,
           createdAt: lead.createdAt.toISOString(),
+          updatedAt: lead.createdAt.toISOString(),
+          nextFollowUpAt: null,
           assigneeName: lead.assignee?.name?.trim() || "—",
           assigneeId: lead.assignedTo,
           canEdit: true,
           won: false,
           lost: false,
+          livePlanLabel: null,
+          onboardingFormId: null,
+          onboardingIndustry: null,
+          formStatus: "Not started",
+          techStatus: null,
         },
       },
       { status: 201 },

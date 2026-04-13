@@ -30,12 +30,16 @@ export const DEFAULT_BGOS_ORIGIN = "https://bgos.online";
 export const DEFAULT_ICECONNECT_ORIGIN = "https://iceconnect.in";
 
 export function publicBgosOrigin(): string {
-  const u = process.env.NEXT_PUBLIC_BGOS_URL?.trim();
+  const u =
+    process.env.NEXT_PUBLIC_BGOS_URL?.trim() ||
+    process.env.NEXT_PUBLIC_APP_URL?.trim();
   return u && u.length > 0 ? u.replace(/\/+$/, "") : DEFAULT_BGOS_ORIGIN;
 }
 
 export function publicIceconnectOrigin(): string {
-  const u = process.env.NEXT_PUBLIC_ICECONNECT_URL?.trim();
+  const u =
+    process.env.NEXT_PUBLIC_ICECONNECT_URL?.trim() ||
+    process.env.ICECONNECT_URL?.trim();
   return u && u.length > 0 ? u.replace(/\/+$/, "") : DEFAULT_ICECONNECT_ORIGIN;
 }
 

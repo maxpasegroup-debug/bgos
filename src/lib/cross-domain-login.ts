@@ -1,13 +1,9 @@
 import { postLoginDestination } from "@/lib/role-routing";
 import {
   isBgosOnlineHost,
-  isIceconnectInHost,
-  publicBgosOrigin,
   publicIceconnectOrigin,
 } from "@/lib/host-routing";
 
-/** Only true “boss” accounts use BGOS web; sales managers stay on ICECONNECT for internal sales. */
-const BOSS_ROLES = new Set(["ADMIN"]);
 const FIELD_ROLES = new Set([
   "SALES_HEAD",
   "SALES_EXECUTIVE",
@@ -40,15 +36,6 @@ export function resolveAfterLoginNavigation(input: {
   hostname: string;
 }): AfterLoginNavigation {
   const path = postLoginDestination(input.role, input.from);
-
-  if (isIceconnectInHost(input.hostname) && BOSS_ROLES.has(input.role)) {
-    const base = publicBgosOrigin();
-    const q = new URLSearchParams();
-    if (input.from) q.set("from", input.from);
-    q.set("hostHint", "bgos");
-    const qs = q.toString();
-    return { kind: "external", url: `${base}/login${qs ? `?${qs}` : ""}` };
-  }
 
   if (isBgosOnlineHost(input.hostname) && FIELD_ROLES.has(input.role)) {
     const base = publicIceconnectOrigin();

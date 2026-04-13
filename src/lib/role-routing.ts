@@ -1,12 +1,11 @@
 /**
  * Role → default app home (BGOS vs ICECONNECT). Safe for Edge middleware and client.
- * ADMIN (and MANAGER) → boss app `/bgos`; field roles → their ICECONNECT dashboard.
+ * Internal sales org leaders default to `/iceconnect/internal-sales`; execs to My Journey.
  */
 
 export const ROLE_HOME: Readonly<Record<string, string>> = {
-  ADMIN: "/bgos",
-  /** Internal sales org: lands on My Journey (metro + targets). Classic pipeline stays at `/iceconnect/internal-sales`. */
-  MANAGER: "/iceconnect/my-journey",
+  ADMIN: "/iceconnect/internal-sales",
+  MANAGER: "/iceconnect/internal-sales",
   SALES_EXECUTIVE: "/iceconnect/my-journey",
   TELECALLER: "/iceconnect/my-journey",
   TECH_HEAD: "/iceconnect/my-journey",

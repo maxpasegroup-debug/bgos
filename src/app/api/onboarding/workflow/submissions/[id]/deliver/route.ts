@@ -7,8 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { canAccessWorkflowSubmission } from "@/lib/onboarding-workflow-access";
 import { notifyInternalUsers } from "@/lib/internal-sales-notifications";
 import { listInternalManagerUserIds } from "@/lib/internal-sales-notifications";
-import { internalStageToLeadStatus } from "@/lib/internal-sales-org";
-import { InternalSalesStage } from "@prisma/client";
+import { IceconnectMetroStage, InternalSalesStage, LeadStatus } from "@prisma/client";
 
 export async function POST(
   _request: NextRequest,
@@ -53,7 +52,9 @@ export async function POST(
           where: { id: sub.leadId },
           data: {
             internalSalesStage: InternalSalesStage.CLIENT_LIVE,
-            status: internalStageToLeadStatus(InternalSalesStage.CLIENT_LIVE),
+            status: LeadStatus.WON,
+            iceconnectMetroStage: IceconnectMetroStage.SUBSCRIPTION,
+            iceconnectSubscribedAt: now,
             internalStageUpdatedAt: now,
           },
         });

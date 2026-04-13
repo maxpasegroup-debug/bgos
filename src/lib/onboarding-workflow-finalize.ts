@@ -1,6 +1,6 @@
 import "server-only";
 
-import { CompanyBusinessType } from "@prisma/client";
+import { CompanyBusinessType, IceconnectMetroStage, InternalSalesStage, LeadStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { pickNextTechUserId, listWorkflowTechUserIds } from "@/lib/onboarding-workflow-assign";
 import { listInternalManagerUserIds, notifyInternalUsers } from "@/lib/internal-sales-notifications";
@@ -33,6 +33,7 @@ export async function finalizeSubmissionToSubmitted(submissionId: string): Promi
     techId = await pickNextTechUserId(row.companyId, { techPoolCompanyId });
   }
 
+  const now = new Date();
   await prisma.$transaction([
     prisma.onboardingSubmission.update({
       where: { id: submissionId },
@@ -46,6 +47,21 @@ export async function finalizeSubmissionToSubmitted(submissionId: string): Promi
       create: { submissionId, status: "NEW" },
       update: { status: "NEW" },
     }),
+    ...(row.leadId
+      ? [
+          prisma.lead.updateMany({
+            where: {
+              id: row.leadId,
+              status: { not: LeadStatus.LOST },
+            },
+            data: {
+              iceconnectMetroStage: IceconnectMetroStage.ONBOARDING,
+              internalSalesStage: InternalSalesStage.SENT_TO_TECH,
+              internalStageUpdatedAt: now,
+            },
+          }),
+        ]
+      : []),
   ]);
 
   const notifyTech = techId

@@ -33,8 +33,8 @@ function isBossRole(role: UserRole): boolean {
 function crossDomainLoginRequired(hostHeader: string | null, role: UserRole): boolean {
   const tenant = hostTenantFromHeader(hostHeader);
   const boss = isBossRole(role);
+  /** Field / exec roles sign in on bgos.online but work on iceconnect.in (separate host cookie). */
   if (tenant === "bgos" && !boss) return true;
-  if (tenant === "ice" && boss) return true;
   return false;
 }
 

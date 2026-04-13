@@ -1,6 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  /** Expose ICECONNECT_URL to the client bundle for same-origin login handoff (Railway often sets server-only `ICECONNECT_URL`). */
+  env: {
+    NEXT_PUBLIC_ICECONNECT_URL:
+      process.env.NEXT_PUBLIC_ICECONNECT_URL?.trim() ||
+      process.env.ICECONNECT_URL?.trim() ||
+      "",
+  },
   async headers() {
     return [
       {
