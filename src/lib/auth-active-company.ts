@@ -17,6 +17,8 @@ export type JwtMembership = {
   trialEndsAt: string | null;
   /** ISO 8601 end of paid Razorpay/Stripe period; when future, trial/billing gates stay open. */
   subscriptionPeriodEnd: string | null;
+  /** When `PAYMENT_PENDING`, product surfaces stay closed until checkout (custom business only). */
+  subscriptionStatus: string | null;
 };
 
 export function parseJwtMemberships(payload: Record<string, unknown>): JwtMembership[] | null {
@@ -36,7 +38,10 @@ export function parseJwtMemberships(payload: Record<string, unknown>): JwtMember
     const spe = o.subscriptionPeriodEnd;
     const subscriptionPeriodEnd =
       typeof spe === "string" && spe.trim() ? spe.trim() : null;
-    out.push({ companyId, plan, jobRole, trialEndsAt, subscriptionPeriodEnd });
+    const ss = o.subscriptionStatus;
+    const subscriptionStatus =
+      typeof ss === "string" && ss.trim() ? ss.trim() : null;
+    out.push({ companyId, plan, jobRole, trialEndsAt, subscriptionPeriodEnd, subscriptionStatus });
   }
   return out.length ? out : null;
 }

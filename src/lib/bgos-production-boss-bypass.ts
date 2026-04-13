@@ -1,4 +1,4 @@
-import { CompanyPlan } from "@prisma/client";
+import { CompanyPlan, CompanySubscriptionStatus } from "@prisma/client";
 
 /** Permanent billing / Sales Booster override — only this login. */
 export const BGOS_PRODUCTION_BOSS_BYPASS_EMAIL = "boss@bgos.online";
@@ -14,6 +14,7 @@ type JwtMembershipLike = {
   jobRole?: unknown;
   trialEndsAt?: string | null;
   subscriptionPeriodEnd?: string | null;
+  subscriptionStatus?: CompanySubscriptionStatus;
 };
 
 /**
@@ -32,5 +33,6 @@ export function applyProductionBossJwtMembershipOverrides<T extends JwtMembershi
     plan: CompanyPlan.PRO,
     subscriptionPeriodEnd: farIso,
     trialEndsAt: null,
+    subscriptionStatus: CompanySubscriptionStatus.ACTIVE,
   }));
 }

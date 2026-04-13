@@ -50,6 +50,7 @@ const SEGMENT_LABEL: Record<string, string> = {
   "internal-sales": "Internal Sales",
   "internal-tech": "Internal Tech",
   "internal-onboarding": "Internal Onboarding",
+  "tech-onboarding": "Tech · Onboarding",
 };
 
 export default async function IceconnectWorkspaceLayout({

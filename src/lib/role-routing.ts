@@ -58,6 +58,17 @@ const ICE_INTERNAL_SALES_HUB = new Set<string>([
   "ADMIN",
 ]);
 
+/** BGOS onboarding workflow engine (forms, tech queue, delivery). */
+const ONBOARDING_WORKFLOW_ROLES = new Set<string>([
+  "ADMIN",
+  "MANAGER",
+  "SALES_EXECUTIVE",
+  "TELECALLER",
+  "SALES_HEAD",
+  "TECH_HEAD",
+  "TECH_EXECUTIVE",
+]);
+
 type RouteRule = { prefix: string; roles: Set<string> };
 
 const PAGE_RULES: RouteRule[] = [
@@ -81,6 +92,11 @@ const PAGE_RULES: RouteRule[] = [
   { prefix: "/iceconnect/wallet", roles: ICE_INTERNAL_SALES_HUB },
   { prefix: "/iceconnect/notifications", roles: ICE_INTERNAL_SALES_HUB },
   { prefix: "/iceconnect/profile", roles: ICE_INTERNAL_SALES_HUB },
+  { prefix: "/onboarding/manage", roles: ONBOARDING_WORKFLOW_ROLES },
+  {
+    prefix: "/iceconnect/tech/onboarding",
+    roles: new Set(["TECH_HEAD", "TECH_EXECUTIVE", "ADMIN", "MANAGER"]),
+  },
   {
     prefix: "/iceconnect/internal-sales",
     roles: new Set([
@@ -241,6 +257,22 @@ const API_RULES: RouteRule[] = [
     roles: ICE_INTERNAL_SALES_HUB,
   },
   {
+    prefix: "/api/onboarding/workflow/create",
+    roles: ONBOARDING_WORKFLOW_ROLES,
+  },
+  {
+    prefix: "/api/onboarding/workflow/submissions",
+    roles: ONBOARDING_WORKFLOW_ROLES,
+  },
+  {
+    prefix: "/api/onboarding/workflow/tech",
+    roles: ONBOARDING_WORKFLOW_ROLES,
+  },
+  {
+    prefix: "/api/onboarding/workflow/custom",
+    roles: ONBOARDING_WORKFLOW_ROLES,
+  },
+  {
     prefix: "/api/iceconnect",
     roles: new Set([
       "SALES_HEAD",
@@ -371,6 +403,7 @@ export const ICECONNECT_DASHBOARD_ROLES: Record<string, readonly string[]> = {
   wallet: ["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
   notifications: ["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
   profile: ["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
+  "tech-onboarding": ["TECH_HEAD", "TECH_EXECUTIVE", "ADMIN", "MANAGER"],
   sales: ["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER"],
   "sales-head": ["SALES_HEAD", "ADMIN", "MANAGER"],
   partner: ["CHANNEL_PARTNER", "ADMIN", "MANAGER"],

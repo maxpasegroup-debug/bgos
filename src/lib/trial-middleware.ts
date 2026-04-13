@@ -26,6 +26,23 @@ function subscriptionPeriodEndMs(row: { subscriptionPeriodEnd: string | null }):
  * True when the active company must not use the product without visiting billing (BASIC trial ended
  * without pay, PRO period ended when `subscriptionPeriodEnd` is present in JWT, etc.).
  */
+/**
+ * Custom-build company selected a plan but has not completed initial checkout yet
+ * ({@link CompanySubscriptionStatus.PAYMENT_PENDING} in JWT membership row).
+ */
+export function jwtSaysCustomPaymentPending(
+  payload: Record<string, unknown>,
+  activeCompanyIdCookie: string | undefined,
+): boolean {
+  const tenant = resolveTenantFromJwt(payload, activeCompanyIdCookie);
+  if (tenant.needsCompany || !tenant.companyId) return false;
+
+  const mems = parseJwtMemberships(payload);
+  const row = mems?.find((m) => m.companyId === tenant.companyId);
+  if (!row?.subscriptionStatus) return false;
+  return row.subscriptionStatus === "PAYMENT_PENDING";
+}
+
 export function jwtSaysSubscriptionExpired(
   payload: Record<string, unknown>,
   activeCompanyIdCookie: string | undefined,
@@ -67,6 +84,29 @@ export function jwtSaysBasicTrialExpired(
 }
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+/**
+ * Custom plan selected but Razorpay checkout not completed — block product APIs until payment.
+ */
+export function customPaymentPendingAllowsApiRequest(pathname: string, method: string): boolean {
+  const p = normalizePathname(pathname);
+  const m = method.toUpperCase();
+  const allow: [string, string][] = [
+    ["/api/auth/me", "GET"],
+    ["/api/auth/logout", "POST"],
+    ["/api/auth/refresh-session", "POST"],
+    ["/api/payment/razorpay/order", "POST"],
+    ["/api/payment/razorpay/verify", "POST"],
+    ["/api/payment/razorpay/webhook", "POST"],
+    ["/api/company/list", "GET"],
+    ["/api/company/switch", "POST"],
+    ["/api/onboarding/custom/status", "GET"],
+    ["/api/onboarding/custom/submit", "POST"],
+  ];
+  if (allow.some(([path, mm]) => p === path && m === mm)) return true;
+  if (m === "GET" && p.startsWith("/api/onboarding/custom/")) return true;
+  return false;
+}
 
 /**
  * When subscription is expired at the edge: allow reads and a small mutation allowlist

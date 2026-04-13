@@ -38,6 +38,7 @@ export async function applyIndustryTemplate(
   industry: string,
 ): Promise<void> {
   const key = industry.trim().toLowerCase();
+  if (key === "custom") return;
   if (key === "solar" || key === "solar-company" || key === "energy") {
     await applySolarTemplate(companyId);
   }

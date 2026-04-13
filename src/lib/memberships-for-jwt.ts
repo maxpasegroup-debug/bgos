@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { CompanyPlan, UserRole } from "@prisma/client";
+import type { CompanyPlan, CompanySubscriptionStatus, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export type JwtMembershipRow = {
@@ -9,6 +9,8 @@ export type JwtMembershipRow = {
   jobRole: UserRole;
   trialEndsAt: string | null;
   subscriptionPeriodEnd: string | null;
+  /** Mirrors {@link Company.subscriptionStatus} for Edge billing holds (e.g. custom PAYMENT_PENDING). */
+  subscriptionStatus: CompanySubscriptionStatus;
 };
 
 /**
@@ -22,9 +24,9 @@ export async function loadMembershipsForJwt(userId: string): Promise<JwtMembersh
         select: {
           plan: true,
           trialEndDate: true,
-          // Present on Company after billing migration — run `npx prisma generate` when the engine isn’t locked.
           subscriptionPeriodEnd: true,
-        } as { plan: true; trialEndDate: true; subscriptionPeriodEnd: true },
+          subscriptionStatus: true,
+        },
       },
     },
     orderBy: { createdAt: "asc" },
@@ -37,6 +39,7 @@ export async function loadMembershipsForJwt(userId: string): Promise<JwtMembersh
       jobRole: r.jobRole,
       trialEndsAt: r.company.trialEndDate?.toISOString() ?? null,
       subscriptionPeriodEnd: co.subscriptionPeriodEnd?.toISOString() ?? null,
+      subscriptionStatus: r.company.subscriptionStatus,
     };
   });
 }

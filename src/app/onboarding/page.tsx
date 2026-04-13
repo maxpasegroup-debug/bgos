@@ -25,6 +25,9 @@ type MeUser = {
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
+  /** First-time onboarding: show Solar vs Custom before the solar form. Skipped when adding another business. */
+  const [addBusinessFlow, setAddBusinessFlow] = useState(false);
+  const [pickedSolarPath, setPickedSolarPath] = useState(false);
   const [name, setName] = useState("");
   const [industry, setIndustry] = useState<"SOLAR">("SOLAR");
   const [logoUrl, setLogoUrl] = useState("");
@@ -71,6 +74,8 @@ export default function OnboardingPage() {
       typeof window !== "undefined" &&
       sessionStorage.getItem(BGOS_ADD_BUSINESS_INTENT_KEY) === "1";
     if (wantAddBusiness) {
+      setAddBusinessFlow(true);
+      setPickedSolarPath(true);
       if (typeof window !== "undefined") {
         const loc = new URL(window.location.href);
         if (loc.searchParams.get("addBusiness") === "1") {
@@ -142,6 +147,7 @@ export default function OnboardingPage() {
         body: JSON.stringify({
           name: fields.data.name,
           industry: fields.data.industry,
+          businessType: "SOLAR",
           ...(fields.data.logoUrl?.trim() ? { logoUrl: fields.data.logoUrl.trim() } : {}),
           ...(fields.data.companyEmail?.trim()
             ? { companyEmail: fields.data.companyEmail.trim() }
@@ -306,6 +312,45 @@ export default function OnboardingPage() {
             </div>
           </div>
           <p className="mt-8 text-center text-sm text-white/40">
+            Wrong account?{" "}
+            <button
+              type="button"
+              onClick={() => void signOut()}
+              className="font-medium text-cyan-400 hover:text-cyan-300"
+            >
+              Sign out
+            </button>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 1 && !addBusinessFlow && !pickedSolarPath) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#0B0F19] px-4 py-10 text-white">
+        <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-8 shadow-xl backdrop-blur">
+          <h1 className="text-center text-xl font-semibold tracking-tight">Select business type</h1>
+          <p className="mt-2 text-center text-sm text-white/55">
+            Solar includes a trial. Custom is paid-only and starts with plan selection and checkout.
+          </p>
+          <div className="mt-8 flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={() => setPickedSolarPath(true)}
+              className="w-full rounded-xl border border-cyan-500/35 bg-cyan-500/10 py-3.5 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-500/20"
+            >
+              Solar
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/onboarding/custom/plan")}
+              className="w-full rounded-xl border border-white/12 bg-white/[0.06] py-3.5 text-sm font-semibold text-white transition hover:bg-white/10"
+            >
+              Custom (build your own system)
+            </button>
+          </div>
+          <p className="mt-8 text-center text-sm text-white/45">
             Wrong account?{" "}
             <button
               type="button"

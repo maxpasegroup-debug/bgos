@@ -17,6 +17,10 @@ import { companyMembershipClass } from "../src/lib/user-company";
 
 async function main() {
   await prisma.activityLog.deleteMany();
+  await prisma.onboardingMessage.deleteMany();
+  await prisma.onboardingSubmissionTechTask.deleteMany();
+  await prisma.onboardingSubmission.deleteMany();
+  await prisma.onboardingFormTemplate.deleteMany();
   await prisma.task.deleteMany();
   await prisma.deal.deleteMany();
   await prisma.invoicePayment.deleteMany();

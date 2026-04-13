@@ -98,6 +98,7 @@ export async function POST(request: Request) {
                 plan: true,
                 trialEndDate: true,
                 subscriptionPeriodEnd: true,
+                subscriptionStatus: true,
               },
             },
           },
@@ -178,6 +179,7 @@ export async function POST(request: Request) {
           jobRole: m.jobRole,
           trialEndsAt: m.company.trialEndDate?.toISOString() ?? null,
           subscriptionPeriodEnd: m.company.subscriptionPeriodEnd?.toISOString() ?? null,
+          subscriptionStatus: m.company.subscriptionStatus,
         }));
     const mems = applyProductionBossJwtMembershipOverrides(user.email, memsRaw);
     const primary = mems[0];

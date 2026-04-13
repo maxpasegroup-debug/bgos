@@ -28,6 +28,8 @@ import {
 } from "@/lib/host-routing";
 import { getRoleHome, roleCanAccessPath } from "@/lib/role-routing";
 import {
+  customPaymentPendingAllowsApiRequest,
+  jwtSaysCustomPaymentPending,
   jwtSaysSubscriptionExpired,
   trialExpiredAllowsApiRequest,
   TRIAL_EXPIRED_API_MESSAGE,
@@ -47,10 +49,19 @@ function normalizePathname(pathname: string): string {
  * Page routes that skip JWT enforcement here (no redirect to `/login` from middleware).
  * `/` is excluded from this list on purpose — it is handled in `app/page.tsx`.
  */
-const PUBLIC_ROUTES = ["/login", "/signup", "/onboarding", "/iceconnect/customer-login"] as const;
+const PUBLIC_ROUTES = ["/login", "/signup", "/iceconnect/customer-login"] as const;
+
+/** Boss activation wizard + public client onboarding fill — not `/onboarding/manage` (auth required). */
+function isOnboardingPublicPath(p: string): boolean {
+  if (p === "/onboarding") return true;
+  if (p === "/onboarding/basic" || p === "/onboarding/pro" || p === "/onboarding/enterprise") return true;
+  if (p.startsWith("/onboarding/fill/")) return true;
+  return false;
+}
 
 function isPublicRoute(pathname: string): boolean {
   const p = normalizePathname(pathname);
+  if (isOnboardingPublicPath(p)) return true;
   for (const route of PUBLIC_ROUTES) {
     if (p === route || p.startsWith(`${route}/`)) return true;
   }
@@ -69,6 +80,7 @@ function skipsMiddlewareAuth(pathname: string, method: string): boolean {
   if (normalizePathname(pathname) === "/lead") return true;
   if (pathname === "/api/internal-sales/public/lead" && method === "POST") return true;
   if (pathname === "/api/internal-sales/cron/automation" && method === "POST") return true;
+  if (pathname.startsWith("/api/onboarding/workflow/public/")) return true;
   if (isPublicRoute(pathname)) return true;
   if (pathname === "/iceconnect/login") return true;
   if (pathname === "/iceconnect/customer-login" || pathname === "/iceconnect/customer") return true;
@@ -498,6 +510,38 @@ export async function middleware(request: NextRequest) {
   const companyPlan = isPlanLockedToBasic() ? "BASIC" : companyPlanRaw;
 
   const activeCompanyCookie = request.cookies.get(ACTIVE_COMPANY_COOKIE_NAME)?.value;
+  const customPaymentPendingJwt =
+    hasCompanyContext &&
+    !needsCompany &&
+    !productionBossBypass &&
+    !edgeSuperBoss &&
+    jwtSaysCustomPaymentPending(verified.payload, activeCompanyCookie);
+
+  if (customPaymentPendingJwt && tenant === "bgos" && !edgeSuperBoss) {
+    if (pathname.startsWith("/api")) {
+      if (!customPaymentPendingAllowsApiRequest(pathname, request.method)) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Complete subscription payment to continue.",
+            code: "CUSTOM_PAYMENT_REQUIRED",
+          },
+          { status: 403 },
+        );
+      }
+    } else {
+      const p = normalizePathname(pathname);
+      const allowedPage =
+        p === "/onboarding/custom" ||
+        p.startsWith("/onboarding/custom/") ||
+        p === "/login" ||
+        p === "/signup";
+      if (!allowedPage) {
+        return NextResponse.redirect(new URL("/onboarding/custom/pay", request.url));
+      }
+    }
+  }
+
   const subscriptionExpiredJwt =
     hasCompanyContext &&
     !needsCompany &&

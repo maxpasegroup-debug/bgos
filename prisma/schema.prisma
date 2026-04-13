@@ -43,10 +43,19 @@ enum CompanySubscriptionStatus {
   TRIAL
   ACTIVE
   EXPIRED
+  /** Custom-build workspaces: selected plan but initial subscription payment not completed yet. */
+  PAYMENT_PENDING
 }
 
 enum CompanyIndustry {
   SOLAR
+  CUSTOM
+}
+
+/** Product line: solar CRM vs paid custom dashboard build. */
+enum CompanyBusinessType {
+  SOLAR
+  CUSTOM
 }
 
 enum LeadStatus {
@@ -185,10 +194,36 @@ enum ServiceTicketStatus {
   RESOLVED
 }
 
+/** BGOS onboarding workflow templates (category + tier). */
+enum OnboardingWorkflowPlanTier {
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+enum OnboardingSubmissionStatus {
+  DRAFT
+  SUBMITTED
+  IN_REVIEW
+  NEEDS_INFO
+  READY
+  DELIVERED
+}
+
+enum OnboardingTechTaskStatus {
+  NEW
+  IN_PROGRESS
+  WAITING_INFO
+  READY
+  DELIVERED
+}
+
 model Company {
   id         String          @id @default(cuid())
   name       String
   industry   CompanyIndustry @default(SOLAR)
+  /** Solar (default trial path) vs custom paid build — see {@link CompanyBusinessType}. */
+  businessType CompanyBusinessType @default(SOLAR)
   /** Subscription tier; remains {@link CompanyPlan} in DB (not a free-form string). */
   plan       CompanyPlan     @default(BASIC)
   ownerId    String
@@ -229,6 +264,17 @@ model Company {
   internalSalesOrg Boolean @default(false)
   /** Optional default assignee for public / anonymous lead capture. */
   internalSalesDefaultAssigneeId String?
+  /** Round-robin: last tech user id assigned to an onboarding workflow submission. */
+  internalWorkflowLastTechUserId String?
+
+  /** Set when the customer completes the custom requirements form (custom businessType only). */
+  customOnboardingSubmittedAt DateTime?
+  /**
+   * After internal sales confirms final payment, tech may contact the client and start build.
+   * Until then: internal planning only (no client comms).
+   */
+  customBuildClientContactAllowed Boolean @default(false)
+  customFinalPaymentConfirmedAt   DateTime?
 
   owner         User            @relation("OwnedCompany", fields: [ownerId], references: [id], onDelete: Restrict)
   memberships   UserCompany[]
@@ -268,6 +314,8 @@ model Company {
   internalNexaSupportTickets InternalNexaSupportTicket[]
   userManuals                UserManual[]
   salesExecutiveMonthlyTargets SalesExecutiveMonthlyTarget[]
+  onboardingFormTemplates      OnboardingFormTemplate[]
+  onboardingSubmissions        OnboardingSubmission[]
 
   @@index([name])
   @@index([ownerId])
@@ -438,6 +486,9 @@ model User {
   internalInAppNotifications InternalInAppNotification[]
   internalNexaSupportTicketsCreated InternalNexaSupportTicket[] @relation("NexaSupportCreator")
   salesExecutiveMonthlyTargets SalesExecutiveMonthlyTarget[]
+  onboardingSubmissionsFilled  OnboardingSubmission[] @relation("OnboardingFilledBy")
+  onboardingSubmissionsTech    OnboardingSubmission[] @relation("OnboardingTechAssignee")
+  onboardingWorkflowMessages   OnboardingMessage[]
 
   @@index([email])
 }
@@ -521,7 +572,8 @@ model Lead {
   iceconnectCustomerPlan    IceconnectCustomerPlan?
   iceconnectSubscribedAt    DateTime?
 
-  onboardingTasks        OnboardingTask[]
+  onboardingTasks                 OnboardingTask[]
+  onboardingWorkflowSubmission    OnboardingSubmission?
   internalLeadActivities InternalLeadActivity[]
   nexaSupportTickets     InternalNexaSupportTicket[]
 
@@ -1082,4 +1134,82 @@ model InternalEmployeeDailyTarget {
 
   @@unique([companyId, userId, dayKey])
   @@index([companyId])
+}
+
+/// Dynamic sections JSON — rendered by form engine (category + plan tier).
+model OnboardingFormTemplate {
+  id        String                   @id @default(cuid())
+  companyId String
+  category  String
+  planTier  OnboardingWorkflowPlanTier
+  sections  Json
+  isActive  Boolean                  @default(true)
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+
+  company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  submissions  OnboardingSubmission[]
+
+  @@unique([companyId, category, planTier])
+  @@index([companyId])
+  @@index([category, planTier])
+}
+
+/// One workflow per linked lead (optional); token access for client fill.
+model OnboardingSubmission {
+  id                 String                     @id @default(cuid())
+  companyId          String
+  leadId             String?                    @unique
+  templateId         String
+  category           String
+  planTier           OnboardingWorkflowPlanTier
+  filledByUserId     String?
+  clientAccessToken  String                     @unique
+  status             OnboardingSubmissionStatus @default(DRAFT)
+  data               Json                       @default("{}")
+  completionPercent  Int                        @default(0)
+  assignedTechUserId String?
+  deliveryPdfPath    String?
+  salesDeliveredAt   DateTime?
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+
+  company    Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  template   OnboardingFormTemplate  @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  lead       Lead?                   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  filledBy   User?                   @relation("OnboardingFilledBy", fields: [filledByUserId], references: [id], onDelete: SetNull)
+  techAssignee User?                 @relation("OnboardingTechAssignee", fields: [assignedTechUserId], references: [id], onDelete: SetNull)
+  messages   OnboardingMessage[]
+  techTask   OnboardingSubmissionTechTask?
+
+  @@index([companyId])
+  @@index([status])
+  @@index([assignedTechUserId])
+}
+
+model OnboardingMessage {
+  id           String   @id @default(cuid())
+  submissionId String
+  senderId     String?
+  message      String   @db.Text
+  fieldKey     String?
+  createdAt    DateTime @default(now())
+
+  submission OnboardingSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  sender     User?                @relation(fields: [senderId], references: [id], onDelete: SetNull)
+
+  @@index([submissionId, createdAt])
+}
+
+/// Tech-side status mirror (linked 1:1 to submission).
+model OnboardingSubmissionTechTask {
+  id           String                   @id @default(cuid())
+  submissionId String                   @unique
+  status       OnboardingTechTaskStatus   @default(NEW)
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+
+  submission OnboardingSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([status])
 }

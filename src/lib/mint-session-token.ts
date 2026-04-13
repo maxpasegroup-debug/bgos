@@ -103,6 +103,7 @@ export async function mintSessionAccessTokenForUser(input: {
         plan: true,
         trialEndDate: true,
         subscriptionPeriodEnd: true,
+        subscriptionStatus: true,
       },
     });
     if (!co) {
@@ -114,6 +115,7 @@ export async function mintSessionAccessTokenForUser(input: {
       jobRole: UserRole.ADMIN,
       trialEndsAt: co.trialEndDate?.toISOString() ?? null,
       subscriptionPeriodEnd: co.subscriptionPeriodEnd?.toISOString() ?? null,
+      subscriptionStatus: co.subscriptionStatus,
     });
   }
   rows = dedupeMemberships(rows);
@@ -138,6 +140,7 @@ export async function mintSessionAccessTokenForUser(input: {
       jobRole: m.jobRole,
       trialEndsAt: m.trialEndsAt,
       subscriptionPeriodEnd: m.subscriptionPeriodEnd,
+      subscriptionStatus: m.subscriptionStatus,
     })),
     superBoss: true as const,
   });

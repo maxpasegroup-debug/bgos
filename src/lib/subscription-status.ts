@@ -1,18 +1,31 @@
 import "server-only";
 
-import { CompanyPlan, CompanySubscriptionStatus } from "@prisma/client";
+import {
+  CompanyBusinessType,
+  CompanyPlan,
+  CompanySubscriptionStatus,
+} from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export type CompanySubscriptionFields = {
   plan: CompanyPlan;
   trialEndDate: Date | null;
   subscriptionPeriodEnd: Date | null;
+  subscriptionStatus?: CompanySubscriptionStatus;
+  businessType?: CompanyBusinessType;
 };
 
 /**
  * Single source of truth for subscription status (trial / active paid period / expired).
  */
 export function deriveSubscriptionStatus(company: CompanySubscriptionFields): CompanySubscriptionStatus {
+  if (
+    company.subscriptionStatus === CompanySubscriptionStatus.PAYMENT_PENDING &&
+    company.businessType === CompanyBusinessType.CUSTOM
+  ) {
+    return CompanySubscriptionStatus.PAYMENT_PENDING;
+  }
+
   if (company.plan === CompanyPlan.ENTERPRISE) {
     return CompanySubscriptionStatus.ACTIVE;
   }
@@ -60,6 +73,7 @@ export async function syncCompanySubscriptionStatus(companyId: string): Promise<
       trialEndDate: true,
       subscriptionPeriodEnd: true,
       subscriptionStatus: true,
+      businessType: true,
     },
   });
   if (!row) return CompanySubscriptionStatus.ACTIVE;

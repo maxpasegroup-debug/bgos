@@ -245,18 +245,12 @@ export function BgosDashboardGrid({
         />
       ) : null}
 
-      {/* 2 — NEXA priority + health */}
-      <ProFeatureLock
-        locked={!hasProPlan}
-        title="Nexa automation"
-        description="Live priority signals, AI insights, and recommended next actions."
-        className="col-span-full"
-      >
-        <NexaPriorityPanel
-          nexa={dashboard?.nexa}
-          insights={dashboard?.insights ?? []}
-        />
-      </ProFeatureLock>
+      {/* 2 — NEXA priority + health (Basic: snapshot + suggestions; Pro+: full insights) */}
+      <NexaPriorityPanel
+        nexa={dashboard?.nexa}
+        insights={dashboard?.insights ?? []}
+        hasFullNexa={hasProPlan}
+      />
       <BusinessHealthPanel health={dashboard?.health} />
 
       {/* 3 — Pipeline Kanban */}
@@ -322,14 +316,11 @@ export function BgosDashboardGrid({
       />
 
       {/* 9 — NEXA chat */}
-      <ProFeatureLock
-        locked={!hasProPlan}
-        title="Nexa automation"
-        description="Chat with Nexa and run guided automations on your live pipeline."
-        className="col-span-full"
-      >
-        <NexaChatPanel nexa={dashboard?.nexa} insights={dashboard?.insights ?? []} />
-      </ProFeatureLock>
+      <NexaChatPanel
+        nexa={dashboard?.nexa}
+        insights={dashboard?.insights ?? []}
+        hasFullNexa={hasProPlan}
+      />
     </motion.div>
   );
 }
@@ -469,9 +460,11 @@ function formatInsightLine(insight: NexaInsight): string {
 function NexaPriorityPanel({
   nexa,
   insights,
+  hasFullNexa,
 }: {
   nexa: NexaSnapshot | undefined;
   insights: NexaInsight[];
+  hasFullNexa: boolean;
 }) {
   const reduceMotion = useReducedMotion();
 
@@ -505,6 +498,15 @@ function NexaPriorityPanel({
             <div className="absolute -bottom-12 -left-12 h-36 w-36 rounded-full bg-[#FFC300]/15 blur-3xl" />
           </div>
           <div className="relative">
+            {!hasFullNexa ? (
+              <p className="mb-3 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-100/95">
+                Basic plan: Nexa shows live operational signals and light suggestions.{" "}
+                <Link href="/bgos/subscription" className="font-semibold text-[#FFC300] underline-offset-2 hover:underline">
+                  Upgrade to Pro
+                </Link>{" "}
+                for deep intelligence, Sales Booster, and automation.
+              </p>
+            ) : null}
             <h2 className="text-lg font-semibold text-white sm:text-xl">
               Nexa insights
             </h2>
@@ -548,7 +550,7 @@ function NexaPriorityPanel({
                 </div>
               </div>
             ) : null}
-            {insights.length > 0 ? (
+            {hasFullNexa && insights.length > 0 ? (
               <ul className="mt-5 space-y-2.5 text-sm text-white/80 sm:mt-6 sm:text-base">
                 {insights.map((it) => (
                   <li key={it.id} className="flex gap-3">
@@ -1036,9 +1038,11 @@ function buildNexaBrief(nexa: NexaSnapshot | undefined, insights: NexaInsight[])
 function NexaChatPanel({
   nexa,
   insights,
+  hasFullNexa,
 }: {
   nexa: NexaSnapshot | undefined;
   insights: NexaInsight[];
+  hasFullNexa: boolean;
 }) {
   const reduceMotion = useReducedMotion();
   const brief = useMemo(() => buildNexaBrief(nexa, insights), [nexa, insights]);
@@ -1077,7 +1081,7 @@ function NexaChatPanel({
           <div className="mt-4 rounded-lg border border-white/[0.08] bg-black/30 px-4 py-3">
             <p className="text-sm text-white/85">{reply}</p>
           </div>
-          {insights.length > 0 ? (
+          {hasFullNexa && insights.length > 0 ? (
             <div className="mt-3 rounded-lg border border-white/[0.08] bg-black/25 p-3">
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-white/45">
                 Insights
@@ -1088,6 +1092,15 @@ function NexaChatPanel({
                 ))}
               </ul>
             </div>
+          ) : null}
+          {!hasFullNexa ? (
+            <p className="mt-3 text-xs text-white/50">
+              Automation and deep Nexa actions require Pro.{" "}
+              <Link href="/bgos/subscription" className="text-[#FFC300] underline-offset-2 hover:underline">
+                View plans
+              </Link>
+              .
+            </p>
           ) : null}
           <p className="mb-2 mt-5 text-[10px] font-semibold uppercase tracking-wider text-white/40">
             Suggested actions
@@ -1109,29 +1122,31 @@ function NexaChatPanel({
             >
               {actionBusy === "fix" ? "Working..." : "Fix Now"}
             </button>
-            <button
-              type="button"
-              disabled={actionBusy !== null}
-              onClick={async () => {
-                setActionBusy("auto");
-                const res = await fetch("/api/nexa/auto-handle", {
-                  method: "POST",
-                  credentials: "include",
-                });
-                if (res.ok) {
-                  const j = (await res.json()) as { created?: number };
-                  setReply(
-                    `Auto Handle completed. NEXA generated ${Number(j.created ?? 0)} action task(s).`,
-                  );
-                } else {
-                  setReply("Auto Handle could not complete. Try again shortly.");
-                }
-                setActionBusy(null);
-              }}
-              className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-left text-xs font-medium text-white/85 transition-colors hover:border-[#FFC300]/35 hover:bg-white/[0.07] sm:text-sm"
-            >
-              {actionBusy === "auto" ? "Auto handling..." : "Auto Handle"}
-            </button>
+            {hasFullNexa ? (
+              <button
+                type="button"
+                disabled={actionBusy !== null}
+                onClick={async () => {
+                  setActionBusy("auto");
+                  const res = await fetch("/api/nexa/auto-handle", {
+                    method: "POST",
+                    credentials: "include",
+                  });
+                  if (res.ok) {
+                    const j = (await res.json()) as { created?: number };
+                    setReply(
+                      `Auto Handle completed. NEXA generated ${Number(j.created ?? 0)} action task(s).`,
+                    );
+                  } else {
+                    setReply("Auto Handle could not complete. Try again shortly.");
+                  }
+                  setActionBusy(null);
+                }}
+                className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-left text-xs font-medium text-white/85 transition-colors hover:border-[#FFC300]/35 hover:bg-white/[0.07] sm:text-sm"
+              >
+                {actionBusy === "auto" ? "Auto handling..." : "Auto Handle"}
+              </button>
+            ) : null}
           </div>
           <form
             className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center"

@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { CompanyPlan } from "@prisma/client";
+import { CompanyBusinessType, CompanyPlan, CompanySubscriptionStatus } from "@prisma/client";
 import Razorpay from "razorpay";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
@@ -15,7 +15,7 @@ import { USER_ADMIN_ROLES } from "@/lib/user-company";
 export const runtime = "nodejs";
 
 const bodySchema = z.object({
-  plan: z.enum(["basic", "pro"]),
+  plan: z.enum(["basic", "pro", "enterprise"]),
 });
 
 /**
@@ -38,20 +38,42 @@ export async function POST(request: NextRequest) {
   const parsed = await parseJsonBodyZod(request, bodySchema);
   if (!parsed.ok) return parsed.response;
 
-  const targetPlan: CompanyPlan = parsed.data.plan === "pro" ? CompanyPlan.PRO : CompanyPlan.BASIC;
+  const targetPlan: CompanyPlan =
+    parsed.data.plan === "pro"
+      ? CompanyPlan.PRO
+      : parsed.data.plan === "enterprise"
+        ? CompanyPlan.ENTERPRISE
+        : CompanyPlan.BASIC;
   const company = await prisma.company.findUnique({
     where: { id: session.companyId },
-    select: { id: true, plan: true },
+    select: { id: true, plan: true, subscriptionStatus: true, businessType: true },
   });
   if (!company) {
     return jsonError(404, "NOT_FOUND", "Company not found.");
   }
 
-  if (company.plan === CompanyPlan.ENTERPRISE) {
-    return jsonError(400, "INVALID_PLAN", "Enterprise billing is via sales — use Contact Sales.");
-  }
-  if (targetPlan === CompanyPlan.BASIC && company.plan !== CompanyPlan.BASIC) {
-    return jsonError(400, "INVALID_PLAN", "Basic checkout is only for workspaces on the Basic plan.");
+  const customPending =
+    company.businessType === CompanyBusinessType.CUSTOM &&
+    company.subscriptionStatus === CompanySubscriptionStatus.PAYMENT_PENDING;
+
+  if (customPending) {
+    if (targetPlan !== company.plan) {
+      return jsonError(
+        400,
+        "PLAN_MISMATCH",
+        "Checkout must match the plan you selected for your custom workspace.",
+      );
+    }
+  } else {
+    if (
+      company.plan === CompanyPlan.ENTERPRISE &&
+      company.businessType !== CompanyBusinessType.CUSTOM
+    ) {
+      return jsonError(400, "INVALID_PLAN", "Enterprise billing is via sales — use Contact Sales.");
+    }
+    if (targetPlan === CompanyPlan.BASIC && company.plan !== CompanyPlan.BASIC) {
+      return jsonError(400, "INVALID_PLAN", "Basic checkout is only for workspaces on the Basic plan.");
+    }
   }
 
   const amount = razorpayAmountForPlan(targetPlan);

@@ -1,4 +1,10 @@
-import { CompanyIndustry, CompanyPlan, CompanySubscriptionStatus, UserRole } from "@prisma/client";
+import {
+  CompanyBusinessType,
+  CompanyIndustry,
+  CompanyPlan,
+  CompanySubscriptionStatus,
+  UserRole,
+} from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -16,22 +22,59 @@ import { companyMembershipClass } from "@/lib/user-company";
 import { trialEndDateFromStart } from "@/lib/trial";
 import { isSuperBossEmail } from "@/lib/super-boss";
 
-const bodySchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1, "Company name is required")
-    .max(200, "Company name is too long"),
-  industry: z.nativeEnum(CompanyIndustry),
-  logoUrl: z.string().max(2048).optional(),
-  primaryColor: z.string().max(32).optional(),
-  secondaryColor: z.string().max(32).optional(),
-  companyEmail: z.union([z.literal(""), z.string().email().max(200)]).optional(),
-  companyPhone: z.string().max(40).optional(),
-  billingAddress: z.string().max(4000).optional(),
-  gstNumber: z.string().max(32).optional(),
-  bankDetails: z.string().max(4000).optional(),
-});
+const bodySchema = z
+  .object({
+    name: z
+      .string()
+      .trim()
+      .min(1, "Company name is required")
+      .max(200, "Company name is too long"),
+    industry: z.nativeEnum(CompanyIndustry),
+    businessType: z.nativeEnum(CompanyBusinessType).optional().default(CompanyBusinessType.SOLAR),
+    /** Required when {@link businessType} is CUSTOM (Basic / Pro / Enterprise paid build). */
+    plan: z.nativeEnum(CompanyPlan).optional(),
+    logoUrl: z.string().max(2048).optional(),
+    primaryColor: z.string().max(32).optional(),
+    secondaryColor: z.string().max(32).optional(),
+    companyEmail: z.union([z.literal(""), z.string().email().max(200)]).optional(),
+    companyPhone: z.string().max(40).optional(),
+    billingAddress: z.string().max(4000).optional(),
+    gstNumber: z.string().max(32).optional(),
+    bankDetails: z.string().max(4000).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.businessType === CompanyBusinessType.CUSTOM) {
+      if (!data.plan) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Choose a plan for your custom workspace.",
+          path: ["plan"],
+        });
+      }
+      if (data.industry !== CompanyIndustry.CUSTOM) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Custom workspaces use the Custom industry.",
+          path: ["industry"],
+        });
+      }
+    } else {
+      if (data.industry === CompanyIndustry.CUSTOM) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Solar workspaces cannot use the Custom industry.",
+          path: ["industry"],
+        });
+      }
+      if (data.industry !== CompanyIndustry.SOLAR) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Solar workspaces use the Solar industry.",
+          path: ["industry"],
+        });
+      }
+    }
+  });
 
 function jwtHasCompanyContext(
   u: NonNullable<ReturnType<typeof getAuthUserFromToken>>,
@@ -125,7 +168,9 @@ export async function POST(request: NextRequest) {
 
     const {
       name,
-      industry,
+      industry: industryRaw,
+      businessType,
+      plan: customPlan,
       logoUrl: logoIn,
       primaryColor,
       secondaryColor,
@@ -135,6 +180,22 @@ export async function POST(request: NextRequest) {
       gstNumber,
       bankDetails,
     } = parsed.data;
+
+    const industry =
+      businessType === CompanyBusinessType.CUSTOM ? CompanyIndustry.CUSTOM : industryRaw;
+
+    const addingAnotherBusiness = jwtHasCompanyContext(jwtOnly);
+
+    if (businessType === CompanyBusinessType.CUSTOM && addingAnotherBusiness) {
+      return NextResponse.json(
+        {
+          ok: false as const,
+          error: "Custom build onboarding is only for your first workspace.",
+          code: "CUSTOM_NOT_ALLOWED" as const,
+        },
+        { status: 400 },
+      );
+    }
 
   let logoUrl: string | null = null;
   if (logoIn != null && logoIn.trim() !== "") {
@@ -151,8 +212,6 @@ export async function POST(request: NextRequest) {
       );
     }
   }
-
-    const addingAnotherBusiness = jwtHasCompanyContext(jwtOnly);
 
     if (addingAnotherBusiness) {
       if (!user.workspaceReady) {
@@ -221,12 +280,46 @@ export async function POST(request: NextRequest) {
 
     let companyId: string;
     const row = await prisma.$transaction(async (tx) => {
+      if (businessType === CompanyBusinessType.CUSTOM) {
+        const pl = customPlan!;
+        const co = await tx.company.create({
+          data: {
+            name,
+            industry,
+            businessType: CompanyBusinessType.CUSTOM,
+            plan: pl,
+            ownerId: user.sub,
+            trialStartDate: null,
+            trialEndDate: null,
+            isTrialActive: false,
+            subscriptionStatus: CompanySubscriptionStatus.PAYMENT_PENDING,
+            ...(logoUrl != null ? { logoUrl } : {}),
+            ...(primaryColor?.trim() ? { primaryColor: primaryColor.trim() } : {}),
+            ...(secondaryColor?.trim() ? { secondaryColor: secondaryColor.trim() } : {}),
+            ...(companyEmail?.trim() ? { companyEmail: companyEmail.trim() } : {}),
+            ...(companyPhone?.trim() ? { companyPhone: companyPhone.trim() } : {}),
+            ...(billingAddress?.trim() ? { billingAddress: billingAddress.trim() } : {}),
+            ...(gstNumber?.trim() ? { gstNumber: gstNumber.trim().toUpperCase() } : {}),
+            ...(bankDetails?.trim() ? { bankDetails: bankDetails.trim() } : {}),
+          },
+        });
+        await tx.userCompany.create({
+          data: {
+            userId: user.sub,
+            companyId: co.id,
+            role: companyMembershipClass(UserRole.ADMIN),
+            jobRole: UserRole.ADMIN,
+          },
+        });
+        return co;
+      }
+
       const trialStartDate = new Date();
-      // New workspaces: BASIC + 15-day trial window (wall-clock end on `trialEndDate`).
       const co = await tx.company.create({
         data: {
           name,
           industry,
+          businessType: CompanyBusinessType.SOLAR,
           plan: CompanyPlan.BASIC,
           ownerId: user.sub,
           trialStartDate,
@@ -255,12 +348,10 @@ export async function POST(request: NextRequest) {
     });
     companyId = row.id;
 
-    if (industry === CompanyIndustry.SOLAR) {
-      try {
-        await applyIndustryTemplate(companyId, "SOLAR");
-      } catch (e) {
-        createLogger("company/create").error("applyIndustryTemplate failed", e, { companyId });
-      }
+    try {
+      await applyIndustryTemplate(companyId, industry === CompanyIndustry.SOLAR ? "SOLAR" : "CUSTOM");
+    } catch (e) {
+      createLogger("company/create").error("applyIndustryTemplate failed", e, { companyId });
     }
 
     const mems = await loadMembershipsForJwt(user.sub);
@@ -290,12 +381,16 @@ export async function POST(request: NextRequest) {
     const res = NextResponse.json({
       ok: true as const,
       companyId,
+      businessType,
+      ...(businessType === CompanyBusinessType.CUSTOM
+        ? { requiresCustomPayment: true as const, nextStep: "/onboarding/custom/pay" as const }
+        : {}),
       user: {
         id: user.sub,
         email: user.email,
         role: UserRole.ADMIN,
         companyId,
-        companyPlan: CompanyPlan.BASIC,
+        companyPlan: row.plan,
       },
     });
 

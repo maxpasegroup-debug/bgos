@@ -8,6 +8,8 @@ import { prisma } from "@/lib/prisma";
 export const RAZORPAY_BASIC_MONTHLY_PAISE = 600_000;
 /** ₹12,000 / month in paise */
 export const RAZORPAY_PRO_MONTHLY_PAISE = 1_200_000;
+/** ₹24,000 / month in paise — custom enterprise tier checkout */
+export const RAZORPAY_ENTERPRISE_MONTHLY_PAISE = 2_400_000;
 
 const SUBSCRIPTION_PERIOD_DAYS = 30;
 
@@ -60,6 +62,7 @@ export function verifyRazorpayWebhookSignature(rawBody: string, signature: strin
 }
 
 export function razorpayAmountForPlan(plan: CompanyPlan): number {
+  if (plan === "ENTERPRISE") return RAZORPAY_ENTERPRISE_MONTHLY_PAISE;
   if (plan === "PRO") return RAZORPAY_PRO_MONTHLY_PAISE;
   return RAZORPAY_BASIC_MONTHLY_PAISE;
 }
@@ -76,7 +79,14 @@ function parseOrderNotes(notes: unknown): OrderNotes | null {
   const userId = typeof o.userId === "string" ? o.userId.trim() : "";
   const companyId = typeof o.companyId === "string" ? o.companyId.trim() : "";
   const planRaw = typeof o.plan === "string" ? o.plan.trim().toUpperCase() : "";
-  const plan = planRaw === "PRO" ? ("PRO" as CompanyPlan) : planRaw === "BASIC" ? ("BASIC" as CompanyPlan) : null;
+  const plan =
+    planRaw === "PRO"
+      ? ("PRO" as CompanyPlan)
+      : planRaw === "BASIC"
+        ? ("BASIC" as CompanyPlan)
+        : planRaw === "ENTERPRISE"
+          ? ("ENTERPRISE" as CompanyPlan)
+          : null;
   if (!userId || !companyId || !plan) return null;
   return { userId, companyId, plan };
 }
