@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuthWithRoles } from "@/lib/auth";
+import { ACTIVITY_TYPES, logActivity } from "@/lib/activity-log";
 import { prisma } from "@/lib/prisma";
 import { isAllowedHrEmployeeRole } from "@/lib/internal-hr-roles";
 import {
@@ -65,12 +66,20 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
   const data = parsed.data;
 
+  const companyMeta = await prisma.company.findUnique({
+    where: { id: session.companyId },
+    select: { internalSalesOrg: true, ownerId: true },
+  });
+
+  if (data.role !== undefined && companyMeta?.ownerId === id && data.role !== UserRole.ADMIN) {
+    return NextResponse.json(
+      { ok: false as const, error: "Company owner must remain Admin", code: "VALIDATION_ERROR" as const },
+      { status: 400 },
+    );
+  }
+
   if (data.role !== undefined) {
-    const co = await prisma.company.findUnique({
-      where: { id: session.companyId },
-      select: { internalSalesOrg: true },
-    });
-    if (!co || !isAllowedHrEmployeeRole(co.internalSalesOrg, data.role)) {
+    if (!companyMeta || !isAllowedHrEmployeeRole(companyMeta.internalSalesOrg, data.role)) {
       return NextResponse.json(
         { ok: false as const, error: "Invalid role for this company", code: "VALIDATION_ERROR" as const },
         { status: 400 },
@@ -111,6 +120,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       );
     }
 
+    await logActivity(prisma, {
+      companyId: session.companyId,
+      userId: session.sub,
+      type: ACTIVITY_TYPES.TEAM_MEMBER_UPDATED,
+      message: `Team member updated: ${user.email}`,
+      metadata: { targetUserId: id },
+    });
+
     return NextResponse.json({ ok: true as const, user: toPublicUser(user, m) });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
@@ -121,4 +138,56 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
     throw e;
   }
+}
+
+export async function DELETE(request: NextRequest, context: RouteContext) {
+  const session = await requireAuthWithRoles(request, USER_ADMIN_ROLES);
+  if (session instanceof NextResponse) return session;
+
+  const { id } = await context.params;
+  if (id === session.sub) {
+    return NextResponse.json(
+      { ok: false as const, error: "You cannot delete your own account", code: "FORBIDDEN" as const },
+      { status: 403 },
+    );
+  }
+
+  const existing = await findUserInCompany(id, session.companyId);
+  if (!existing) {
+    return NextResponse.json(
+      { ok: false as const, error: "User not found", code: "NOT_FOUND" },
+      { status: 404 },
+    );
+  }
+
+  const company = await prisma.company.findUnique({
+    where: { id: session.companyId },
+    select: { ownerId: true },
+  });
+  if (company?.ownerId === id) {
+    return NextResponse.json(
+      { ok: false as const, error: "Cannot remove the company owner from the team", code: "FORBIDDEN" as const },
+      { status: 403 },
+    );
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.userCompany.delete({
+      where: { userId_companyId: { userId: id, companyId: session.companyId } },
+    });
+    const remaining = await tx.userCompany.count({ where: { userId: id } });
+    if (remaining === 0) {
+      await tx.user.delete({ where: { id } });
+    }
+  });
+
+  await logActivity(prisma, {
+    companyId: session.companyId,
+    userId: session.sub,
+    type: ACTIVITY_TYPES.TEAM_MEMBER_DELETED,
+    message: `Team member removed from company: ${existing.email}`,
+    metadata: { targetUserId: id },
+  });
+
+  return NextResponse.json({ ok: true as const });
 }

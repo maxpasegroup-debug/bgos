@@ -7,6 +7,8 @@ export const AUTH_ERROR_CODES = {
   TOKEN_EXPIRED: "TOKEN_EXPIRED",
   TOKEN_INVALID: "TOKEN_INVALID",
   INVALID_CREDENTIALS: "INVALID_CREDENTIALS",
+  /** Account exists but is disabled — show “contact admin”, not wrong password. */
+  ACCOUNT_DISABLED: "ACCOUNT_DISABLED",
   /** Preferred code when email is already registered. */
   EMAIL_IN_USE: "EMAIL_IN_USE",
   /** @deprecated Use {@link AUTH_ERROR_CODES.EMAIL_IN_USE}. */
@@ -20,6 +22,7 @@ const MESSAGES: Record<AuthErrorCode, string> = {
   TOKEN_EXPIRED: "Session expired — please sign in again",
   TOKEN_INVALID: "Invalid or expired session",
   INVALID_CREDENTIALS: "Invalid email or password",
+  ACCOUNT_DISABLED: "Your account is inactive. Contact your administrator.",
   EMAIL_IN_USE: EMAIL_ALREADY_IN_USE_MESSAGE,
   EMAIL_TAKEN: EMAIL_ALREADY_IN_USE_MESSAGE,
 };

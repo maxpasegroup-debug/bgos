@@ -117,8 +117,20 @@ export async function POST(request: Request) {
       { status: 401 },
     );
 
-    if (!user || !user.isActive) {
+    if (!user) {
       return authError;
+    }
+
+    if (!user.isActive) {
+      return NextResponse.json(
+        {
+          success: false as const,
+          ok: false as const,
+          error: "Your account is inactive. Contact your administrator.",
+          code: AUTH_ERROR_CODES.ACCOUNT_DISABLED,
+        },
+        { status: 403 },
+      );
     }
 
     console.info("[auth/login] Before password check", {

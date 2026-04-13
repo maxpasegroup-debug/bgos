@@ -53,13 +53,13 @@ export function IceconnectCustomersClient() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Customers</h1>
-        <p className="mt-1 text-sm text-gray-500">Converted subscriptions only</p>
+        <p className="mt-1 text-sm text-gray-500">Leads converted after payment (Customers module)</p>
       </div>
       {err ? <p className="text-sm text-red-600">{err}</p> : null}
       {loading ? (
         <p className="text-sm text-gray-500">Loading…</p>
       ) : rows.length === 0 ? (
-        <p className="text-sm text-gray-500">No customers yet. Close leads at Subscription.</p>
+        <p className="text-sm text-gray-500">No customers yet. Complete payment and convert from Leads.</p>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
           <table className="w-full text-left text-sm">

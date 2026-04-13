@@ -31,8 +31,17 @@ export function isInternalOrgEmployeeRole(role: UserRole): boolean {
   return (INTERNAL_ORG_EMPLOYEE_ROLES as readonly UserRole[]).includes(role);
 }
 
+/** Solar / tenant companies: field roles plus manager + tech (boss team management). */
+const NON_INTERNAL_ASSIGNABLE = new Set<UserRole>([
+  ...SOLAR_FIELD_EMPLOYEE_ROLE_OPTIONS.map((o) => o.value),
+  UserRole.MANAGER,
+  UserRole.TECH_HEAD,
+  UserRole.TECH_EXECUTIVE,
+]);
+
 export function isAllowedHrEmployeeRole(internalSalesOrg: boolean, role: UserRole): boolean {
-  return internalSalesOrg
-    ? isInternalOrgEmployeeRole(role)
-    : SOLAR_FIELD_EMPLOYEE_ROLE_OPTIONS.some((o) => o.value === role);
+  if (internalSalesOrg) {
+    return isInternalOrgEmployeeRole(role);
+  }
+  return NON_INTERNAL_ASSIGNABLE.has(role);
 }

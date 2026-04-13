@@ -5,6 +5,7 @@ import { prismaKnownErrorResponse } from "@/lib/api-response";
 import { handleApiError } from "@/lib/route-error";
 import { requireIceconnectRole } from "@/lib/iceconnect-route-guard";
 import { CUSTOMER_PLAN_LABEL, METRO_STAGE_LABEL } from "@/lib/iceconnect-sales-hub";
+import { isIceconnectPrivileged } from "@/lib/iceconnect-scope";
 import { prisma } from "@/lib/prisma";
 import { assertIceconnectInternalSalesOrg } from "@/lib/require-iceconnect-internal-org";
 
@@ -24,10 +25,12 @@ export async function GET(request: NextRequest) {
   if (gate) return gate;
 
   try {
+    const assigneeScope = isIceconnectPrivileged(session.role) ? {} : { assignedTo: session.sub };
+
     const rows = await prisma.lead.findMany({
       where: {
         companyId: session.companyId,
-        assignedTo: session.sub,
+        ...assigneeScope,
         iceconnectMetroStage: IceconnectMetroStage.SUBSCRIPTION,
       },
       orderBy: { iceconnectSubscribedAt: "desc" },

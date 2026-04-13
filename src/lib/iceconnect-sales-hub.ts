@@ -10,6 +10,7 @@ export const METRO_STAGES: readonly IceconnectMetroStage[] = [
   IceconnectMetroStage.DEMO_DONE,
   IceconnectMetroStage.FOLLOW_UP,
   IceconnectMetroStage.ONBOARDING,
+  IceconnectMetroStage.PAYMENT_DONE,
   IceconnectMetroStage.SUBSCRIPTION,
 ] as const;
 
@@ -18,8 +19,9 @@ export const METRO_STAGE_LABEL: Record<IceconnectMetroStage, string> = {
   [IceconnectMetroStage.INTRO_CALL]: "Intro Call",
   [IceconnectMetroStage.DEMO_DONE]: "Demo Done",
   [IceconnectMetroStage.FOLLOW_UP]: "Follow-up",
-  [IceconnectMetroStage.ONBOARDING]: "Onboarding",
-  [IceconnectMetroStage.SUBSCRIPTION]: "Subscription",
+  [IceconnectMetroStage.ONBOARDING]: "Form Filled",
+  [IceconnectMetroStage.PAYMENT_DONE]: "Payment Done",
+  [IceconnectMetroStage.SUBSCRIPTION]: "Converted",
 };
 
 export const CUSTOMER_PLAN_LABEL: Record<IceconnectCustomerPlan, string> = {
@@ -70,6 +72,7 @@ const DEMO_AND_BEYOND: IceconnectMetroStage[] = [
   IceconnectMetroStage.DEMO_DONE,
   IceconnectMetroStage.FOLLOW_UP,
   IceconnectMetroStage.ONBOARDING,
+  IceconnectMetroStage.PAYMENT_DONE,
   IceconnectMetroStage.SUBSCRIPTION,
 ];
 

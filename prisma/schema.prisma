@@ -112,13 +112,14 @@ enum InternalCallStatus {
   NOT_INTERESTED
 }
 
-/** ICECONNECT sales executive metro pipeline (internal org). SUBSCRIPTION counts toward monthly targets. */
+/** ICECONNECT sales executive metro pipeline (internal org). SUBSCRIPTION = converted customer. */
 enum IceconnectMetroStage {
   LEAD_CREATED
   INTRO_CALL
   DEMO_DONE
   FOLLOW_UP
   ONBOARDING
+  PAYMENT_DONE
   SUBSCRIPTION
 }
 
@@ -275,6 +276,9 @@ model Company {
    */
   customBuildClientContactAllowed Boolean @default(false)
   customFinalPaymentConfirmedAt   DateTime?
+
+  /** Platform (super boss): hide archived tenants from the client directory. */
+  archivedAt DateTime?
 
   owner         User            @relation("OwnedCompany", fields: [ownerId], references: [id], onDelete: Restrict)
   memberships   UserCompany[]

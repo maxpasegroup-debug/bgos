@@ -94,6 +94,7 @@ export async function GET(request: NextRequest) {
               IceconnectMetroStage.DEMO_DONE,
               IceconnectMetroStage.FOLLOW_UP,
               IceconnectMetroStage.ONBOARDING,
+              IceconnectMetroStage.PAYMENT_DONE,
               IceconnectMetroStage.SUBSCRIPTION,
             ],
           },
@@ -145,11 +146,13 @@ export async function GET(request: NextRequest) {
       where: {
         companyId,
         assignedTo: userId,
-        iceconnectMetroStage: IceconnectMetroStage.ONBOARDING,
+        iceconnectMetroStage: IceconnectMetroStage.PAYMENT_DONE,
       },
     });
     if (readyForClose > 0) {
-      nexaLines.push(`${readyForClose} lead${readyForClose === 1 ? "" : "s"} ready for subscription.`);
+      nexaLines.push(
+        `${readyForClose} lead${readyForClose === 1 ? "" : "s"} ready to convert after payment.`,
+      );
     }
     if (targetCount > 0 && progressPct < 50 && periodMonth === new Date().getMonth() + 1) {
       const day = new Date().getDate();

@@ -105,17 +105,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const onboarding = await prisma.lead.count({
+    const paymentDone = await prisma.lead.count({
       where: {
         companyId: session.companyId,
         assignedTo: session.sub,
-        iceconnectMetroStage: IceconnectMetroStage.ONBOARDING,
+        iceconnectMetroStage: IceconnectMetroStage.PAYMENT_DONE,
       },
     });
-    if (onboarding > 0) {
+    if (paymentDone > 0) {
       items.push({
         id: "nexa-close",
-        text: `Nexa: ${onboarding} lead${onboarding === 1 ? "" : "s"} ready for subscription`,
+        text: `Nexa: ${paymentDone} lead${paymentDone === 1 ? "" : "s"} ready to convert to customer`,
         kind: "nexa",
         at: now.toISOString(),
       });

@@ -11,8 +11,13 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const filter = searchParams.get("category") as BossControlClientCategory | null;
 
+  const includeArchived = request.nextUrl.searchParams.get("includeArchived") === "1";
+
   const rows = await prisma.company.findMany({
-    where: { internalSalesOrg: false },
+    where: {
+      internalSalesOrg: false,
+      ...(includeArchived ? {} : { archivedAt: null }),
+    },
     select: {
       id: true,
       name: true,
