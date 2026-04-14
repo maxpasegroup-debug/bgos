@@ -11,7 +11,11 @@ import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
 import { signAccessToken } from "@/lib/jwt";
 import { isBossReady } from "@/lib/boss-ready";
-import { postLoginDestination, SUPER_BOSS_HOME_PATH } from "@/lib/role-routing";
+import {
+  postLoginDestination,
+  SUPER_BOSS_HOME_PATH,
+  TECH_EXEC_HOME_PATH,
+} from "@/lib/role-routing";
 import {
   applyProductionBossJwtMembershipOverrides,
   isBgosProductionBossBypassEmail,
@@ -53,6 +57,9 @@ function internalPostLoginLocation(
 ): string {
   if (isSuperBossEmail(userEmail)) {
     return SUPER_BOSS_HOME_PATH;
+  }
+  if (role === UserRole.TECH_EXECUTIVE) {
+    return TECH_EXEC_HOME_PATH;
   }
   if (isBossReady(role, companyId)) {
     return "/bgos/dashboard";
@@ -303,6 +310,8 @@ export async function POST(request: Request) {
     const needsCrossDomainHandoff = crossDomainLoginRequired(hostHeader, effectiveRole);
     const nextPath = boss
       ? SUPER_BOSS_HOME_PATH
+      : effectiveRole === UserRole.TECH_EXECUTIVE
+        ? TECH_EXEC_HOME_PATH
       : isBossReady(effectiveRole, companyId)
         ? "/bgos/dashboard"
         : internalPostLoginLocation(

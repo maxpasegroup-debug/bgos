@@ -23,6 +23,13 @@ const SALES_HUB_ORDER = [
 ] as const;
 
 const SALES_HUB_SIDEBAR_SEGMENTS = new Set<string>(SALES_HUB_ORDER);
+const TECH_HUB_NAV = [
+  { seg: "my-tasks", label: "My Tasks", href: "/iceconnect/tech#my-tasks" },
+  { seg: "onboarding-queue", label: "Onboarding Queue", href: "/iceconnect/tech#onboarding-queue" },
+  { seg: "config", label: "Config", href: "/iceconnect/tech#config" },
+  { seg: "testing", label: "Testing", href: "/iceconnect/tech#testing" },
+  { seg: "completed", label: "Completed", href: "/iceconnect/tech#completed" },
+] as const;
 
 const SALES_HUB_LABEL: Record<string, string> = {
   "my-journey": "My Journey",
@@ -75,6 +82,7 @@ export default async function IceconnectWorkspaceLayout({
     dbUser?.name?.trim() || user.email.split("@")[0]?.trim() || user.email;
 
   let salesHubNav: { seg: string; label: string; href: string }[] | null = null;
+  let salesHubTitle: string | undefined;
   if (user.companyId) {
     const co = await prisma.company.findUnique({
       where: { id: user.companyId },
@@ -88,13 +96,18 @@ export default async function IceconnectWorkspaceLayout({
       "TECH_EXECUTIVE",
     ]);
     if (co?.internalSalesOrg === true && hubRoles.has(user.role)) {
-      salesHubNav = SALES_HUB_ORDER.filter((seg) =>
-        canAccessIceconnectDashboard(seg, user.role),
-      ).map((seg) => ({
-        seg,
-        label: SALES_HUB_LABEL[seg] ?? seg,
-        href: `/iceconnect/${seg}`,
-      }));
+      if (user.role === "TECH_EXECUTIVE") {
+        salesHubNav = [...TECH_HUB_NAV];
+        salesHubTitle = "Tech";
+      } else {
+        salesHubNav = SALES_HUB_ORDER.filter((seg) =>
+          canAccessIceconnectDashboard(seg, user.role),
+        ).map((seg) => ({
+          seg,
+          label: SALES_HUB_LABEL[seg] ?? seg,
+          href: `/iceconnect/${seg}`,
+        }));
+      }
     }
   }
 
@@ -115,6 +128,7 @@ export default async function IceconnectWorkspaceLayout({
       companyCount={companyCount}
       nav={nav}
       salesHubNav={salesHubNav}
+      salesHubTitle={salesHubTitle}
     >
       {children}
     </IceconnectWorkspaceShell>

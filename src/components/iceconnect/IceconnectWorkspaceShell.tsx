@@ -42,6 +42,7 @@ type ShellInnerProps = {
   nav: IceconnectNavItem[];
   /** When set, replaces layout with internal sales hub sidebar + minimal header. */
   salesHubNav?: IceconnectNavItem[] | null;
+  salesHubTitle?: string;
   children: ReactNode;
 };
 
@@ -91,6 +92,7 @@ function IceconnectSalesHubChrome({
   role,
   companyCount,
   salesHubNav,
+  salesHubTitle,
   children,
 }: Omit<ShellInnerProps, "nav"> & { salesHubNav: IceconnectNavItem[] }) {
   const pathname = usePathname();
@@ -129,7 +131,7 @@ function IceconnectSalesHubChrome({
         <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col border-r border-gray-200/90 bg-white shadow-sm">
           <div className="border-b border-gray-100 px-4 py-5">
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-400">ICECONNECT</p>
-            <p className="mt-1 text-sm font-semibold text-gray-900">Sales</p>
+            <p className="mt-1 text-sm font-semibold text-gray-900">{salesHubTitle ?? "Sales"}</p>
           </div>
           <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
             {salesHubNav.map((item) => {
@@ -329,9 +331,11 @@ function IceconnectClassicChrome({
 }
 
 function IceconnectWorkspaceChrome(props: ShellInnerProps) {
-  const { salesHubNav, nav, ...rest } = props;
+  const { salesHubNav, salesHubTitle, nav, ...rest } = props;
   if (salesHubNav && salesHubNav.length > 0) {
-    return <IceconnectSalesHubChrome {...rest} salesHubNav={salesHubNav} />;
+    return (
+      <IceconnectSalesHubChrome {...rest} salesHubNav={salesHubNav} salesHubTitle={salesHubTitle} />
+    );
   }
   return <IceconnectClassicChrome {...rest} nav={nav} />;
 }

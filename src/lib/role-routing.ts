@@ -5,14 +5,15 @@
 
 /** Platform owner (`BGOS_BOSS_EMAIL` + JWT `superBoss`) — internal control plane, not tenant solar dashboard. */
 export const SUPER_BOSS_HOME_PATH = "/bgos/control/clients";
+export const TECH_EXEC_HOME_PATH = "/iceconnect/tech";
 
 export const ROLE_HOME: Readonly<Record<string, string>> = {
   ADMIN: "/bgos/dashboard",
-  MANAGER: "/iceconnect/internal-sales",
-  SALES_EXECUTIVE: "/iceconnect/my-journey",
-  TELECALLER: "/iceconnect/my-journey",
-  TECH_HEAD: "/iceconnect/my-journey",
-  TECH_EXECUTIVE: "/iceconnect/my-journey",
+  MANAGER: "/iceconnect/leads",
+  SALES_EXECUTIVE: "/iceconnect/leads",
+  TELECALLER: "/iceconnect/leads",
+  TECH_HEAD: TECH_EXEC_HOME_PATH,
+  TECH_EXECUTIVE: TECH_EXEC_HOME_PATH,
   SALES_HEAD: "/iceconnect/sales-head",
   CHANNEL_PARTNER: "/iceconnect/partner",
   OPERATIONS_HEAD: "/iceconnect/operations",
@@ -50,14 +51,10 @@ export const DOCUMENT_VAULT_ROLES = new Set<string>(DOCUMENT_VAULT_ROLES_LIST);
 
 const PRIVILEGED = new Set<string>(["ADMIN", "MANAGER"]);
 
-/** ICECONNECT internal sales hub (My Journey, metro leads, wallet). Boss (ADMIN) uses BGOS only. */
-const ICE_INTERNAL_SALES_HUB = new Set<string>([
-  "SALES_EXECUTIVE",
-  "TELECALLER",
-  "MANAGER",
-  "TECH_HEAD",
-  "TECH_EXECUTIVE",
-]);
+/** ICECONNECT sales workspace (leads/customers/wallet). */
+const ICE_SALES_HUB = new Set<string>(["SALES_EXECUTIVE", "TELECALLER", "MANAGER"]);
+/** ICECONNECT technical workspace. */
+const ICE_TECH_HUB = new Set<string>(["TECH_HEAD", "TECH_EXECUTIVE", "MANAGER"]);
 
 /** BGOS onboarding workflow engine (forms, tech queue, delivery). */
 const ONBOARDING_WORKFLOW_ROLES = new Set<string>([
@@ -87,12 +84,13 @@ const PAGE_RULES: RouteRule[] = [
   { prefix: "/iceconnect/accounts", roles: new Set(["ACCOUNTANT", "ADMIN", "MANAGER"]) },
   { prefix: "/iceconnect/loan", roles: new Set(["LCO", "ADMIN", "MANAGER"]) },
   { prefix: "/iceconnect/hr", roles: new Set(["HR_MANAGER", "ADMIN", "MANAGER"]) },
-  { prefix: "/iceconnect/my-journey", roles: ICE_INTERNAL_SALES_HUB },
-  { prefix: "/iceconnect/leads", roles: ICE_INTERNAL_SALES_HUB },
-  { prefix: "/iceconnect/customers", roles: ICE_INTERNAL_SALES_HUB },
-  { prefix: "/iceconnect/wallet", roles: ICE_INTERNAL_SALES_HUB },
-  { prefix: "/iceconnect/notifications", roles: ICE_INTERNAL_SALES_HUB },
-  { prefix: "/iceconnect/profile", roles: ICE_INTERNAL_SALES_HUB },
+  { prefix: "/iceconnect/my-journey", roles: ICE_SALES_HUB },
+  { prefix: "/iceconnect/leads", roles: ICE_SALES_HUB },
+  { prefix: "/iceconnect/customers", roles: ICE_SALES_HUB },
+  { prefix: "/iceconnect/wallet", roles: ICE_SALES_HUB },
+  { prefix: "/iceconnect/notifications", roles: ICE_SALES_HUB },
+  { prefix: "/iceconnect/profile", roles: ICE_SALES_HUB },
+  { prefix: "/iceconnect/tech", roles: ICE_TECH_HUB },
   { prefix: "/onboarding/manage", roles: ONBOARDING_WORKFLOW_ROLES },
   {
     prefix: "/iceconnect/tech/onboarding",
@@ -106,7 +104,6 @@ const PAGE_RULES: RouteRule[] = [
       "ADMIN",
       "MANAGER",
       "TECH_HEAD",
-      "TECH_EXECUTIVE",
     ]),
   },
   {
@@ -236,8 +233,6 @@ const API_RULES: RouteRule[] = [
       "TELECALLER",
       "ADMIN",
       "MANAGER",
-      "TECH_HEAD",
-      "TECH_EXECUTIVE",
       "OPERATIONS_HEAD",
       "SITE_ENGINEER",
       "PRO",
@@ -254,7 +249,7 @@ const API_RULES: RouteRule[] = [
   },
   {
     prefix: "/api/iceconnect/executive",
-    roles: ICE_INTERNAL_SALES_HUB,
+    roles: ICE_SALES_HUB,
   },
   {
     prefix: "/api/onboarding/workflow/create",
@@ -347,6 +342,18 @@ export function roleCanAccessPath(
 ): boolean {
   const p = normalizePathnameRole(pathname);
 
+  if (
+    role === "TECH_EXECUTIVE" &&
+    (
+      p === "/iceconnect/leads" ||
+      p.startsWith("/iceconnect/leads/") ||
+      p === "/api/internal-sales" ||
+      p.startsWith("/api/internal-sales/")
+    )
+  ) {
+    return false;
+  }
+
   if (opts?.superBoss === true) {
     if (p === "/bgos" || p === "/iceconnect" || p.startsWith("/iceconnect/")) {
       return false;
@@ -404,12 +411,13 @@ export function postLoginDestination(
 
 /** Path segment after `/iceconnect/` → roles allowed on that dashboard. */
 export const ICECONNECT_DASHBOARD_ROLES: Record<string, readonly string[]> = {
-  "my-journey": ["SALES_EXECUTIVE", "TELECALLER", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
-  leads: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
-  customers: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
-  wallet: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
-  notifications: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
-  profile: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
+  "my-journey": ["SALES_EXECUTIVE", "TELECALLER", "MANAGER"],
+  leads: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER"],
+  customers: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER"],
+  wallet: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER"],
+  notifications: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER"],
+  profile: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER"],
+  tech: ["TECH_HEAD", "TECH_EXECUTIVE", "MANAGER"],
   "tech-onboarding": ["TECH_HEAD", "TECH_EXECUTIVE", "MANAGER"],
   sales: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER"],
   "sales-head": ["SALES_HEAD", "MANAGER"],
@@ -423,7 +431,7 @@ export const ICECONNECT_DASHBOARD_ROLES: Record<string, readonly string[]> = {
   accounts: ["ACCOUNTANT", "MANAGER"],
   loan: ["LCO", "MANAGER"],
   hr: ["HR_MANAGER", "MANAGER"],
-  "internal-sales": ["SALES_EXECUTIVE", "TELECALLER", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
+  "internal-sales": ["SALES_EXECUTIVE", "TELECALLER", "MANAGER", "TECH_HEAD"],
   "internal-tech": ["TECH_HEAD", "TECH_EXECUTIVE", "MANAGER"],
   "internal-onboarding": [
     "MANAGER",

@@ -6,7 +6,7 @@ import { Suspense, useState } from "react";
 import { z } from "zod";
 import { resolveAfterLoginNavigation } from "@/lib/cross-domain-login";
 import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
-import { SUPER_BOSS_HOME_PATH } from "@/lib/role-routing";
+import { SUPER_BOSS_HOME_PATH, TECH_EXEC_HOME_PATH } from "@/lib/role-routing";
 
 const clientLoginSchema = z.object({
   email: z.string().trim().min(1, "Email is required").email("Enter a valid email"),
@@ -134,6 +134,11 @@ function LoginForm() {
 
       if (role === "ADMIN") {
         router.replace("/bgos/dashboard");
+        router.refresh();
+        return;
+      }
+      if (role === "TECH_EXECUTIVE") {
+        router.replace(TECH_EXEC_HOME_PATH);
         router.refresh();
         return;
       }
