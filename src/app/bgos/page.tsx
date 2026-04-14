@@ -1,5 +1,6 @@
-import { BgosDashboardView } from "@/components/bgos/BgosDashboardView";
+import { redirect } from "next/navigation";
 
+/** Single entry for the command-center UI — avoids duplicate mounts at `/bgos` vs `/bgos/dashboard`. */
 export default function BgosHomePage() {
-  return <BgosDashboardView />;
+  redirect("/bgos/dashboard");
 }

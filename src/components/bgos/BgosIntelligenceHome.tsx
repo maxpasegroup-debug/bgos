@@ -88,7 +88,7 @@ function PulseLineChart({ trend }: { trend: DashboardAnalyticsTrendPoint[] }) {
 }
 
 export function BgosIntelligenceHome() {
-  const { dashboard, hasProPlan, refetch } = useBgosDashboardContext();
+  const { dashboard, hasProPlan, refetch, superBossNoCompany } = useBgosDashboardContext();
   const [heroNexaLine, setHeroNexaLine] = useState<string | null>(null);
 
   const [pulseRange, setPulseRange] = useState<PulseRangeKey>("today");
@@ -127,10 +127,20 @@ export function BgosIntelligenceHome() {
   }, []);
 
   useEffect(() => {
+    if (superBossNoCompany) {
+      setPulseLoading(false);
+      setPulseError(null);
+      setPulseDash(null);
+      return;
+    }
     void fetchPulse(pulseRange);
-  }, [fetchPulse, pulseRange]);
+  }, [fetchPulse, pulseRange, superBossNoCompany]);
 
   useEffect(() => {
+    if (superBossNoCompany) {
+      setGrowthLoaded(true);
+      return;
+    }
     let c = false;
     (async () => {
       try {
@@ -154,7 +164,7 @@ export function BgosIntelligenceHome() {
     return () => {
       c = true;
     };
-  }, []);
+  }, [superBossNoCompany]);
 
   const pulseAnalytics: DashboardAnalytics | null = pulseDash?.analytics ?? null;
 
@@ -249,6 +259,21 @@ export function BgosIntelligenceHome() {
   return (
     <div className={`${BGOS_MAIN_PAD} pb-16 pt-6`}>
       <div className={HOME_MAX_W}>
+        {superBossNoCompany ? (
+          <div
+            className={`${SECTION_MB} rounded-2xl border border-amber-400/25 bg-amber-500/10 px-5 py-4 text-sm text-amber-50`}
+            role="status"
+          >
+            <p className="font-medium text-white">Select a workspace to load live numbers.</p>
+            <p className="mt-1 text-white/70">
+              Open{" "}
+              <Link href="/bgos/control/clients" className="font-semibold text-[#FFC300] underline-offset-2 hover:underline">
+                Control → Clients
+              </Link>{" "}
+              to pick a company.
+            </p>
+          </div>
+        ) : null}
         {/* Hero + Nexa */}
         <motion.section
           initial={{ opacity: 0, y: 12 }}

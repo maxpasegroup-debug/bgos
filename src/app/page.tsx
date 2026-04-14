@@ -4,6 +4,7 @@ import { Landing } from "@/components/landing/Landing";
 import { AUTH_COOKIE_NAME } from "@/lib/auth-config";
 import { hostTenantFromHeader } from "@/lib/host-routing";
 import { verifyAccessTokenResult } from "@/lib/jwt";
+import { getRoleHome } from "@/lib/role-routing";
 import { isSuperBossEmail } from "@/lib/super-boss";
 
 export default async function Home() {
@@ -18,7 +19,11 @@ export default async function Home() {
       if (verified.ok) {
         const p = verified.payload as Record<string, unknown>;
         const em = typeof p.email === "string" ? p.email : "";
-        redirect(isSuperBossEmail(em) ? "/bgos/control" : "/bgos");
+        const role = typeof p.role === "string" ? p.role : "";
+        if (isSuperBossEmail(em) || role === "ADMIN") {
+          redirect("/bgos/dashboard");
+        }
+        redirect(getRoleHome(role));
       }
     }
   }

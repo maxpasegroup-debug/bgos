@@ -23,7 +23,6 @@ import {
   absoluteRoleHomeUrl,
   hostTenantFromHeader,
   publicBgosOrigin,
-  publicIceconnectOrigin,
   type HostTenant,
 } from "@/lib/host-routing";
 import { getRoleHome, roleCanAccessPath } from "@/lib/role-routing";
@@ -275,11 +274,12 @@ export async function middleware(request: NextRequest) {
         return wrongHostJson("ICECONNECT API is only available on iceconnect.in");
       }
     } else if (pathname === "/iceconnect" || pathname.startsWith("/iceconnect/")) {
-      const dest = new URL(pathname, publicIceconnectOrigin());
+      /** Same-origin BGOS host: never mount ICECONNECT workspace here (avoids boss flicker / wrong shell). */
+      const dest = new URL("/bgos/dashboard", request.url);
       dest.search = request.nextUrl.search;
       return NextResponse.redirect(dest);
     } else if (!bgosAllowsPagePath(pathname)) {
-      return NextResponse.redirect(new URL("/bgos", request.url));
+      return NextResponse.redirect(new URL("/bgos/dashboard", request.url));
     }
   }
 
@@ -316,7 +316,7 @@ export async function middleware(request: NextRequest) {
         const p = iceVerified.payload as Record<string, unknown>;
         const em = typeof p.email === "string" ? p.email : "";
         const sb = p.superBoss === true && isSuperBossEmail(em);
-        const homePath = sb ? "/bgos/control" : getRoleHome(String(p.role));
+        const homePath = sb ? "/bgos/dashboard" : getRoleHome(String(p.role));
         return NextResponse.redirect(absoluteRoleHomeUrl(tenant, homePath, request.url));
       }
       return NextResponse.next();
@@ -332,7 +332,7 @@ export async function middleware(request: NextRequest) {
           const p = loginVerified.payload as Record<string, unknown>;
           const em = typeof p.email === "string" ? p.email : "";
           const sb = p.superBoss === true && isSuperBossEmail(em);
-          const homePath = sb ? "/bgos/control" : getRoleHome(String(p.role));
+          const homePath = sb ? "/bgos/dashboard" : getRoleHome(String(p.role));
           return NextResponse.redirect(absoluteRoleHomeUrl(tenant, homePath, request.url));
         }
       }
@@ -405,7 +405,9 @@ export async function middleware(request: NextRequest) {
       normalizedPath === "/api/company/create" ||
       (normalizedPath === "/api/company/list" && request.method === "GET") ||
       (edgeSuperBoss &&
-        (normalizedPath === "/bgos/control" || normalizedPath.startsWith("/bgos/control/"))) ||
+        (normalizedPath === "/bgos/dashboard" ||
+          normalizedPath === "/bgos/control" ||
+          normalizedPath.startsWith("/bgos/control/"))) ||
       (edgeSuperBoss && normalizedPath.startsWith("/api/bgos/control/"));
     if (!allowed) {
       if (pathname.startsWith("/api")) {
@@ -445,7 +447,9 @@ export async function middleware(request: NextRequest) {
         (normalizedPath === "/api/auth/refresh-session" && request.method === "POST") ||
         (normalizedPath === "/api/company/list" && request.method === "GET") ||
         (edgeSuperBoss &&
-          (normalizedPath === "/bgos/control" || normalizedPath.startsWith("/bgos/control/"))) ||
+          (normalizedPath === "/bgos/dashboard" ||
+            normalizedPath === "/bgos/control" ||
+            normalizedPath.startsWith("/bgos/control/"))) ||
         (edgeSuperBoss && normalizedPath.startsWith("/api/bgos/control/"));
       if (!allowedActivation) {
         if (pathname.startsWith("/api")) {
@@ -489,7 +493,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname === "/iceconnect" || pathname === "/iceconnect/") {
-    const homePath = edgeSuperBoss ? "/bgos/control" : getRoleHome(role);
+    const homePath = edgeSuperBoss ? "/bgos/dashboard" : getRoleHome(role);
     if (normalizePathname(homePath) !== normalizePathname(pathname)) {
       return NextResponse.redirect(absoluteRoleHomeUrl(tenant, homePath, request.url));
     }
@@ -503,7 +507,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (!pathname.startsWith("/api") && tenant === "bgos" && edgeSuperBoss && normalizedPath === "/bgos") {
-    return NextResponse.redirect(new URL("/bgos/control", request.url));
+    return NextResponse.redirect(new URL("/bgos/dashboard", request.url));
   }
 
   if (
@@ -514,7 +518,7 @@ export async function middleware(request: NextRequest) {
     normalizedPath !== "/iceconnect/login" &&
     !normalizedPath.startsWith("/iceconnect/login/")
   ) {
-    return NextResponse.redirect(new URL("/bgos/control", publicBgosOrigin()));
+    return NextResponse.redirect(new URL("/bgos/dashboard", publicBgosOrigin()));
   }
 
   if (

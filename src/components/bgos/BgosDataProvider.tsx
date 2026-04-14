@@ -27,6 +27,8 @@ type Ctx = {
   sessionRole: UserRole | null;
   /** Platform owner ({@link process.env.BGOS_BOSS_EMAIL} + session). */
   isSuperBoss: boolean;
+  /** Platform boss with no active company — live `/api/dashboard` is skipped on `/bgos/dashboard`. */
+  superBossNoCompany: boolean;
   /** Permanent Pro / trial bypass for the platform boss email only (server-flagged). */
   bossBillingBypass: boolean;
   refetch: () => void;
@@ -60,6 +62,7 @@ export function BgosDataProvider({ children }: { children: ReactNode }) {
     refetch,
     isLoading,
     syncGeneration,
+    superBossNoCompany,
   } = useBgosData(4000, analyticsRangePreset, onPlanProRequired);
 
   const hasProPlan = useMemo(
@@ -100,6 +103,7 @@ export function BgosDataProvider({ children }: { children: ReactNode }) {
       trialReadOnly,
       sessionRole,
       isSuperBoss,
+      superBossNoCompany,
       bossBillingBypass,
       refetch,
       isLoading,
@@ -117,6 +121,7 @@ export function BgosDataProvider({ children }: { children: ReactNode }) {
       trialReadOnly,
       sessionRole,
       isSuperBoss,
+      superBossNoCompany,
       bossBillingBypass,
       refetch,
       isLoading,

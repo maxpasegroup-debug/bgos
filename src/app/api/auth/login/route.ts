@@ -49,7 +49,7 @@ function internalPostLoginLocation(
   userEmail: string,
 ): string {
   if (isSuperBossEmail(userEmail)) {
-    return "/bgos/control";
+    return "/bgos/dashboard";
   }
   if (needsOnboardingFlow || companyId == null || !workspaceActivated) {
     return "/onboarding";

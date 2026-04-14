@@ -108,7 +108,7 @@ export async function switchActiveCompanyPost(
     select: { internalSalesOrg: true },
   });
   const redirectPath =
-    co?.internalSalesOrg === true ? "/iceconnect/my-journey" : "/bgos";
+    co?.internalSalesOrg === true ? "/iceconnect/my-journey" : "/bgos/dashboard";
 
   const res = NextResponse.json({
     ok: true as const,

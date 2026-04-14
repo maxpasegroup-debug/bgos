@@ -148,6 +148,11 @@ export function useBgosData(
   const controlShell =
     typeof pathname === "string" &&
     (pathname === "/bgos/control" || pathname.startsWith("/bgos/control/"));
+  const bossLandingPath =
+    typeof pathname === "string" && (pathname === "/bgos/dashboard" || pathname === "/bgos");
+  const sbLandingMeChecked = useRef(false);
+  const superBossNoCompanyRef = useRef(false);
+  const [superBossNoCompany, setSuperBossNoCompany] = useState(false);
   const [dashboard, setDashboard] = useState<DashboardPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [companyPlan, setCompanyPlan] = useState<CompanyPlan | null>(null);
@@ -165,8 +170,17 @@ export function useBgosData(
   const [bossBillingBypass, setBossBillingBypass] = useState(false);
   const okOnce = useRef(false);
 
+  useEffect(() => {
+    sbLandingMeChecked.current = false;
+    superBossNoCompanyRef.current = false;
+    setSuperBossNoCompany(false);
+  }, [pathname]);
+
   const refetch = useCallback(() => {
     setError(null);
+    sbLandingMeChecked.current = false;
+    superBossNoCompanyRef.current = false;
+    setSuperBossNoCompany(false);
     setReloadToken((n) => n + 1);
   }, []);
 
@@ -211,38 +225,76 @@ export function useBgosData(
   useEffect(() => {
     let cancelled = false;
 
+    const emptySnapshot = () =>
+      normalizeDashboard({
+        leads: 0,
+        revenue: 0,
+        installations: 0,
+        pendingPayments: 0,
+        pipeline: [],
+        insights: [],
+        salesBooster: { plan: "BASIC", featuresUnlocked: false, companyName: "" },
+        automationCenter: null,
+        nexa: EMPTY_NEXA,
+        operations: EMPTY_OPS,
+        revenueBreakdown: EMPTY_REV,
+        risks: EMPTY_RISKS,
+        health: EMPTY_HEALTH,
+        hr: EMPTY_HR,
+        inventory: EMPTY_INVENTORY,
+        partner: EMPTY_PARTNER,
+        team: [],
+        financial: emptyFinancialOverview(),
+        analytics: EMPTY_ANALYTICS,
+        analyticsRange: EMPTY_ANALYTICS_RANGE,
+      });
+
     const load = async () => {
       if (controlShell) {
         if (!cancelled) {
-          setDashboard(
-            normalizeDashboard({
-              leads: 0,
-              revenue: 0,
-              installations: 0,
-              pendingPayments: 0,
-              pipeline: [],
-              insights: [],
-              salesBooster: { plan: "BASIC", featuresUnlocked: false, companyName: "" },
-              automationCenter: null,
-              nexa: EMPTY_NEXA,
-              operations: EMPTY_OPS,
-              revenueBreakdown: EMPTY_REV,
-              risks: EMPTY_RISKS,
-              health: EMPTY_HEALTH,
-              hr: EMPTY_HR,
-              inventory: EMPTY_INVENTORY,
-              partner: EMPTY_PARTNER,
-              team: [],
-              financial: emptyFinancialOverview(),
-              analytics: EMPTY_ANALYTICS,
-              analyticsRange: EMPTY_ANALYTICS_RANGE,
-            }),
-          );
+          setDashboard(emptySnapshot());
           setError(null);
           okOnce.current = true;
         }
         return;
       }
+
+      if (superBossNoCompanyRef.current) {
+        if (!cancelled) {
+          setDashboard(emptySnapshot());
+          setError(null);
+          okOnce.current = true;
+        }
+        return;
+      }
+
+      if (bossLandingPath && !sbLandingMeChecked.current) {
+        sbLandingMeChecked.current = true;
+        try {
+          const meRes = await fetch("/api/auth/me", { credentials: "include" });
+          if (meRes.ok) {
+            const mj = (await meRes.json()) as {
+              user?: { isSuperBoss?: boolean; companyId?: string | null };
+            };
+            if (
+              mj.user?.isSuperBoss === true &&
+              (mj.user.companyId == null || mj.user.companyId === "")
+            ) {
+              superBossNoCompanyRef.current = true;
+              if (!cancelled) {
+                setSuperBossNoCompany(true);
+                setDashboard(emptySnapshot());
+                setError(null);
+                okOnce.current = true;
+              }
+              return;
+            }
+          }
+        } catch {
+          /* fall through to live dashboard */
+        }
+      }
+
       try {
         const dashUrl = `/api/dashboard?range=${encodeURIComponent(analyticsRangePreset)}`;
         const res = await fetch(dashUrl, { credentials: "include" });
@@ -334,7 +386,7 @@ export function useBgosData(
     };
 
     void load();
-    if (controlShell) {
+    if (controlShell || superBossNoCompanyRef.current) {
       return () => {
         cancelled = true;
       };
@@ -344,9 +396,10 @@ export function useBgosData(
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [pollMs, reloadToken, analyticsRangePreset, onPlanProRequired, controlShell]);
+  }, [pollMs, reloadToken, analyticsRangePreset, onPlanProRequired, controlShell, bossLandingPath]);
 
-  const isLoading = !controlShell && dashboard === null && error === null;
+  const isLoading =
+    !controlShell && !superBossNoCompany && dashboard === null && error === null;
 
   const trialReadOnly = bossBillingBypass ? false : basicTrialExpired;
 
@@ -363,5 +416,6 @@ export function useBgosData(
     syncGeneration,
     isSuperBoss,
     bossBillingBypass,
+    superBossNoCompany,
   };
 }

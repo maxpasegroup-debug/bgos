@@ -93,7 +93,7 @@ function LoginForm() {
         } catch {
           /* non-fatal */
         }
-        router.push("/bgos/control");
+        router.replace("/bgos/dashboard");
         router.refresh();
         return;
       }
@@ -103,7 +103,7 @@ function LoginForm() {
         data.user?.companyId == null ||
         data.user?.needsWorkspaceActivation
       ) {
-        router.push("/onboarding");
+        router.replace("/onboarding");
         router.refresh();
         return;
       }
@@ -121,7 +121,7 @@ function LoginForm() {
           (listJson.ok && Array.isArray(listJson.companies) && listJson.companies.length > 1) ||
           (Array.isArray(data.companies) && data.companies.length > 1);
         if (multiCompany) {
-          router.push("/iceconnect/select-company");
+          router.replace("/iceconnect/select-company");
           router.refresh();
           return;
         }
@@ -133,18 +133,24 @@ function LoginForm() {
         /* non-fatal */
       }
 
+      if (role === "ADMIN") {
+        router.replace("/bgos/dashboard");
+        router.refresh();
+        return;
+      }
+
       const nav = resolveAfterLoginNavigation({
         role,
         from,
         hostname: typeof window !== "undefined" ? window.location.hostname : "",
       });
       if (nav.kind === "external") {
-        window.location.assign(nav.url);
+        window.location.replace(nav.url);
         return;
       }
       const serverPath =
         typeof data.nextPath === "string" && data.nextPath.startsWith("/") ? data.nextPath : null;
-      router.push(serverPath ?? nav.path);
+      router.replace(serverPath ?? nav.path);
       router.refresh();
     } catch {
       setError("Network error");

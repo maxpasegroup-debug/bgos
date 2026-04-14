@@ -60,7 +60,7 @@ export function BgosHeader() {
     companyName: null,
     billing: null,
   });
-  const logoHref = isSuperBoss ? "/bgos/control" : "/bgos";
+  const logoHref = "/bgos/dashboard";
   const profileRef = useRef<HTMLDivElement | null>(null);
   const notifRef = useRef<HTMLDivElement | null>(null);
 

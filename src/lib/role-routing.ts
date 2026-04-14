@@ -4,7 +4,7 @@
  */
 
 export const ROLE_HOME: Readonly<Record<string, string>> = {
-  ADMIN: "/bgos",
+  ADMIN: "/bgos/dashboard",
   MANAGER: "/iceconnect/internal-sales",
   SALES_EXECUTIVE: "/iceconnect/my-journey",
   TELECALLER: "/iceconnect/my-journey",
@@ -333,8 +333,8 @@ function superBossAllowedPath(p: string): boolean {
 
 /**
  * Whether this role may access this pathname (pages + role-scoped APIs).
- * Platform boss uses `/bgos/control` as home; `/bgos` and `/iceconnect/*` are blocked on purpose,
- * while `/bgos/*` still works after opening a company from Control.
+ * Platform boss lands on `/bgos/dashboard`; `/bgos` (index) and `/iceconnect/*` are blocked on purpose,
+ * while `/bgos/*` still works including `/bgos/control` after opening a company from Control.
  */
 export function roleCanAccessPath(
   role: string,
@@ -390,7 +390,7 @@ export function postLoginDestination(
   opts?: RoleAccessOpts,
 ): string {
   if (opts?.superBoss === true) {
-    return "/bgos/control";
+    return "/bgos/dashboard";
   }
   if (from && from.startsWith("/") && roleCanAccessPath(role, from, opts)) {
     return from;

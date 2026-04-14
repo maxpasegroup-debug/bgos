@@ -16,7 +16,7 @@ type NavDef = {
 };
 
 const primaryNav: NavDef[] = [
-  { id: "home", label: "Home", href: "/bgos", icon: HomeIcon },
+  { id: "home", label: "Home", href: "/bgos/dashboard", icon: HomeIcon },
   { id: "sales", label: "Sales", href: "/bgos/sales", icon: SalesIcon },
   { id: "operations", label: "Operations", href: "/bgos/operations", icon: OpsIcon },
   { id: "team", label: "Team", href: "/bgos/hr", icon: TeamIcon },
@@ -70,7 +70,8 @@ export function BgosSidebar() {
     if (item.href.startsWith("/bgos/control#")) {
       return pathname === "/bgos/control";
     }
-    if (item.href === "/bgos") return pathname === "/bgos";
+    if (item.href === "/bgos/dashboard")
+      return pathname === "/bgos/dashboard" || pathname === "/bgos";
     return pathname === item.href || pathname.startsWith(`${item.href}/`);
   }
 

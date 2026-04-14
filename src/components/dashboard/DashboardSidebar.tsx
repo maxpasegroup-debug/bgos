@@ -6,23 +6,23 @@ import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
 
 const navItems = [
-  { id: "home", label: "Home", href: "/dashboard", icon: HomeIcon },
-  { id: "sales", label: "Sales", href: "/dashboard#sales", icon: SalesIcon },
+  { id: "home", label: "Home", href: "/bgos/dashboard", icon: HomeIcon },
+  { id: "sales", label: "Sales", href: "/bgos/sales", icon: SalesIcon },
   {
     id: "operations",
     label: "Operations",
-    href: "/dashboard#operations",
+    href: "/bgos/operations",
     icon: OpsIcon,
   },
-  { id: "team", label: "Team", href: "/dashboard#team", icon: TeamIcon },
+  { id: "team", label: "Team", href: "/bgos/hr", icon: TeamIcon },
   {
     id: "revenue",
     label: "Revenue",
-    href: "/dashboard#revenue",
+    href: "/bgos/revenue",
     icon: RevenueIcon,
   },
-  { id: "risks", label: "Risks", href: "/dashboard#risks", icon: RisksIcon },
-  { id: "nexa", label: "NEXA", href: "/dashboard#nexa", icon: NexaIcon },
+  { id: "risks", label: "Risks", href: "/bgos/risks", icon: RisksIcon },
+  { id: "nexa", label: "NEXA", href: "/bgos/nexa", icon: NexaIcon },
 ] as const;
 
 export function DashboardSidebar() {
@@ -32,7 +32,11 @@ export function DashboardSidebar() {
     <aside className="fixed bottom-0 left-0 top-0 z-40 flex w-[4.5rem] flex-col overflow-visible border-r border-white/10 bg-[#0B0F19]/95 py-4 backdrop-blur-xl sm:w-[4.75rem] sm:py-6">
       <nav className="flex flex-1 flex-col items-center gap-1 px-2 sm:gap-2">
         {navItems.map((item) => {
-          const active = pathname === item.href.split("#")[0] && item.id === "home";
+          const base = item.href.split("#")[0] ?? item.href;
+          const active =
+            item.id === "home"
+              ? pathname === base || pathname === "/bgos"
+              : pathname === base || pathname.startsWith(`${base}/`);
           return (
             <SidebarLink
               key={item.id}
