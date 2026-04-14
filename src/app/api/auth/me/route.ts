@@ -154,8 +154,13 @@ export async function GET() {
           jwtSuperBoss = (vr.payload as Record<string, unknown>).superBoss === true;
         }
       }
-      const isSuperBoss =
-        jwtSuperBoss === true && isSuperBossEmail(session.user.email) === true;
+      /** Email is JWT-verified; do not require `superBoss` claim so UI matches control APIs after token refresh. */
+      const isSuperBoss = isSuperBossEmail(session.user.email) === true;
+      if (isSuperBoss && !jwtSuperBoss) {
+        console.warn(
+          "[auth/me] BGOS_BOSS_EMAIL session without JWT superBoss claim — re-login or POST /api/auth/refresh-session.",
+        );
+      }
       const bossLocked = isBossReady(session.user.role, session.user.companyId);
       return jsonSuccess({
         authenticated: true as const,

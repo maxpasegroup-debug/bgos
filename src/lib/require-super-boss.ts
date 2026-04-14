@@ -2,7 +2,7 @@ import "server-only";
 
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { type AuthUser, getTokenFromRequest, requireAuth } from "@/lib/auth";
+import { type AuthUser, getAuthUser, getAuthUserFromToken, getTokenFromRequest } from "@/lib/auth";
 import { verifyAccessTokenResult } from "@/lib/jwt";
 import { getBgosBossEmail, isSuperBossEmail } from "@/lib/super-boss";
 
@@ -13,10 +13,12 @@ import { getBgosBossEmail, isSuperBossEmail } from "@/lib/super-boss";
 export function requireSuperBossApi(
   request: NextRequest | Request,
 ): AuthUser | NextResponse {
-  const user = requireAuth(request);
-  if (user instanceof NextResponse) return user;
   const token = getTokenFromRequest(request);
-  if (!token) {
+  let user = getAuthUser(request);
+  if (!user && token) {
+    user = getAuthUserFromToken(token);
+  }
+  if (!user || !token) {
     return NextResponse.json(
       { ok: false as const, error: "Unauthorized", code: "UNAUTHORIZED" as const },
       { status: 401 },

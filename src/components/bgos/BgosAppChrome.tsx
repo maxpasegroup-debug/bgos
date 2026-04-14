@@ -12,7 +12,8 @@ import { PlanUpgradeBanner } from "./PlanUpgradeBanner";
 import { useBgosTheme } from "./BgosThemeContext";
 
 export function BgosAppChrome({ children }: { children: ReactNode }) {
-  const { companyPlan, planLockedToBasic, trialReadOnly } = useBgosDashboardContext();
+  const { companyPlan, planLockedToBasic, trialReadOnly, controlShell } =
+    useBgosDashboardContext();
   const { theme } = useBgosTheme();
   const light = theme === "light";
 
@@ -30,7 +31,9 @@ export function BgosAppChrome({ children }: { children: ReactNode }) {
       <BgosSidebar />
       <div className={`relative flex min-h-screen flex-col ${BGOS_SIDEBAR_PAD}`}>
         <BgosHeader />
-        {!planLockedToBasic && !trialReadOnly ? <PlanUpgradeBanner plan={companyPlan} /> : null}
+        {!controlShell && !planLockedToBasic && !trialReadOnly ? (
+          <PlanUpgradeBanner plan={companyPlan} />
+        ) : null}
         <div className="relative z-10 flex-1">{children}</div>
         <BgosCheckoutSuccess />
       </div>

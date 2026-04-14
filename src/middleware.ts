@@ -15,6 +15,7 @@ import {
   AUTH_HEADER_USER_ROLE,
   AUTH_HEADER_PREFIX,
   AUTH_HEADER_SUPER_BOSS,
+  AUTH_HEADER_MW_PATHNAME,
   AUTH_JWT_ISSUER,
   pathnameRequiresProPlan,
 } from "@/lib/auth-config";
@@ -679,6 +680,7 @@ export async function middleware(request: NextRequest) {
     );
   }
 
+  requestHeaders.set(AUTH_HEADER_MW_PATHNAME, normalizedPath);
   return NextResponse.next({
     request: { headers: requestHeaders },
   });

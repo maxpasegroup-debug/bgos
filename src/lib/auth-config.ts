@@ -20,6 +20,8 @@ export const AUTH_HEADER_NEEDS_COMPANY = "x-bgos-needs-company";
 export const AUTH_HEADER_WORKSPACE_READY = "x-bgos-workspace-ready";
 /** `"1"` when JWT carries `superBoss: true` (BGOS_BOSS_EMAIL owner mode). */
 export const AUTH_HEADER_SUPER_BOSS = "x-bgos-super-boss";
+/** Set by middleware to the normalized request path (for RSC / client shell hints). Not a trust boundary. */
+export const AUTH_HEADER_MW_PATHNAME = "x-bgos-mw-pathname";
 /**
  * `BASIC` | `PRO` | `ENTERPRISE` for the **active** company (cookie + JWT `memberships[].plan`).
  * Edge middleware gates Pro+ APIs using this header (PRO and ENTERPRISE both pass Pro gates).

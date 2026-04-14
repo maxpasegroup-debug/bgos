@@ -14,6 +14,8 @@ import { dashboardRangeRequiresPro, type DashboardRangePreset } from "@/lib/dash
 import { type DashboardPayload, useBgosData } from "./useBgosData";
 
 type Ctx = {
+  /** BGOS internal control plane (`/bgos/control/*`) — not tenant solar shell. */
+  controlShell: boolean;
   dashboard: DashboardPayload | null;
   error: string | null;
   companyPlan: CompanyPlan | null;
@@ -41,7 +43,15 @@ type Ctx = {
 
 const BgosDataContext = createContext<Ctx | null>(null);
 
-export function BgosDataProvider({ children }: { children: ReactNode }) {
+export function BgosDataProvider({
+  children,
+  initialSuperBoss = false,
+  serverPathname = "",
+}: {
+  children: ReactNode;
+  initialSuperBoss?: boolean;
+  serverPathname?: string;
+}) {
   const [analyticsRangePreset, setAnalyticsRangePresetState] =
     useState<DashboardRangePreset>("this_month");
 
@@ -50,6 +60,7 @@ export function BgosDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const {
+    controlShell,
     dashboard,
     error,
     companyPlan,
@@ -63,7 +74,10 @@ export function BgosDataProvider({ children }: { children: ReactNode }) {
     isLoading,
     syncGeneration,
     superBossNoCompany,
-  } = useBgosData(4000, analyticsRangePreset, onPlanProRequired);
+  } = useBgosData(4000, analyticsRangePreset, onPlanProRequired, {
+    initialSuperBoss,
+    serverPathname,
+  });
 
   const hasProPlan = useMemo(
     () =>
@@ -94,6 +108,7 @@ export function BgosDataProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(
     () => ({
+      controlShell,
       dashboard,
       error,
       companyPlan,
@@ -112,6 +127,7 @@ export function BgosDataProvider({ children }: { children: ReactNode }) {
       setAnalyticsRangePreset,
     }),
     [
+      controlShell,
       dashboard,
       error,
       companyPlan,

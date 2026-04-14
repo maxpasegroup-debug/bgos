@@ -38,8 +38,9 @@ const moreNav: NavDef[] = [
 ];
 
 export function BgosSidebar() {
-  const pathname = usePathname();
-  const { hasProPlan, planLockedToBasic, isSuperBoss, bossBillingBypass } = useBgosDashboardContext();
+  const pathname = usePathname() ?? "";
+  const { hasProPlan, planLockedToBasic, bossBillingBypass, controlShell } =
+    useBgosDashboardContext();
   const { theme } = useBgosTheme();
   const light = theme === "light";
   const [moreOpen, setMoreOpen] = useState(false);
@@ -74,10 +75,6 @@ export function BgosSidebar() {
       return pathname === "/bgos/dashboard" || pathname === "/bgos";
     return pathname === item.href || pathname.startsWith(`${item.href}/`);
   }
-
-  const controlShell =
-    isSuperBoss &&
-    (pathname === "/bgos/control" || pathname.startsWith("/bgos/control/"));
 
   const shell = light
     ? "border-slate-200/90 bg-white/90 shadow-[4px_0_24px_-8px_rgba(15,23,42,0.08)]"

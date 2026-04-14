@@ -6,10 +6,18 @@ import { BgosDataProvider } from "./BgosDataProvider";
 import { BgosThemeProvider } from "./BgosThemeContext";
 import { BgosUpgradeModalProvider } from "./BgosUpgradeModalContext";
 
-export function BgosProviders({ children }: { children: ReactNode }) {
+export function BgosProviders({
+  children,
+  initialSuperBoss = false,
+  serverPathname = "",
+}: {
+  children: ReactNode;
+  initialSuperBoss?: boolean;
+  serverPathname?: string;
+}) {
   return (
     <BgosThemeProvider>
-      <BgosDataProvider>
+      <BgosDataProvider initialSuperBoss={initialSuperBoss} serverPathname={serverPathname}>
         <BgosUpgradeModalProvider>
           <BgosAppChrome>{children}</BgosAppChrome>
         </BgosUpgradeModalProvider>

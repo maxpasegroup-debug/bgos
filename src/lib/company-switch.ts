@@ -4,10 +4,9 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { parseJsonBody, zodValidationErrorResponse } from "@/lib/api-response";
-import { getTokenFromRequest, requireAuth } from "@/lib/auth";
+import { requireAuth } from "@/lib/auth";
 import { requireActiveCompanyMembership } from "@/lib/auth";
 import { MintSessionTokenError, mintSessionAccessTokenForUser } from "@/lib/mint-session-token";
-import { verifyAccessTokenResult } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/route-error";
 import { SUPER_BOSS_HOME_PATH } from "@/lib/role-routing";
@@ -47,11 +46,7 @@ export async function switchActiveCompanyPost(
 
   const { companyId } = parsed.data;
 
-  const tokenStr = getTokenFromRequest(request);
-  const vr = tokenStr ? verifyAccessTokenResult(tokenStr) : { ok: false as const };
-  const payload = vr.ok ? (vr.payload as Record<string, unknown>) : null;
-  const jwtSuperBoss = payload?.superBoss === true;
-  const superBossOk = jwtSuperBoss === true && isSuperBossEmail(auth.email);
+  const superBossOk = isSuperBossEmail(auth.email);
 
   if (!superBossOk) {
     const session = await requireActiveCompanyMembership(request);

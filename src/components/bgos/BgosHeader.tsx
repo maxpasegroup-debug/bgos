@@ -47,8 +47,8 @@ function roleLabel(role: string): string {
 }
 
 export function BgosHeader() {
-  const pathname = usePathname();
-  const { trialReadOnly, isSuperBoss, bossBillingBypass } = useBgosDashboardContext();
+  const pathname = usePathname() ?? "";
+  const { trialReadOnly, isSuperBoss, bossBillingBypass, controlShell } = useBgosDashboardContext();
   const { theme, toggleTheme } = useBgosTheme();
   const light = theme === "light";
   const reduceMotion = useReducedMotion();
@@ -63,7 +63,8 @@ export function BgosHeader() {
     companyName: null,
     billing: null,
   });
-  const logoHref = isSuperBoss ? SUPER_BOSS_HOME_PATH : "/bgos/dashboard";
+  const logoHref =
+    controlShell || isSuperBoss ? SUPER_BOSS_HOME_PATH : "/bgos/dashboard";
   const profileRef = useRef<HTMLDivElement | null>(null);
   const notifRef = useRef<HTMLDivElement | null>(null);
 
@@ -175,7 +176,9 @@ export function BgosHeader() {
             height={32}
           />
         </Link>
-        {isSuperBoss || bossBillingBypass ? null : <BgosCompanySwitcher light={light} />}
+        {controlShell || isSuperBoss || bossBillingBypass ? null : (
+          <BgosCompanySwitcher light={light} />
+        )}
         <h1
           className={
             light
@@ -183,9 +186,7 @@ export function BgosHeader() {
               : "min-w-0 flex-1 truncate text-center text-xs font-semibold tracking-wide text-white/90 sm:text-sm"
           }
         >
-          {pathname === "/bgos/control" || pathname.startsWith("/bgos/control/")
-            ? "BGOS Control"
-            : "Business overview"}
+          {controlShell ? "BGOS Control" : "Business overview"}
         </h1>
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
           <motion.button

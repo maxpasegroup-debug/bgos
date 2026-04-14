@@ -140,17 +140,27 @@ function normalizeDashboard(d: DashboardPayload): DashboardPayload {
   };
 }
 
+export type UseBgosDataOpts = {
+  /** From RSC layout — avoids solar-shell flash before `/api/auth/me` resolves. */
+  initialSuperBoss?: boolean;
+  /** Middleware pathname hint for first paint when client pathname lags. */
+  serverPathname?: string;
+};
+
 export function useBgosData(
   pollMs = 4000,
   analyticsRangePreset: string = "this_month",
   onPlanProRequired?: () => void,
+  opts?: UseBgosDataOpts,
 ) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
+  const pathForShell =
+    pathname ||
+    (typeof opts?.serverPathname === "string" ? opts.serverPathname : "");
   const controlShell =
-    typeof pathname === "string" &&
-    (pathname === "/bgos/control" || pathname.startsWith("/bgos/control/"));
+    pathForShell === "/bgos/control" || pathForShell.startsWith("/bgos/control/");
   const bossLandingPath =
-    typeof pathname === "string" && (pathname === "/bgos/dashboard" || pathname === "/bgos");
+    pathname === "/bgos/dashboard" || pathname === "/bgos";
   const sbLandingMeChecked = useRef(false);
   const superBossNoCompanyRef = useRef(false);
   const [superBossNoCompany, setSuperBossNoCompany] = useState(false);
@@ -167,7 +177,7 @@ export function useBgosData(
   const [reloadToken, setReloadToken] = useState(0);
   /** Bumped after each successful `/api/dashboard` load so pipeline / lists stay in sync. */
   const [syncGeneration, setSyncGeneration] = useState(0);
-  const [isSuperBoss, setIsSuperBoss] = useState(false);
+  const [isSuperBoss, setIsSuperBoss] = useState(() => Boolean(opts?.initialSuperBoss));
   const [bossBillingBypass, setBossBillingBypass] = useState(false);
   const okOnce = useRef(false);
 
@@ -405,7 +415,15 @@ export function useBgosData(
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [pollMs, reloadToken, analyticsRangePreset, onPlanProRequired, controlShell, bossLandingPath]);
+  }, [
+    pollMs,
+    reloadToken,
+    analyticsRangePreset,
+    onPlanProRequired,
+    controlShell,
+    bossLandingPath,
+    pathname,
+  ]);
 
   const isLoading =
     !controlShell && !superBossNoCompany && dashboard === null && error === null;
@@ -426,5 +444,6 @@ export function useBgosData(
     isSuperBoss,
     bossBillingBypass,
     superBossNoCompany,
+    controlShell,
   };
 }
