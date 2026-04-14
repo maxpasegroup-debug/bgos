@@ -12,6 +12,7 @@ import { verifyPassword } from "@/lib/password";
 import { signAccessToken } from "@/lib/jwt";
 import { isBossReady } from "@/lib/boss-ready";
 import {
+  MICRO_FRANCHISE_HOME_PATH,
   postLoginDestination,
   SUPER_BOSS_HOME_PATH,
   TECH_EXEC_HOME_PATH,
@@ -60,6 +61,9 @@ function internalPostLoginLocation(
   }
   if (role === UserRole.TECH_EXECUTIVE) {
     return TECH_EXEC_HOME_PATH;
+  }
+  if (role === UserRole.MICRO_FRANCHISE) {
+    return MICRO_FRANCHISE_HOME_PATH;
   }
   if (isBossReady(role, companyId)) {
     return "/bgos/dashboard";
@@ -308,19 +312,23 @@ export async function POST(request: Request) {
 
     const hostHeader = request.headers.get("host");
     const needsCrossDomainHandoff = crossDomainLoginRequired(hostHeader, effectiveRole);
+    const forcePasswordReset = user.firstLogin === true;
     const nextPath = boss
       ? SUPER_BOSS_HOME_PATH
       : effectiveRole === UserRole.TECH_EXECUTIVE
         ? TECH_EXEC_HOME_PATH
-      : isBossReady(effectiveRole, companyId)
-        ? "/bgos/dashboard"
-        : internalPostLoginLocation(
-            effectiveRole,
-            parsed.data.from?.trim() || undefined,
-            companyId,
-            Boolean(user.workspaceActivatedAt),
-            user.email,
-          );
+        : effectiveRole === UserRole.MICRO_FRANCHISE
+          ? MICRO_FRANCHISE_HOME_PATH
+          : isBossReady(effectiveRole, companyId)
+            ? "/bgos/dashboard"
+            : internalPostLoginLocation(
+                effectiveRole,
+                parsed.data.from?.trim() || undefined,
+                companyId,
+                Boolean(user.workspaceActivatedAt),
+                user.email,
+              );
+    const forcedNextPath = forcePasswordReset ? "/iceconnect/profile?forcePasswordReset=1" : nextPath;
 
     // Cookie setting — structured body: { success, user } plus fields used by existing clients.
     const res = NextResponse.json(
@@ -331,8 +339,10 @@ export async function POST(request: Request) {
         companies: companiesPayload,
         needsCompanySelection: boss ? false : companiesPayload.length > 1,
         needsCrossDomainHandoff,
-        nextPath,
+        nextPath: forcedNextPath,
         isSuperBoss: boss,
+        firstLogin: forcePasswordReset,
+        ...(forcePasswordReset ? { code: "FORCE_PASSWORD_RESET" as const } : {}),
       },
       { status: 200 },
     );
@@ -342,7 +352,7 @@ export async function POST(request: Request) {
     }
     console.info("[auth/login] response", {
       userId: user.id,
-      nextPath,
+      nextPath: forcedNextPath,
       needsCrossDomainHandoff,
       userPayloadRole: userPayload.role,
       userPayloadCompanyId: userPayload.companyId,

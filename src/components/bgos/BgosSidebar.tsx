@@ -495,6 +495,8 @@ const superBossControlNav: NavDef[] = [
   { id: "sb-clients", label: "Clients", href: "/bgos/control/clients", icon: BuildingIcon },
   { id: "sb-team", label: "My Team", href: "/bgos/control/team", icon: TeamIcon },
   { id: "sb-sales", label: "Sales", href: "/bgos/control/sales", icon: SalesIcon },
+  { id: "sb-partners", label: "Channel Partners", href: "/bgos/control/sales/channel-partners", icon: CustomerIcon },
+  { id: "sb-mf", label: "Micro Franchise", href: "/bgos/control/micro-franchise", icon: NexaIcon },
   { id: "sb-tech", label: "Technical Dept", href: "/bgos/control/technical", icon: OpsIcon },
   { id: "sb-accounts", label: "Accounts", href: "/bgos/control/accounts", icon: BillingIcon },
   { id: "sb-vision", label: "Vision & Targets", href: "/bgos/control/vision", icon: PricingIcon },

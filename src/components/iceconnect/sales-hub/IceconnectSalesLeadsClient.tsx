@@ -1,7 +1,8 @@
 "use client";
 
 
-import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
+import { apiFetch, formatFetchFailure, readApiJson } from "@/lib/api-fetch";
+import { publicBgosOrigin } from "@/lib/host-routing";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -94,6 +95,7 @@ export function IceconnectSalesLeadsClient() {
   const [accountOpenLeadId, setAccountOpenLeadId] = useState<string | null>(null);
   const [accountIndustry, setAccountIndustry] = useState<"solar" | "custom">("solar");
   const [accountMode, setAccountMode] = useState<"send_form" | "fill_for_client">("send_form");
+  const [shareExecId, setShareExecId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setErr(null);
@@ -131,6 +133,26 @@ export function IceconnectSalesLeadsClient() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch("/api/auth/me", { credentials: "include" });
+        const j = ((await readApiJson(res, "auth/me-leads")) ?? {}) as {
+          ok?: boolean;
+          user?: { id?: string };
+        };
+        if (cancelled || !res.ok || j.ok !== true || !j.user?.id) return;
+        setShareExecId(j.user.id);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filteredLeads = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -256,6 +278,45 @@ export function IceconnectSalesLeadsClient() {
           Create Lead
         </button>
       </div>
+
+      {shareExecId ? (
+        <div className="rounded-2xl border border-indigo-200 bg-gradient-to-r from-indigo-50 to-violet-50 p-4 shadow-sm">
+          <p className="text-sm font-semibold text-indigo-950">Share Online Micro Franchise</p>
+          <p className="mt-1 text-xs text-indigo-900/80">
+            Applicants use Nexa on BGOS — your ref is tracked automatically.
+          </p>
+          <p className="mt-2 break-all font-mono text-[11px] text-indigo-800">
+            {`${publicBgosOrigin()}/micro-franchise/apply?ref=${encodeURIComponent(shareExecId)}`}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white"
+              onClick={async () => {
+                const url = `${publicBgosOrigin()}/micro-franchise/apply?ref=${encodeURIComponent(shareExecId)}`;
+                try {
+                  await navigator.clipboard.writeText(url);
+                  setErr(null);
+                } catch {
+                  setErr("Could not copy link — copy manually from the text above.");
+                }
+              }}
+            >
+              Copy link
+            </button>
+            <a
+              className="rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-800"
+              href={`https://wa.me/?text=${encodeURIComponent(
+                `Apply for BGOS Micro Franchise (takes 2 min): ${publicBgosOrigin()}/micro-franchise/apply?ref=${encodeURIComponent(shareExecId)}`,
+              )}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              WhatsApp share
+            </a>
+          </div>
+        </div>
+      ) : null}
 
       {stats ? (
         <motion.div

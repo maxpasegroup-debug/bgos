@@ -30,6 +30,8 @@ enum UserRole {
   ACCOUNTANT
   LCO
   HR_MANAGER
+  /** Online micro-franchise partner (ICECONNECT workspace, referral + wallet). */
+  MICRO_FRANCHISE
 }
 
 enum CompanyPlan {
@@ -279,6 +281,12 @@ model Company {
 
   /** Platform (super boss): hide archived tenants from the client directory. */
   archivedAt DateTime?
+  /** Optional referral phone captured at launch. */
+  referralPhone String?
+  /** Sales-launch channel partner (cross-company referral tracking). */
+  launchChannelPartnerId String?
+  /** Micro-franchise partner linked by referral phone (takes precedence over channel partner when matched). */
+  microFranchisePartnerId String?
 
   owner         User            @relation("OwnedCompany", fields: [ownerId], references: [id], onDelete: Restrict)
   memberships   UserCompany[]
@@ -320,9 +328,15 @@ model Company {
   salesExecutiveMonthlyTargets SalesExecutiveMonthlyTarget[]
   onboardingFormTemplates      OnboardingFormTemplate[]
   onboardingSubmissions        OnboardingSubmission[]
+  launchChannelPartner         LaunchChannelPartner? @relation("LaunchPartnerCompany", fields: [launchChannelPartnerId], references: [id], onDelete: SetNull)
+  microFranchisePartner        MicroFranchisePartner? @relation(fields: [microFranchisePartnerId], references: [id], onDelete: SetNull)
+  microFranchiseCommissionTxs    CommissionTransaction[]
+  techRequests                 TechRequest[]
 
   @@index([name])
   @@index([ownerId])
+  @@index([launchChannelPartnerId])
+  @@index([microFranchisePartnerId])
 }
 
 /** Boss monthly targets on Home — drives projections (1Y / multi-year copy). */
@@ -468,6 +482,8 @@ model User {
   createdAt DateTime  @default(now())
   /** Set when the boss completes onboarding step 2 (NEXA activation). Invited employees get this on create. */
   workspaceActivatedAt DateTime?
+  /** Force one-time password reset on first successful login. */
+  firstLogin Boolean @default(false)
 
   companiesOwned       Company[]        @relation("OwnedCompany")
   memberships          UserCompany[]
@@ -493,8 +509,149 @@ model User {
   onboardingSubmissionsFilled  OnboardingSubmission[] @relation("OnboardingFilledBy")
   onboardingSubmissionsTech    OnboardingSubmission[] @relation("OnboardingTechAssignee")
   onboardingWorkflowMessages   OnboardingMessage[]
+  onboardingSessionsCreated    OnboardingSession[] @relation("OnboardingSessionCreator")
+  microFranchiseReferrals        MicroFranchiseApplication[] @relation("MicroFranchiseReferrer")
+  microFranchiseAssignments      MicroFranchiseApplication[] @relation("MicroFranchiseAssignee")
+  microFranchisePartner          MicroFranchisePartner?
 
   @@index([email])
+}
+
+/** Sales-launch referral partner registry (cross-company). */
+model LaunchChannelPartner {
+  id           String   @id @default(cuid())
+  phone        String   @unique
+  name         String?
+  totalRevenue Float    @default(0)
+  conversions  Int      @default(0)
+  createdAt    DateTime @default(now())
+  companies    Company[] @relation("LaunchPartnerCompany")
+}
+
+/** Sales launch session used by Nexa chat onboarding flow. */
+model OnboardingSession {
+  id              String   @id @default(cuid())
+  companyName     String
+  industry        String
+  rawTeamInput    String
+  parsedTeam      Json
+  unknownRoles    Json
+  status          String   @default("draft")
+  createdByUserId String
+  createdAt       DateTime @default(now())
+
+  creator User @relation("OnboardingSessionCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+
+  @@index([createdByUserId, createdAt])
+  @@index([status])
+}
+
+/** Tech exception queue created from launch unknown roles. */
+model TechRequest {
+  id          String   @id @default(cuid())
+  roleName    String
+  description String?
+  companyId   String?
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([companyId])
+}
+
+/** Online micro-franchise applicant pipeline (APPLICATION → … → APPROVED). */
+model MicroFranchiseApplication {
+  id             String   @id @default(cuid())
+  name           String
+  phone          String
+  email          String?
+  location       String?
+  experience     String?
+  /// APPLICATION | REVIEW | TRAINING | MOU | APPROVED | REJECTED
+  status         String   @default("APPLICATION")
+  referredById   String?
+  assignedToId   String?
+  /// JSON array: { at: ISO string, body: string, authorEmail?: string }
+  notes          Json     @default("[]")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  referredBy User? @relation("MicroFranchiseReferrer", fields: [referredById], references: [id], onDelete: SetNull)
+  assignedTo User? @relation("MicroFranchiseAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  partner    MicroFranchisePartner?
+
+  @@index([status, createdAt])
+  @@index([referredById])
+  @@index([phone])
+}
+
+/** Commission template for micro-franchise offers (boss-managed). */
+model CommissionPlan {
+  id           String   @id @default(cuid())
+  name         String
+  /// PERCENTAGE | FIXED
+  type         String
+  value        Float
+  recurring    Boolean  @default(false)
+  instantBonus Float?
+  createdAt    DateTime @default(now())
+
+  partners MicroFranchisePartner[]
+}
+
+/** Activated micro-franchise partner (ICECONNECT login + referral phone as ID). */
+model MicroFranchisePartner {
+  id               String   @id @default(cuid())
+  applicationId    String?  @unique
+  name             String
+  phone            String   @unique
+  email            String?
+  userId           String   @unique
+  commissionPlanId String?
+  createdAt        DateTime @default(now())
+
+  application      MicroFranchiseApplication? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  user             User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commissionPlan   CommissionPlan?            @relation(fields: [commissionPlanId], references: [id], onDelete: SetNull)
+  wallet           Wallet?
+  companies        Company[]
+  commissionTransactions CommissionTransaction[]
+
+  @@index([commissionPlanId])
+}
+
+model Wallet {
+  id          String   @id @default(cuid())
+  partnerId   String   @unique
+  balance     Float    @default(0)
+  pending     Float    @default(0)
+  totalEarned Float    @default(0)
+  updatedAt   DateTime @updatedAt
+
+  partner MicroFranchisePartner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+}
+
+model CommissionTransaction {
+  id         String   @id @default(cuid())
+  partnerId  String
+  companyId  String
+  amount     Float
+  /// RECURRING | ONE_TIME
+  type       String
+  /// PENDING (awaiting boss release) | RELEASED (in partner balance) | PAID_OUT
+  status     String   @default("PENDING")
+  /// Idempotency: Razorpay payment id when commission sourced from subscription payment.
+  paymentRef String?  @unique
+  createdAt  DateTime @default(now())
+
+  partner MicroFranchisePartner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  company Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId, createdAt])
+  @@index([companyId])
+  @@index([status])
 }
 
 /** Monthly sales target + salary for ICECONNECT executives (internal org). */

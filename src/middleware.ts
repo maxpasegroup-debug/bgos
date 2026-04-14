@@ -66,6 +66,7 @@ function isOnboardingPublicPath(p: string): boolean {
 function isPublicRoute(pathname: string): boolean {
   const p = normalizePathname(pathname);
   if (isOnboardingPublicPath(p)) return true;
+  if (p === "/micro-franchise/apply" || p.startsWith("/micro-franchise/apply")) return true;
   for (const route of PUBLIC_ROUTES) {
     if (p === route || p.startsWith(`${route}/`)) return true;
   }
@@ -83,6 +84,7 @@ function skipsMiddlewareAuth(pathname: string, method: string): boolean {
   if (isRootPath(pathname)) return true;
   if (normalizePathname(pathname) === "/lead") return true;
   if (pathname === "/api/internal-sales/public/lead" && method === "POST") return true;
+  if (pathname === "/api/micro-franchise/apply" && method === "POST") return true;
   if (pathname === "/api/internal-sales/cron/automation" && method === "POST") return true;
   if (pathname.startsWith("/api/onboarding/workflow/public/")) return true;
   if (isPublicRoute(pathname)) return true;

@@ -4,6 +4,7 @@ import Razorpay from "razorpay";
 import { jsonError } from "@/lib/api-response";
 import { handleApiError } from "@/lib/route-error";
 import { prisma } from "@/lib/prisma";
+import { accrueMicroFranchiseCommission } from "@/lib/micro-franchise-commission";
 import {
   applySuccessfulRazorpayPayment,
   decodeRazorpayOrderNotes,
@@ -106,7 +107,7 @@ export async function POST(request: NextRequest) {
 
     const userId = notes.userId && notes.userId.length > 0 ? notes.userId : company.ownerId;
 
-    await applySuccessfulRazorpayPayment({
+    const { applied } = await applySuccessfulRazorpayPayment({
       companyId: notes.companyId,
       userId,
       targetPlan: notes.plan,
@@ -115,6 +116,14 @@ export async function POST(request: NextRequest) {
       amountPaise: normalized.amountPaise,
       currency: normalized.currency,
     });
+
+    if (applied) {
+      await accrueMicroFranchiseCommission({
+        companyId: notes.companyId,
+        amountPaise: normalized.amountPaise,
+        paymentRef: normalized.paymentId,
+      });
+    }
 
     if (eventId) {
       await recordRazorpayWebhookDedup(eventId, eventType);

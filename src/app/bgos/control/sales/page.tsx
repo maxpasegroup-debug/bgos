@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useBgosTheme } from "@/components/bgos/BgosThemeContext";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
 import { apiFetch, formatFetchFailure, readApiJson } from "@/lib/api-fetch";
@@ -14,10 +15,20 @@ type SalesJson = {
   perEmployee?: { userId: string | null; name: string; email: string | null; leadCount: number }[];
 };
 
+type PartnerRow = {
+  id: string;
+  phone: string;
+  name?: string | null;
+  companiesCount: number;
+  conversions: number;
+  totalRevenue: number;
+};
+
 export default function ControlSalesPage() {
   const { theme } = useBgosTheme();
   const light = theme === "light";
   const [data, setData] = useState<SalesJson | null>(null);
+  const [partners, setPartners] = useState<PartnerRow[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -39,6 +50,15 @@ export default function ControlSalesPage() {
         return;
       }
       setData(j);
+
+      const pRes = await apiFetch("/api/channel-partners", { credentials: "include" });
+      const pj = ((await readApiJson(pRes, "channel-partners")) ?? {}) as {
+        ok?: boolean;
+        partners?: PartnerRow[];
+      };
+      if (pRes.ok && pj.ok && Array.isArray(pj.partners)) {
+        setPartners(pj.partners);
+      }
     } catch (e) {
       console.error("API ERROR:", e);
       setError(formatFetchFailure(e, "Could not reach sales API"));
@@ -114,6 +134,26 @@ export default function ControlSalesPage() {
                 data.perEmployee!.map((r) => (
                   <li key={r.userId ?? r.name} className={muted}>
                     {r.name} — {r.leadCount} leads
+                  </li>
+                ))
+              )}
+            </ul>
+          </div>
+
+          <div className={cardShell}>
+            <p className={light ? "font-bold text-slate-900" : "font-bold text-white"}>Channel Partners</p>
+            <div className="mt-2">
+              <Link href="/bgos/control/sales/channel-partners" className="text-xs text-cyan-300 hover:text-cyan-200">
+                Open detailed channel partner module →
+              </Link>
+            </div>
+            <ul className="mt-3 space-y-2 text-sm">
+              {partners.length === 0 ? (
+                <li className={muted}>No channel partner conversions yet.</li>
+              ) : (
+                partners.map((p) => (
+                  <li key={p.id} className={muted}>
+                    {p.name || "Partner"} ({p.phone}) — Companies: {p.companiesCount}, Conversions: {p.conversions}, Revenue: {p.totalRevenue.toFixed(0)}
                   </li>
                 ))
               )}

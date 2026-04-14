@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
     data: {
       password: passwordHash,
       isActive: true,
+      firstLogin: true,
     },
   });
 

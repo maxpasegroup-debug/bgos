@@ -29,6 +29,7 @@ const ROLE_LABEL: Record<string, string> = {
   HR_MANAGER: "HR Manager",
   TECH_HEAD: "Tech Head",
   TECH_EXECUTIVE: "Tech Executive",
+  MICRO_FRANCHISE: "Micro Franchise Partner",
 };
 
 export type IceconnectNavItem = { seg: string; label: string; href: string };

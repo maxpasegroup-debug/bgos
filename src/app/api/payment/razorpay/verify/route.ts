@@ -1,11 +1,13 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { CompanyBusinessType } from "@prisma/client";
 import Razorpay from "razorpay";
 import { z } from "zod";
 import { jsonError, jsonSuccess, parseJsonBodyZod } from "@/lib/api-response";
 import { requireAuthWithRoles } from "@/lib/auth";
 import { handleApiError } from "@/lib/route-error";
 import { prisma } from "@/lib/prisma";
+import { accrueMicroFranchiseCommission } from "@/lib/micro-franchise-commission";
 import {
   applySuccessfulRazorpayPayment,
   decodeRazorpayOrderNotes,
@@ -82,6 +84,29 @@ export async function POST(request: NextRequest) {
       amountPaise: orderAmount,
       currency: typeof order.currency === "string" ? order.currency : "INR",
     });
+
+    if (applied) {
+      await accrueMicroFranchiseCommission({
+        companyId: notes.companyId,
+        amountPaise: orderAmount,
+        paymentRef: razorpay_payment_id,
+      });
+    }
+
+    const co = await prisma.company.findUnique({
+      where: { id: notes.companyId },
+      select: { businessType: true, name: true },
+    });
+    if (applied && co?.businessType === CompanyBusinessType.CUSTOM) {
+      await prisma.techRequest.create({
+        data: {
+          roleName: "CUSTOM_BUILD",
+          companyId: notes.companyId,
+          status: "pending",
+          description: `Custom onboarding paid and ready for tech execution (${co.name}).`,
+        },
+      });
+    }
 
     return jsonSuccess({
       applied,

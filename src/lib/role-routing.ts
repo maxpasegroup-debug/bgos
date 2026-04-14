@@ -6,6 +6,7 @@
 /** Platform owner (`BGOS_BOSS_EMAIL` + JWT `superBoss`) — internal control plane, not tenant solar dashboard. */
 export const SUPER_BOSS_HOME_PATH = "/bgos/control/clients";
 export const TECH_EXEC_HOME_PATH = "/iceconnect/tech";
+export const MICRO_FRANCHISE_HOME_PATH = "/iceconnect/micro-franchise";
 
 export const ROLE_HOME: Readonly<Record<string, string>> = {
   ADMIN: "/bgos/dashboard",
@@ -16,6 +17,7 @@ export const ROLE_HOME: Readonly<Record<string, string>> = {
   TECH_EXECUTIVE: TECH_EXEC_HOME_PATH,
   SALES_HEAD: "/iceconnect/sales-head",
   CHANNEL_PARTNER: "/iceconnect/partner",
+  MICRO_FRANCHISE: MICRO_FRANCHISE_HOME_PATH,
   OPERATIONS_HEAD: "/iceconnect/operations",
   /** Field tech roles default to internal workspace when using BGOS Internal; adjust if you need classic field dashboards. */
   SITE_ENGINEER: "/iceconnect/internal-sales",
@@ -88,8 +90,12 @@ const PAGE_RULES: RouteRule[] = [
   { prefix: "/iceconnect/leads", roles: ICE_SALES_HUB },
   { prefix: "/iceconnect/customers", roles: ICE_SALES_HUB },
   { prefix: "/iceconnect/wallet", roles: ICE_SALES_HUB },
+  { prefix: "/iceconnect/micro-franchise", roles: new Set(["MICRO_FRANCHISE"]) },
   { prefix: "/iceconnect/notifications", roles: ICE_SALES_HUB },
-  { prefix: "/iceconnect/profile", roles: ICE_SALES_HUB },
+  {
+    prefix: "/iceconnect/profile",
+    roles: new Set([...ICE_SALES_HUB, "MICRO_FRANCHISE"]),
+  },
   { prefix: "/iceconnect/tech", roles: ICE_TECH_HUB },
   { prefix: "/onboarding/manage", roles: ONBOARDING_WORKFLOW_ROLES },
   {
@@ -268,6 +274,10 @@ const API_RULES: RouteRule[] = [
     roles: ONBOARDING_WORKFLOW_ROLES,
   },
   {
+    prefix: "/api/micro-franchise/partner",
+    roles: new Set(["MICRO_FRANCHISE"]),
+  },
+  {
     prefix: "/api/iceconnect",
     roles: new Set([
       "SALES_HEAD",
@@ -416,7 +426,8 @@ export const ICECONNECT_DASHBOARD_ROLES: Record<string, readonly string[]> = {
   customers: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER"],
   wallet: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER"],
   notifications: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER"],
-  profile: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER"],
+  profile: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER", "MICRO_FRANCHISE"],
+  "micro-franchise": ["MICRO_FRANCHISE"],
   tech: ["TECH_HEAD", "TECH_EXECUTIVE", "MANAGER"],
   "tech-onboarding": ["TECH_HEAD", "TECH_EXECUTIVE", "MANAGER"],
   sales: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER"],

@@ -15,10 +15,20 @@ type Item = {
   updatedAt: string;
 };
 
+type TechRequestItem = {
+  id: string;
+  roleName: string;
+  description?: string | null;
+  status: string;
+  companyName?: string | null;
+  createdAt: string;
+};
+
 export default function ControlTechnicalPage() {
   const { theme } = useBgosTheme();
   const light = theme === "light";
   const [items, setItems] = useState<Item[]>([]);
+  const [requests, setRequests] = useState<TechRequestItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -42,6 +52,15 @@ export default function ControlTechnicalPage() {
         return;
       }
       setItems(j.items);
+
+      const rRes = await apiFetch("/api/tech/requests", { credentials: "include" });
+      const rj = ((await readApiJson(rRes, "control/tech-requests")) ?? {}) as {
+        ok?: boolean;
+        requests?: TechRequestItem[];
+      };
+      if (rRes.ok && rj.ok && Array.isArray(rj.requests)) {
+        setRequests(rj.requests);
+      }
     } catch (e) {
       console.error("API ERROR:", e);
       setError(formatFetchFailure(e, "Could not reach technical queue API"));
@@ -85,6 +104,24 @@ export default function ControlTechnicalPage() {
           </li>
         ))}
       </ul>
+
+      <div className="mt-8">
+        <h2 className={light ? "text-sm font-semibold text-slate-900" : "text-sm font-semibold text-white"}>
+          Tech Exception Queue
+        </h2>
+        <ul className="mt-3 space-y-2">
+          {requests.length === 0 ? <li className={muted}>No pending role exceptions.</li> : null}
+          {requests.map((r) => (
+            <li key={r.id} className={cardShell}>
+              <p className={light ? "font-medium text-slate-900" : "font-medium text-white"}>
+                {r.roleName} <span className={muted}>({r.status})</span>
+              </p>
+              <p className={muted + " text-xs"}>{r.companyName || "No company linked"} · {new Date(r.createdAt).toLocaleString()}</p>
+              {r.description ? <p className={muted + " mt-1 text-xs"}>{r.description}</p> : null}
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
