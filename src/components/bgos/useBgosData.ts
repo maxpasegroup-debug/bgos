@@ -275,7 +275,11 @@ export function useBgosData(
           const meRes = await apiFetch("/api/auth/me");
           if (meRes.ok) {
             const mj = (await meRes.json()) as {
-              user?: { isSuperBoss?: boolean; companyId?: string | null };
+              user?: {
+                isSuperBoss?: boolean;
+                companyId?: string | null;
+                role?: UserRole;
+              };
             };
             if (
               mj.user?.isSuperBoss === true &&
@@ -283,6 +287,8 @@ export function useBgosData(
             ) {
               superBossNoCompanyRef.current = true;
               if (!cancelled) {
+                setIsSuperBoss(true);
+                if (mj.user?.role) setSessionRole(mj.user.role);
                 setSuperBossNoCompany(true);
                 setDashboard(emptySnapshot());
                 setError(null);

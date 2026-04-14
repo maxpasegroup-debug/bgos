@@ -11,7 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
 import { signAccessToken } from "@/lib/jwt";
 import { isBossReady } from "@/lib/boss-ready";
-import { postLoginDestination } from "@/lib/role-routing";
+import { postLoginDestination, SUPER_BOSS_HOME_PATH } from "@/lib/role-routing";
 import {
   applyProductionBossJwtMembershipOverrides,
   isBgosProductionBossBypassEmail,
@@ -52,7 +52,7 @@ function internalPostLoginLocation(
   userEmail: string,
 ): string {
   if (isSuperBossEmail(userEmail)) {
-    return "/bgos/dashboard";
+    return SUPER_BOSS_HOME_PATH;
   }
   if (isBossReady(role, companyId)) {
     return "/bgos/dashboard";
@@ -301,15 +301,17 @@ export async function POST(request: Request) {
 
     const hostHeader = request.headers.get("host");
     const needsCrossDomainHandoff = crossDomainLoginRequired(hostHeader, effectiveRole);
-    const nextPath = isBossReady(effectiveRole, companyId)
-      ? "/bgos/dashboard"
-      : internalPostLoginLocation(
-          effectiveRole,
-          parsed.data.from?.trim() || undefined,
-          companyId,
-          Boolean(user.workspaceActivatedAt),
-          user.email,
-        );
+    const nextPath = boss
+      ? SUPER_BOSS_HOME_PATH
+      : isBossReady(effectiveRole, companyId)
+        ? "/bgos/dashboard"
+        : internalPostLoginLocation(
+            effectiveRole,
+            parsed.data.from?.trim() || undefined,
+            companyId,
+            Boolean(user.workspaceActivatedAt),
+            user.email,
+          );
 
     // Cookie setting — structured body: { success, user } plus fields used by existing clients.
     const res = NextResponse.json(

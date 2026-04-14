@@ -10,6 +10,7 @@ import { MintSessionTokenError, mintSessionAccessTokenForUser } from "@/lib/mint
 import { verifyAccessTokenResult } from "@/lib/jwt";
 import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/route-error";
+import { SUPER_BOSS_HOME_PATH } from "@/lib/role-routing";
 import { isSuperBossEmail } from "@/lib/super-boss";
 import { setActiveCompanyCookie, setSessionCookie } from "@/lib/session-cookie";
 
@@ -107,8 +108,11 @@ export async function switchActiveCompanyPost(
     where: { id: companyId },
     select: { internalSalesOrg: true },
   });
-  const redirectPath =
-    co?.internalSalesOrg === true ? "/iceconnect/my-journey" : "/bgos/dashboard";
+  const redirectPath = superBossOk
+    ? SUPER_BOSS_HOME_PATH
+    : co?.internalSalesOrg === true
+      ? "/iceconnect/my-journey"
+      : "/bgos/dashboard";
 
   const res = NextResponse.json({
     ok: true as const,

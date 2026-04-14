@@ -6,6 +6,7 @@ import { Suspense, useState } from "react";
 import { z } from "zod";
 import { resolveAfterLoginNavigation } from "@/lib/cross-domain-login";
 import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
+import { SUPER_BOSS_HOME_PATH } from "@/lib/role-routing";
 
 const clientLoginSchema = z.object({
   email: z.string().trim().min(1, "Email is required").email("Enter a valid email"),
@@ -90,7 +91,7 @@ function LoginForm() {
         } catch (e) {
           console.error("API ERROR:", e);
         }
-        router.replace("/bgos/dashboard");
+        router.replace(SUPER_BOSS_HOME_PATH);
         router.refresh();
         return;
       }

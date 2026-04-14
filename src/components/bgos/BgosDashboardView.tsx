@@ -1,6 +1,6 @@
 "use client";
 
-
+import { UserRole } from "@prisma/client";
 import { apiFetch } from "@/lib/api-fetch";
 import { useEffect, useState } from "react";
 import { BgosDashboardGrid } from "./BgosDashboardGrid";
@@ -22,7 +22,18 @@ const routeToSection: Record<string, string> = {
 
 export function BgosDashboardView({ section }: { section?: string }) {
   const isIntelHome = !section;
-  const { dashboard, error, refetch, isLoading, analyticsRangePreset } = useBgosDashboardContext();
+  const {
+    dashboard,
+    error,
+    refetch,
+    isLoading,
+    analyticsRangePreset,
+    sessionRole,
+    isSuperBoss,
+  } = useBgosDashboardContext();
+  /** Company boss + platform owner: command center (grid), not the intelligence / “pulse” home. */
+  const useBossCommandCenterHome =
+    sessionRole === UserRole.ADMIN || isSuperBoss === true;
   const scrollKey = section ? routeToSection[section] ?? section : undefined;
   const [userName, setUserName] = useState("Boss");
 
@@ -30,7 +41,7 @@ export function BgosDashboardView({ section }: { section?: string }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await apiFetch("/api/auth/me", { credentials: "include" });
+        const res = await apiFetch("/api/auth/me");
         const j = (await res.json()) as { user?: { name?: string } };
         const name = j.user?.name?.trim();
         if (!cancelled && name) setUserName(name);
@@ -54,7 +65,10 @@ export function BgosDashboardView({ section }: { section?: string }) {
   }, [scrollKey, isLoading]);
 
   if (isLoading) {
-    return isIntelHome ? <BgosIntelligenceHomeSkeleton /> : <BgosDashboardSkeletons />;
+    if (isIntelHome && !useBossCommandCenterHome) {
+      return <BgosIntelligenceHomeSkeleton />;
+    }
+    return <BgosDashboardSkeletons />;
   }
 
   if (error !== null && dashboard === null) {
@@ -77,7 +91,7 @@ export function BgosDashboardView({ section }: { section?: string }) {
     );
   }
 
-  if (isIntelHome) {
+  if (isIntelHome && !useBossCommandCenterHome) {
     return <BgosIntelligenceHome />;
   }
 

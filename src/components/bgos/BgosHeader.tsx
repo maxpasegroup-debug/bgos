@@ -10,6 +10,7 @@ import { BgosAddLeadModal } from "./BgosAddLeadModal";
 import { BgosCompanySwitcher } from "./BgosCompanySwitcher";
 import { useBgosDashboardContext } from "./BgosDataProvider";
 import { BGOS_MAIN_PAD } from "./layoutTokens";
+import { SUPER_BOSS_HOME_PATH } from "@/lib/role-routing";
 import { useBgosTheme } from "./BgosThemeContext";
 
 type BillingPeek = {
@@ -62,7 +63,7 @@ export function BgosHeader() {
     companyName: null,
     billing: null,
   });
-  const logoHref = "/bgos/dashboard";
+  const logoHref = isSuperBoss ? SUPER_BOSS_HOME_PATH : "/bgos/dashboard";
   const profileRef = useRef<HTMLDivElement | null>(null);
   const notifRef = useRef<HTMLDivElement | null>(null);
 

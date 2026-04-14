@@ -4,7 +4,7 @@ import { Landing } from "@/components/landing/Landing";
 import { AUTH_COOKIE_NAME } from "@/lib/auth-config";
 import { hostTenantFromHeader } from "@/lib/host-routing";
 import { verifyAccessTokenResult } from "@/lib/jwt";
-import { getRoleHome } from "@/lib/role-routing";
+import { getRoleHome, SUPER_BOSS_HOME_PATH } from "@/lib/role-routing";
 import { isSuperBossEmail } from "@/lib/super-boss";
 
 export default async function Home() {
@@ -20,7 +20,10 @@ export default async function Home() {
         const p = verified.payload as Record<string, unknown>;
         const em = typeof p.email === "string" ? p.email : "";
         const role = typeof p.role === "string" ? p.role : "";
-        if (isSuperBossEmail(em) || role === "ADMIN") {
+        if (isSuperBossEmail(em)) {
+          redirect(SUPER_BOSS_HOME_PATH);
+        }
+        if (role === "ADMIN") {
           redirect("/bgos/dashboard");
         }
         redirect(getRoleHome(role));

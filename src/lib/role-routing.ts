@@ -3,6 +3,9 @@
  * Company ADMIN (boss) defaults to BGOS; managers / execs use ICECONNECT hubs.
  */
 
+/** Platform owner (`BGOS_BOSS_EMAIL` + JWT `superBoss`) — internal control plane, not tenant solar dashboard. */
+export const SUPER_BOSS_HOME_PATH = "/bgos/control/clients";
+
 export const ROLE_HOME: Readonly<Record<string, string>> = {
   ADMIN: "/bgos/dashboard",
   MANAGER: "/iceconnect/internal-sales",
@@ -323,6 +326,7 @@ function normalizePathnameRole(pathname: string): string {
 }
 
 function superBossAllowedPath(p: string): boolean {
+  if (p === "/bgos/dashboard" || p.startsWith("/bgos/dashboard/")) return false;
   if (p === "/bgos/control" || p.startsWith("/bgos/control/")) return true;
   if (p === "/sales-booster" || p.startsWith("/sales-booster/")) return true;
   if (p === "/onboarding" || p.startsWith("/onboarding/")) return true;
@@ -333,8 +337,8 @@ function superBossAllowedPath(p: string): boolean {
 
 /**
  * Whether this role may access this pathname (pages + role-scoped APIs).
- * Platform boss lands on `/bgos/dashboard`; `/bgos` (index) and `/iceconnect/*` are blocked on purpose,
- * while `/bgos/*` still works including `/bgos/control` after opening a company from Control.
+ * Platform super boss uses `/bgos/control/*` (not tenant `/bgos/dashboard`). `/bgos` (index) and `/iceconnect/*` are blocked on purpose;
+ * other `/bgos/*` paths remain available for internal tools.
  */
 export function roleCanAccessPath(
   role: string,
@@ -390,7 +394,7 @@ export function postLoginDestination(
   opts?: RoleAccessOpts,
 ): string {
   if (opts?.superBoss === true) {
-    return "/bgos/dashboard";
+    return SUPER_BOSS_HOME_PATH;
   }
   if (from && from.startsWith("/") && roleCanAccessPath(role, from, opts)) {
     return from;
