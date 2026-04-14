@@ -46,8 +46,8 @@ export async function POST(request: NextRequest) {
       return jsonError(500, "SERVER_ERROR", "Authentication is not configured", e instanceof Error ? e.message : String(e));
     }
     const res = NextResponse.json({ ok: true as const, alreadyActivated: true as const });
-    setSessionCookie(res, token);
-    setActiveCompanyCookie(res, companyId);
+    await setSessionCookie(res, token);
+    await setActiveCompanyCookie(res, companyId);
     return res;
   }
 
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
   }
 
   const res = NextResponse.json({ ok: true as const });
-  setSessionCookie(res, token);
-  setActiveCompanyCookie(res, companyId);
+  await setSessionCookie(res, token);
+  await setActiveCompanyCookie(res, companyId);
   return res;
 }

@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
       activeCompanyId: session.companyId,
     });
     const res = jsonSuccess({ refreshed: true });
-    setSessionCookie(res, token);
+    await setSessionCookie(res, token);
     return res;
   } catch (e) {
     if (e instanceof MintSessionTokenError) {

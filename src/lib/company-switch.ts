@@ -115,7 +115,7 @@ export async function switchActiveCompanyPost(
     companyId,
     redirectPath,
   });
-  setSessionCookie(res, token);
-  setActiveCompanyCookie(res, companyId);
+  await setSessionCookie(res, token);
+  await setActiveCompanyCookie(res, companyId);
   return res;
 }

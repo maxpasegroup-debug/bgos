@@ -1,46 +1,43 @@
 import "server-only";
 
+import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
 import { ACTIVE_COMPANY_COOKIE_NAME, AUTH_COOKIE_NAME } from "./auth-config";
 
 export const SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 7;
 
-function baseCookieOptions() {
+/** Same-origin session cookies only — never set `domain`. */
+function sessionCookieOptions(maxAge: number) {
   const isProd = process.env.NODE_ENV === "production";
   return {
     httpOnly: true as const,
     secure: isProd,
     sameSite: "lax" as const,
     path: "/",
+    maxAge,
   };
 }
 
-/** Attach HTTP-only session cookie (JWT). */
-export function setSessionCookie(res: NextResponse, token: string): void {
-  res.cookies.set(AUTH_COOKIE_NAME, token, {
-    ...baseCookieOptions(),
-    maxAge: SESSION_MAX_AGE_SEC,
-  });
+/**
+ * Attach HTTP-only session cookie (JWT) via `cookies()` so Set-Cookie is applied
+ * to the Route Handler response (avoids cases where `res.cookies` alone is dropped).
+ */
+export async function setSessionCookie(_res: NextResponse, token: string): Promise<void> {
+  const jar = await cookies();
+  jar.set(AUTH_COOKIE_NAME, token, sessionCookieOptions(SESSION_MAX_AGE_SEC));
 }
 
-/** Clear session cookie (logout). */
-export function clearSessionCookie(res: NextResponse): void {
-  res.cookies.set(AUTH_COOKIE_NAME, "", {
-    ...baseCookieOptions(),
-    maxAge: 0,
-  });
+export async function clearSessionCookie(_res: NextResponse): Promise<void> {
+  const jar = await cookies();
+  jar.set(AUTH_COOKIE_NAME, "", sessionCookieOptions(0));
 }
 
-export function setActiveCompanyCookie(res: NextResponse, companyId: string): void {
-  res.cookies.set(ACTIVE_COMPANY_COOKIE_NAME, companyId, {
-    ...baseCookieOptions(),
-    maxAge: SESSION_MAX_AGE_SEC,
-  });
+export async function setActiveCompanyCookie(_res: NextResponse, companyId: string): Promise<void> {
+  const jar = await cookies();
+  jar.set(ACTIVE_COMPANY_COOKIE_NAME, companyId, sessionCookieOptions(SESSION_MAX_AGE_SEC));
 }
 
-export function clearActiveCompanyCookie(res: NextResponse): void {
-  res.cookies.set(ACTIVE_COMPANY_COOKIE_NAME, "", {
-    ...baseCookieOptions(),
-    maxAge: 0,
-  });
+export async function clearActiveCompanyCookie(_res: NextResponse): Promise<void> {
+  const jar = await cookies();
+  jar.set(ACTIVE_COMPANY_COOKIE_NAME, "", sessionCookieOptions(0));
 }

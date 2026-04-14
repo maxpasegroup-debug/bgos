@@ -160,8 +160,8 @@ export async function POST(request: NextRequest) {
           companyId: stale.companyId,
           recovered: true as const,
         });
-        setSessionCookie(res, newToken);
-        setActiveCompanyCookie(res, primary.companyId);
+        await setSessionCookie(res, newToken);
+        await setActiveCompanyCookie(res, primary.companyId);
         return res;
       }
     }
@@ -273,8 +273,8 @@ export async function POST(request: NextRequest) {
         companyId: existingByOwnerAndName.id,
         existing: true as const,
       });
-      setSessionCookie(res, newToken);
-      setActiveCompanyCookie(res, existingByOwnerAndName.id);
+      await setSessionCookie(res, newToken);
+      await setActiveCompanyCookie(res, existingByOwnerAndName.id);
       return res;
     }
 
@@ -394,8 +394,8 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    setSessionCookie(res, newToken);
-    setActiveCompanyCookie(res, companyId);
+    await setSessionCookie(res, newToken);
+    await setActiveCompanyCookie(res, companyId);
 
     return res;
   } catch (error) {

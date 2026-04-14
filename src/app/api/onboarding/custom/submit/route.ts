@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
       submissionId: sub.id,
       redirect: "/bgos" as const,
     });
-    setSessionCookie(res, newToken);
+    await setSessionCookie(res, newToken);
     return res;
   } catch (e) {
     const p = prismaKnownErrorResponse(e);

@@ -6,7 +6,7 @@ import { clearActiveCompanyCookie, clearSessionCookie } from "@/lib/session-cook
  */
 export async function POST() {
   const res = jsonSuccess({ loggedOut: true });
-  clearSessionCookie(res);
-  clearActiveCompanyCookie(res);
+  await clearSessionCookie(res);
+  await clearActiveCompanyCookie(res);
   return res;
 }

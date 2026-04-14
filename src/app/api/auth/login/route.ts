@@ -292,9 +292,9 @@ export async function POST(request: Request) {
       },
       { status: 200 },
     );
-    setSessionCookie(res, token);
+    await setSessionCookie(res, token);
     if (companyId) {
-      setActiveCompanyCookie(res, companyId);
+      await setActiveCompanyCookie(res, companyId);
     }
     console.info("[auth/login] Before response", {
       userId: user.id,
