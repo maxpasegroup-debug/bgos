@@ -9,6 +9,8 @@ import {
   decodeRazorpayOrderNotes,
   getRazorpayServerConfig,
   parsePaymentCapturedPayload,
+  parsePaymentFailedPayload,
+  recordRazorpayPaymentFailed,
   recordRazorpayWebhookDedup,
   verifyRazorpayWebhookSignature,
 } from "@/lib/razorpay-billing";
@@ -32,7 +34,8 @@ export async function POST(request: NextRequest) {
   let rawBody: string;
   try {
     rawBody = await request.text();
-  } catch {
+  } catch (e) {
+    console.error("[razorpay/webhook] failed to read body", e);
     return jsonError(400, "BAD_REQUEST", "Could not read body.");
   }
 
@@ -43,13 +46,28 @@ export async function POST(request: NextRequest) {
   let parsed: unknown;
   try {
     parsed = JSON.parse(rawBody) as unknown;
-  } catch {
+  } catch (e) {
+    console.error("[razorpay/webhook] invalid JSON", e);
     return jsonError(400, "BAD_REQUEST", "Invalid JSON.");
   }
 
   const root = parsed as Record<string, unknown>;
   const eventType = typeof root.event === "string" ? root.event : "";
   const eventId = typeof root.id === "string" ? root.id : "";
+
+  if (eventType === "payment.failed") {
+    const failedNorm = parsePaymentFailedPayload(parsed);
+    let stored = false;
+    if (failedNorm) {
+      stored = await recordRazorpayPaymentFailed(failedNorm);
+    } else {
+      console.warn("[razorpay/webhook] payment.failed: could not normalize payload", { eventId });
+    }
+    if (eventId) {
+      await recordRazorpayWebhookDedup(eventId, eventType);
+    }
+    return NextResponse.json({ received: true, event: "payment.failed", stored });
+  }
 
   if (eventType !== "payment.captured") {
     return NextResponse.json({ received: true, ignored: eventType || "unknown" });

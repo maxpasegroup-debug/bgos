@@ -2,9 +2,10 @@ import { CompanyPlan, UserRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { parseJsonBody, zodValidationErrorResponse } from "@/lib/api-response";
-import { handleApiError } from "@/lib/route-error";
 import { AUTH_ERROR_CODES } from "@/lib/auth-api";
+import { ensureDefaultBossUser } from "@/lib/bootstrap-default-boss";
 import { checkLoginRateLimit, getClientIpForRateLimit } from "@/lib/login-rate-limit";
+import { withDbRetry } from "@/lib/db-retry";
 import { hostTenantFromHeader, type HostTenant } from "@/lib/host-routing";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
@@ -86,26 +87,30 @@ export async function POST(request: Request) {
     const { password, email: emailRaw } = parsed.data;
     const email = emailRaw.trim();
 
-    const user = await prisma.user.findFirst({
-      where: { email: { equals: email, mode: "insensitive" } },
-      include: {
-        memberships: {
-          include: {
-            company: {
-              select: {
-                id: true,
-                name: true,
-                plan: true,
-                trialEndDate: true,
-                subscriptionPeriodEnd: true,
-                subscriptionStatus: true,
+    await ensureDefaultBossUser();
+
+    const user = await withDbRetry("auth/login.findUser", () =>
+      prisma.user.findFirst({
+        where: { email: { equals: email, mode: "insensitive" } },
+        include: {
+          memberships: {
+            include: {
+              company: {
+                select: {
+                  id: true,
+                  name: true,
+                  plan: true,
+                  trialEndDate: true,
+                  subscriptionPeriodEnd: true,
+                  subscriptionStatus: true,
+                },
               },
             },
+            orderBy: { createdAt: "asc" },
           },
-          orderBy: { createdAt: "asc" },
         },
-      },
-    });
+      }),
+    );
 
     const authError = NextResponse.json(
       {
@@ -205,6 +210,19 @@ export async function POST(request: Request) {
     // JWT creation
     const boss = isSuperBossEmail(user.email);
 
+    const loginHostTenant = hostTenantFromHeader(request.headers.get("host"));
+    if (loginHostTenant === "ice" && effectiveRole === UserRole.ADMIN && !boss) {
+      return NextResponse.json(
+        {
+          success: false as const,
+          ok: false as const,
+          error: "Boss accounts sign in at bgos.online.",
+          code: "WRONG_HOST" as const,
+        },
+        { status: 403 },
+      );
+    }
+
     const token = signAccessToken({
       sub: user.id,
       email: user.email,
@@ -260,17 +278,20 @@ export async function POST(request: Request) {
       user.email,
     );
 
-    // Cookie setting
-    const res = NextResponse.json({
-      success: true as const,
-      ok: true as const,
-      user: userPayload,
-      companies: companiesPayload,
-      needsCompanySelection: boss ? false : companiesPayload.length > 1,
-      needsCrossDomainHandoff,
-      nextPath,
-      isSuperBoss: boss,
-    });
+    // Cookie setting — structured body: { success, user } plus fields used by existing clients.
+    const res = NextResponse.json(
+      {
+        success: true as const,
+        user: userPayload,
+        ok: true as const,
+        companies: companiesPayload,
+        needsCompanySelection: boss ? false : companiesPayload.length > 1,
+        needsCrossDomainHandoff,
+        nextPath,
+        isSuperBoss: boss,
+      },
+      { status: 200 },
+    );
     setSessionCookie(res, token);
     if (companyId) {
       setActiveCompanyCookie(res, companyId);
@@ -283,19 +304,18 @@ export async function POST(request: Request) {
     return res;
   } catch (e) {
     console.error("[auth/login] Unhandled error", e);
-    if (e instanceof Error && /sign|token|jwt/i.test(e.message)) {
-      return NextResponse.json(
-        {
-          success: false as const,
-          ok: false as const,
-          error: "Authentication is not configured",
-          code: "SERVER_ERROR",
-        },
-        { status: 500 },
-      );
-    }
-    const handled = handleApiError("POST /api/auth/login", e);
-    // Ensure a JSON body shape for clients.
-    return handled;
+    const jwtHint =
+      e instanceof Error && /sign|token|jwt|secret/i.test(e.message)
+        ? "Authentication is not configured (check JWT_SECRET)."
+        : "Could not complete sign-in. Try again.";
+    return NextResponse.json(
+      {
+        success: false as const,
+        ok: false as const,
+        error: jwtHint,
+        code: "SERVER_ERROR" as const,
+      },
+      { status: 500 },
+    );
   }
 }

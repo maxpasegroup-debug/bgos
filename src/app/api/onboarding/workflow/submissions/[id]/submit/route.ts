@@ -33,6 +33,13 @@ export async function POST(
       if (e instanceof Error && e.message === "INVALID_STATUS") {
         return jsonError(400, "INVALID_STATUS", "Cannot submit.");
       }
+      if (e instanceof Error && e.message === "EMPTY_SUBMISSION") {
+        return jsonError(
+          400,
+          "EMPTY_SUBMISSION",
+          "Complete the onboarding form before submitting.",
+        );
+      }
       throw e;
     }
 

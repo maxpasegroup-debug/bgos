@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { requireActiveCompanyMembership } from "@/lib/auth";
 import { loadMembershipsForJwt } from "@/lib/memberships-for-jwt";
+import { jsonError, logCaughtError } from "@/lib/api-response";
 import { handleApiError } from "@/lib/route-error";
 import { prisma } from "@/lib/prisma";
 import { setActiveCompanyCookie, setSessionCookie } from "@/lib/session-cookie";
@@ -40,11 +41,9 @@ export async function POST(request: NextRequest) {
         memberships: mems,
         ...(isSuperBossEmail(session.email) ? { superBoss: true as const } : {}),
       });
-    } catch {
-      return NextResponse.json(
-        { ok: false as const, error: "Authentication is not configured", code: "SERVER_ERROR" },
-        { status: 500 },
-      );
+    } catch (e) {
+      logCaughtError("POST /api/onboarding/activate sign JWT (alreadyActivated)", e);
+      return jsonError(500, "SERVER_ERROR", "Authentication is not configured", e instanceof Error ? e.message : String(e));
     }
     const res = NextResponse.json({ ok: true as const, alreadyActivated: true as const });
     setSessionCookie(res, token);
@@ -83,11 +82,9 @@ export async function POST(request: NextRequest) {
       memberships: mems,
       ...(isSuperBossEmail(session.email) ? { superBoss: true as const } : {}),
     });
-  } catch {
-    return NextResponse.json(
-      { ok: false as const, error: "Authentication is not configured", code: "SERVER_ERROR" },
-      { status: 500 },
-    );
+  } catch (e) {
+    logCaughtError("POST /api/onboarding/activate sign JWT", e);
+    return jsonError(500, "SERVER_ERROR", "Authentication is not configured", e instanceof Error ? e.message : String(e));
   }
 
   const res = NextResponse.json({ ok: true as const });

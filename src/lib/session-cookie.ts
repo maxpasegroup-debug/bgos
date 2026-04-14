@@ -5,21 +5,13 @@ import { ACTIVE_COMPANY_COOKIE_NAME, AUTH_COOKIE_NAME } from "./auth-config";
 
 export const SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 7;
 
-function sessionCookieDomain(): string | undefined {
-  const d = process.env.COOKIE_DOMAIN?.trim();
-  if (!d) return undefined;
-  return d;
-}
-
 function baseCookieOptions() {
   const isProd = process.env.NODE_ENV === "production";
-  const domain = sessionCookieDomain();
   return {
     httpOnly: true as const,
     secure: isProd,
     sameSite: "lax" as const,
     path: "/",
-    ...(domain ? { domain } : {}),
   };
 }
 

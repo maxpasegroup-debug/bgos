@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { z } from "zod";
 import { writeStoredCompanyBrand } from "@/contexts/company-branding-context";
-import { resolveAfterLoginNavigation } from "@/lib/cross-domain-login";
 
 const formSchema = z.object({
   email: z.string().trim().min(1, "Email is required").email("Enter a valid email"),
@@ -82,10 +81,14 @@ function IceconnectLoginForm() {
       }
 
       const data = (await res.json()) as {
+        success?: boolean;
         ok?: boolean;
         error?: string;
         code?: string;
         details?: unknown;
+        nextPath?: string;
+        needsCompanySelection?: boolean;
+        companies?: { companyId: string; name: string; jobRole: string }[];
         user?: {
           role: string;
           companyId?: string | null;
@@ -101,6 +104,10 @@ function IceconnectLoginForm() {
           if (!fe.email && !fe.password && data.error) setFormError(data.error);
           return;
         }
+        if (data.code === "WRONG_HOST" && typeof data.error === "string") {
+          setFormError(data.error);
+          return;
+        }
         if (data.code === "CONTACT_ADMIN" && typeof data.error === "string") {
           setFormError(data.error);
           return;
@@ -114,28 +121,21 @@ function IceconnectLoginForm() {
         return;
       }
 
+      if (data.success !== true || !data.user) {
+        setFormError("Invalid sign-in response");
+        return;
+      }
+
       const u = data.user;
       if (
-        u?.needsOnboarding ||
-        u?.companyId == null ||
-        u?.needsWorkspaceActivation
+        u.needsOnboarding ||
+        u.companyId == null ||
+        u.needsWorkspaceActivation
       ) {
         router.push("/onboarding");
         router.refresh();
         return;
       }
-
-      const role = u?.role;
-      if (!role) {
-        setFormError("Invalid sign-in response");
-        return;
-      }
-
-      const payload = data as typeof data & {
-        nextPath?: string;
-        needsCompanySelection?: boolean;
-        companies?: { companyId: string; name: string; jobRole: string }[];
-      };
 
       try {
         const [listRes, curRes] = await Promise.all([
@@ -144,18 +144,21 @@ function IceconnectLoginForm() {
         ]);
         const listJson = (await listRes.json()) as { ok?: boolean; companies?: unknown[] };
         const multiCompany =
-          payload.needsCompanySelection === true ||
+          data.needsCompanySelection === true ||
           (listJson.ok && Array.isArray(listJson.companies) && listJson.companies.length > 1) ||
-          (Array.isArray(payload.companies) && payload.companies.length > 1);
+          (Array.isArray(data.companies) && data.companies.length > 1);
         if (multiCompany) {
           router.push("/iceconnect/select-company");
           router.refresh();
           return;
         }
-        await fetch("/api/auth/refresh-session", {
+        const refreshRes = await fetch("/api/auth/refresh-session", {
           method: "POST",
           credentials: "include",
-        }).catch(() => undefined);
+        });
+        if (!refreshRes.ok) {
+          console.warn("[iceconnect/login] refresh-session failed", refreshRes.status);
+        }
         const curJson = (await curRes.json()) as {
           ok?: boolean;
           company?: {
@@ -168,26 +171,14 @@ function IceconnectLoginForm() {
         if (curJson.ok === true && curJson.company) {
           writeStoredCompanyBrand(curJson.company);
         }
-      } catch {
-        /* non-fatal */
+      } catch (err) {
+        console.warn("[iceconnect/login] post-login company / session step failed", err);
       }
 
-      const nav = resolveAfterLoginNavigation({
-        role,
-        from,
-        hostname: typeof window !== "undefined" ? window.location.hostname : "",
-      });
-      if (nav.kind === "external") {
-        window.location.assign(nav.url);
-        return;
-      }
-      const serverPath =
-        typeof payload.nextPath === "string" && payload.nextPath.startsWith("/")
-          ? payload.nextPath
-          : null;
-      router.push(serverPath ?? nav.path);
+      router.push("/iceconnect");
       router.refresh();
-    } catch {
+    } catch (err) {
+      console.error("[iceconnect/login] network or unexpected error", err);
       setFormError("Network error");
     } finally {
       setPending(false);

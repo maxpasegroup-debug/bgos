@@ -81,7 +81,7 @@ async function main() {
     });
     if (!res.ok || !json.ok) fail("signup", `status ${res.status}`, json);
     bossJar = mergeCookieJar("", res);
-    if (!bossJar.includes("bgos_session=")) fail("signup", "no session cookie");
+    if (!bossJar.includes("token=")) fail("signup", "no session cookie");
   }
 
   // 2) First business
@@ -254,7 +254,7 @@ async function main() {
     });
     if (!res.ok || !json.ok) fail("login telecaller", `status ${res.status}`, json);
     empJar = mergeCookieJar("", res);
-    if (!empJar.includes("bgos_session=")) fail("login telecaller", "no session");
+    if (!empJar.includes("token=")) fail("login telecaller", "no session");
   }
 
   {

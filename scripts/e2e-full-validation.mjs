@@ -103,7 +103,7 @@ async function main() {
     });
     if (!res.ok || !json.ok) fail("signup", `status ${res.status}`, json);
     bossJar = mergeCookieJar("", res);
-    if (!bossJar || !bossJar.includes("bgos_session=")) fail("signup", "no session cookie");
+    if (!bossJar || !bossJar.includes("token=")) fail("signup", "no session cookie");
   }
 
   {
@@ -172,7 +172,7 @@ async function main() {
     });
     if (!res.ok || !json.ok) fail("login telecaller", `status ${res.status}`, json);
     empJar = mergeCookieJar("", res);
-    if (!empJar || !empJar.includes("bgos_session=")) fail("login telecaller", "no session cookie");
+    if (!empJar || !empJar.includes("token=")) fail("login telecaller", "no session cookie");
   }
 
   {

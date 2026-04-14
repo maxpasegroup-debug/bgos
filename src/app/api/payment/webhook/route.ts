@@ -9,7 +9,7 @@ import {
   targetPlanFromMetadata,
 } from "@/lib/billing-stripe";
 import { planRank } from "@/lib/company-plan-values";
-import { jsonError } from "@/lib/api-response";
+import { jsonError, logCaughtError } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
 import { handleApiError } from "@/lib/route-error";
 
@@ -38,16 +38,23 @@ export async function POST(request: NextRequest) {
   let rawBody: string;
   try {
     rawBody = await request.text();
-  } catch {
-    return jsonError(400, "BAD_REQUEST", "Could not read body");
+  } catch (e) {
+    logCaughtError("POST /api/payment/webhook read body", e);
+    return jsonError(400, "BAD_REQUEST", "Could not read body", e instanceof Error ? e.message : String(e));
   }
 
   const stripe = stripeClient(billing.secretKey);
   let event: Stripe.Event;
   try {
     event = stripe.webhooks.constructEvent(rawBody, signature, billing.webhookSecret);
-  } catch {
-    return jsonError(400, "INVALID_SIGNATURE", "Invalid webhook signature");
+  } catch (e) {
+    logCaughtError("POST /api/payment/webhook constructEvent", e);
+    return jsonError(
+      400,
+      "INVALID_SIGNATURE",
+      "Invalid webhook signature",
+      e instanceof Error ? e.message : String(e),
+    );
   }
 
   if (event.type !== "checkout.session.completed") {

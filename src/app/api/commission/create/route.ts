@@ -2,6 +2,7 @@ import { UserRole } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { parseJsonBody } from "@/lib/api-response";
 import { requireIceconnectRole } from "@/lib/iceconnect-route-guard";
 import { prisma } from "@/lib/prisma";
 
@@ -17,11 +18,9 @@ export async function POST(request: NextRequest) {
   const session = await requireIceconnectRole(request, [UserRole.SALES_HEAD, UserRole.ACCOUNTANT]);
   if (session instanceof NextResponse) return session;
 
-  let json: unknown;
-  try { json = await request.json(); } catch {
-    return NextResponse.json({ ok: false as const, error: "Invalid JSON", code: "BAD_REQUEST" }, { status: 400 });
-  }
-  const parsed = schema.safeParse(json);
+  const raw = await parseJsonBody(request);
+  if (!raw.ok) return raw.response;
+  const parsed = schema.safeParse(raw.data);
   if (!parsed.success) {
     return NextResponse.json({ ok: false as const, error: "Invalid body", code: "VALIDATION" }, { status: 400 });
   }

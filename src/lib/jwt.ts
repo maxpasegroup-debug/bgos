@@ -37,7 +37,8 @@ export function verifyAccessTokenResult(token: string):
   let secret: string;
   try {
     secret = requireJwtSecret();
-  } catch {
+  } catch (e) {
+    console.error("ERROR:jwt.verifyAccessTokenResult requireJwtSecret", e);
     return { ok: false, code: "TOKEN_INVALID" };
   }
   try {

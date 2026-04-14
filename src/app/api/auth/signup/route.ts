@@ -6,6 +6,7 @@ import { parseJsonBody, zodValidationErrorResponse } from "@/lib/api-response";
 import { handleApiError } from "@/lib/route-error";
 import { hashPassword } from "@/lib/password";
 import { signAccessToken } from "@/lib/jwt";
+import { hostTenantFromHeader } from "@/lib/host-routing";
 import { prisma } from "@/lib/prisma";
 import { setSessionCookie } from "@/lib/session-cookie";
 import {
@@ -33,6 +34,17 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: Request) {
+  if (hostTenantFromHeader(request.headers.get("host")) === "ice") {
+    return NextResponse.json(
+      {
+        ok: false as const,
+        error: "Registration is only available on bgos.online.",
+        code: "WRONG_HOST" as const,
+      },
+      { status: 403 },
+    );
+  }
+
   const raw = await parseJsonBody(request);
   if (!raw.ok) return raw.response;
 
@@ -86,7 +98,8 @@ export async function POST(request: Request) {
       companyPlan: CompanyPlan.BASIC,
       workspaceReady: false,
     });
-  } catch {
+  } catch (e) {
+    console.error("[auth/signup] JWT signing failed", e);
     return NextResponse.json(
       { ok: false as const, error: "Authentication is not configured", code: "SERVER_ERROR" },
       { status: 500 },

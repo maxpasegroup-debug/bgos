@@ -1,5 +1,11 @@
 import { PrismaClient } from "@prisma/client";
 
+if (!process.env.DATABASE_URL?.trim()) {
+  console.warn(
+    "[prisma] DATABASE_URL is not set — configure it for PostgreSQL (e.g. in Railway or .env).",
+  );
+}
+
 /**
  * Single Prisma instance for Node.js runtime (API routes, Server Actions, seed).
  * Prevents connection exhaustion during Next.js hot reload in development.

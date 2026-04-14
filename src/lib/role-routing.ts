@@ -1,10 +1,10 @@
 /**
  * Role → default app home (BGOS vs ICECONNECT). Safe for Edge middleware and client.
- * Internal sales org leaders default to `/iceconnect/internal-sales`; execs to My Journey.
+ * Company ADMIN (boss) defaults to BGOS; managers / execs use ICECONNECT hubs.
  */
 
 export const ROLE_HOME: Readonly<Record<string, string>> = {
-  ADMIN: "/iceconnect/internal-sales",
+  ADMIN: "/bgos",
   MANAGER: "/iceconnect/internal-sales",
   SALES_EXECUTIVE: "/iceconnect/my-journey",
   TELECALLER: "/iceconnect/my-journey",
@@ -47,14 +47,13 @@ export const DOCUMENT_VAULT_ROLES = new Set<string>(DOCUMENT_VAULT_ROLES_LIST);
 
 const PRIVILEGED = new Set<string>(["ADMIN", "MANAGER"]);
 
-/** ICECONNECT internal sales hub (My Journey, metro leads, wallet). */
+/** ICECONNECT internal sales hub (My Journey, metro leads, wallet). Boss (ADMIN) uses BGOS only. */
 const ICE_INTERNAL_SALES_HUB = new Set<string>([
   "SALES_EXECUTIVE",
   "TELECALLER",
   "MANAGER",
   "TECH_HEAD",
   "TECH_EXECUTIVE",
-  "ADMIN",
 ]);
 
 /** BGOS onboarding workflow engine (forms, tech queue, delivery). */
@@ -118,7 +117,6 @@ const PAGE_RULES: RouteRule[] = [
   {
     prefix: "/iceconnect/internal-onboarding",
     roles: new Set([
-      "ADMIN",
       "MANAGER",
       "OPERATIONS_HEAD",
       "SITE_ENGINEER",
@@ -357,6 +355,12 @@ export function roleCanAccessPath(
     return false;
   }
 
+  /** Company boss: BGOS + boss APIs only — never employee ICECONNECT surfaces (any host / dev). */
+  if (role === "ADMIN" && !opts?.superBoss) {
+    if (p === "/iceconnect" || p.startsWith("/iceconnect/")) return false;
+    if (p.startsWith("/api/iceconnect") || p.startsWith("/api/internal-sales")) return false;
+  }
+
   if (pathname === "/iceconnect" || pathname === "/iceconnect/") {
     return PRIVILEGED.has(role);
   }
@@ -396,29 +400,28 @@ export function postLoginDestination(
 
 /** Path segment after `/iceconnect/` → roles allowed on that dashboard. */
 export const ICECONNECT_DASHBOARD_ROLES: Record<string, readonly string[]> = {
-  "my-journey": ["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
-  leads: ["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
-  customers: ["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
-  wallet: ["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
-  notifications: ["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
-  profile: ["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
-  "tech-onboarding": ["TECH_HEAD", "TECH_EXECUTIVE", "ADMIN", "MANAGER"],
-  sales: ["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER"],
-  "sales-head": ["SALES_HEAD", "ADMIN", "MANAGER"],
-  partner: ["CHANNEL_PARTNER", "ADMIN", "MANAGER"],
-  operations: ["OPERATIONS_HEAD", "ADMIN", "MANAGER"],
-  site: ["SITE_ENGINEER", "ADMIN", "MANAGER"],
-  pro: ["PRO", "ADMIN", "MANAGER"],
-  install: ["INSTALLATION_TEAM", "ADMIN", "MANAGER"],
-  service: ["SERVICE_TEAM", "ADMIN", "MANAGER"],
-  inventory: ["INVENTORY_MANAGER", "ADMIN", "MANAGER"],
-  accounts: ["ACCOUNTANT", "ADMIN", "MANAGER"],
-  loan: ["LCO", "ADMIN", "MANAGER"],
-  hr: ["HR_MANAGER", "ADMIN", "MANAGER"],
-  "internal-sales": ["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
-  "internal-tech": ["TECH_HEAD", "TECH_EXECUTIVE", "ADMIN", "MANAGER"],
+  "my-journey": ["SALES_EXECUTIVE", "TELECALLER", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
+  leads: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
+  customers: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
+  wallet: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
+  notifications: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
+  profile: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
+  "tech-onboarding": ["TECH_HEAD", "TECH_EXECUTIVE", "MANAGER"],
+  sales: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER"],
+  "sales-head": ["SALES_HEAD", "MANAGER"],
+  partner: ["CHANNEL_PARTNER", "MANAGER"],
+  operations: ["OPERATIONS_HEAD", "MANAGER"],
+  site: ["SITE_ENGINEER", "MANAGER"],
+  pro: ["PRO", "MANAGER"],
+  install: ["INSTALLATION_TEAM", "MANAGER"],
+  service: ["SERVICE_TEAM", "MANAGER"],
+  inventory: ["INVENTORY_MANAGER", "MANAGER"],
+  accounts: ["ACCOUNTANT", "MANAGER"],
+  loan: ["LCO", "MANAGER"],
+  hr: ["HR_MANAGER", "MANAGER"],
+  "internal-sales": ["SALES_EXECUTIVE", "TELECALLER", "MANAGER", "TECH_HEAD", "TECH_EXECUTIVE"],
+  "internal-tech": ["TECH_HEAD", "TECH_EXECUTIVE", "MANAGER"],
   "internal-onboarding": [
-    "ADMIN",
     "MANAGER",
     "OPERATIONS_HEAD",
     "SITE_ENGINEER",

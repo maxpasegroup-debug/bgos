@@ -86,7 +86,6 @@ export default async function IceconnectWorkspaceLayout({
       "MANAGER",
       "TECH_HEAD",
       "TECH_EXECUTIVE",
-      "ADMIN",
     ]);
     if (co?.internalSalesOrg === true && hubRoles.has(user.role)) {
       salesHubNav = SALES_HUB_ORDER.filter((seg) =>

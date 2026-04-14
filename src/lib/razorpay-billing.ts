@@ -2,6 +2,7 @@ import "server-only";
 
 import crypto from "node:crypto";
 import { CompanySubscriptionStatus, type CompanyPlan, Prisma } from "@prisma/client";
+import Razorpay from "razorpay";
 import { prisma } from "@/lib/prisma";
 
 /** ₹6,000 / month in paise */
@@ -45,7 +46,8 @@ export function verifyRazorpayPaymentSignature(
   if (expected.length !== signature.length) return false;
   try {
     return crypto.timingSafeEqual(Buffer.from(expected, "utf8"), Buffer.from(signature, "utf8"));
-  } catch {
+  } catch (e) {
+    console.error("ERROR:razorpay.verifyPaymentSignature", e);
     return false;
   }
 }
@@ -56,7 +58,8 @@ export function verifyRazorpayWebhookSignature(rawBody: string, signature: strin
   if (expected.length !== signature.length) return false;
   try {
     return crypto.timingSafeEqual(Buffer.from(expected, "utf8"), Buffer.from(signature, "utf8"));
-  } catch {
+  } catch (e) {
+    console.error("ERROR:razorpay.verifyWebhookSignature", e);
     return false;
   }
 }
@@ -165,6 +168,81 @@ export type NormalizedRazorpayPaymentCaptured = {
   amountPaise: number;
   currency: string;
 };
+
+export type NormalizedRazorpayPaymentFailed = {
+  paymentId: string;
+  orderId: string;
+  amountPaise: number;
+  currency: string;
+};
+
+/** Best-effort parse of `payment.failed` webhook JSON. */
+export function parsePaymentFailedPayload(raw: unknown): NormalizedRazorpayPaymentFailed | null {
+  if (!raw || typeof raw !== "object") return null;
+  const root = raw as Record<string, unknown>;
+  if (root.event !== "payment.failed") return null;
+  const payload = root.payload;
+  if (!payload || typeof payload !== "object") return null;
+  const payWrap = (payload as Record<string, unknown>).payment;
+  if (!payWrap || typeof payWrap !== "object") return null;
+  const ent = (payWrap as Record<string, unknown>).entity;
+  if (!ent || typeof ent !== "object") return null;
+  const e = ent as Record<string, unknown>;
+  const paymentId = typeof e.id === "string" ? e.id : "";
+  const orderId = typeof e.order_id === "string" ? e.order_id : "";
+  const amount = typeof e.amount === "number" ? e.amount : Number(e.amount);
+  const currency = typeof e.currency === "string" ? e.currency : "INR";
+  if (!orderId || !Number.isFinite(amount)) return null;
+  return { paymentId, orderId, amountPaise: amount, currency };
+}
+
+/**
+ * Persist failed payment against the checkout order (status `failed`). Idempotent on `razorpayOrderId`.
+ */
+export async function recordRazorpayPaymentFailed(normalized: NormalizedRazorpayPaymentFailed): Promise<boolean> {
+  const billing = getRazorpayServerConfig();
+  if (!billing) return false;
+
+  try {
+    const rz = new Razorpay({ key_id: billing.keyId, key_secret: billing.keySecret });
+    const order = await rz.orders.fetch(normalized.orderId);
+    const notes = decodeRazorpayOrderNotes(order.notes);
+    if (!notes) {
+      console.warn("[razorpay] payment.failed: order notes missing", normalized.orderId);
+      return false;
+    }
+
+    const company = await prisma.company.findUnique({
+      where: { id: notes.companyId },
+      select: { ownerId: true },
+    });
+    if (!company) return false;
+
+    const userId = notes.userId.length > 0 ? notes.userId : company.ownerId;
+
+    await prisma.razorpayPayment.upsert({
+      where: { razorpayOrderId: normalized.orderId },
+      create: {
+        companyId: notes.companyId,
+        userId,
+        razorpayOrderId: normalized.orderId,
+        razorpayPaymentId: normalized.paymentId || null,
+        plan: notes.plan,
+        amount: normalized.amountPaise,
+        currency: normalized.currency.toUpperCase() || "INR",
+        status: "failed",
+      },
+      update: {
+        ...(normalized.paymentId ? { razorpayPaymentId: normalized.paymentId } : {}),
+        status: "failed",
+      },
+    });
+    return true;
+  } catch (e) {
+    console.error("ERROR:razorpay.recordRazorpayPaymentFailed", e);
+    return false;
+  }
+}
 
 /** Best-effort parse of `payment.captured` webhook JSON (Node route only). */
 export function parsePaymentCapturedPayload(raw: unknown): NormalizedRazorpayPaymentCaptured | null {

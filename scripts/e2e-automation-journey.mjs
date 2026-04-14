@@ -110,7 +110,7 @@ async function main() {
     });
     if (!res.ok || !json.ok) fail("signup", `status ${res.status}`, json);
     jar = mergeCookieJar("", res);
-    if (!jar.includes("bgos_session=")) fail("signup", "no session cookie");
+    if (!jar.includes("token=")) fail("signup", "no session cookie");
   }
 
   {

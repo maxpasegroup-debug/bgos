@@ -18,6 +18,16 @@ export async function finalizeSubmissionToSubmitted(submissionId: string): Promi
     throw new Error("INVALID_STATUS");
   }
 
+  const payload = row.data;
+  if (
+    payload == null ||
+    typeof payload !== "object" ||
+    Array.isArray(payload) ||
+    Object.keys(payload as object).length === 0
+  ) {
+    throw new Error("EMPTY_SUBMISSION");
+  }
+
   const internal = await prisma.company.findFirst({
     where: { internalSalesOrg: true },
     select: { id: true },

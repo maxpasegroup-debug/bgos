@@ -3,7 +3,8 @@
  */
 import { jwtCompanyPlanFromUnknown, type JwtCompanyPlan } from "./plan-tier";
 
-export const AUTH_COOKIE_NAME = "bgos_session";
+/** HTTP-only JWT session cookie (middleware + APIs). */
+export const AUTH_COOKIE_NAME = "token";
 /** HTTP-only cookie: validated against JWT memberships in middleware; DB check in APIs. */
 export const ACTIVE_COMPANY_COOKIE_NAME = "activeCompanyId";
 export const AUTH_JWT_ISSUER = "bgos";

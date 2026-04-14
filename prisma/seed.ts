@@ -16,6 +16,13 @@ import { prisma } from "../src/lib/prisma";
 import { companyMembershipClass } from "../src/lib/user-company";
 
 async function main() {
+  if (process.env.NODE_ENV === "production") {
+    console.error(
+      "[seed] Refusing to run: NODE_ENV=production. Seeds wipe data and are for dev/staging only.",
+    );
+    process.exit(1);
+  }
+
   await prisma.activityLog.deleteMany();
   await prisma.onboardingMessage.deleteMany();
   await prisma.onboardingSubmissionTechTask.deleteMany();

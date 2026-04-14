@@ -32,6 +32,13 @@ export async function POST(
       if (e instanceof Error && e.message === "NOT_FOUND") {
         return jsonError(404, "NOT_FOUND", "Not found.");
       }
+      if (e instanceof Error && e.message === "EMPTY_SUBMISSION") {
+        return jsonError(
+          400,
+          "EMPTY_SUBMISSION",
+          "Complete the onboarding form before submitting.",
+        );
+      }
       throw e;
     }
 

@@ -465,6 +465,29 @@ export async function middleware(request: NextRequest) {
 
   const role = String(verified.payload.role);
 
+  /** Company boss (ADMIN) must use bgos.online — not employee dashboards on iceconnect.in. */
+  if (tenant === "ice" && !edgeSuperBoss && role === "ADMIN") {
+    const authOnlyApi =
+      normalizedPath === "/api/auth/me" ||
+      normalizedPath === "/api/auth/logout" ||
+      (normalizedPath === "/api/auth/refresh-session" && method === "POST");
+    if (!authOnlyApi) {
+      if (pathname.startsWith("/api")) {
+        return NextResponse.json(
+          {
+            ok: false as const,
+            error: "Boss workspace is on bgos.online",
+            code: "WRONG_HOST" as const,
+          },
+          { status: 403 },
+        );
+      }
+      const bossLogin = new URL("/login", publicBgosOrigin());
+      bossLogin.searchParams.set("reason", "boss");
+      return NextResponse.redirect(bossLogin);
+    }
+  }
+
   if (pathname === "/iceconnect" || pathname === "/iceconnect/") {
     const homePath = edgeSuperBoss ? "/bgos/control" : getRoleHome(role);
     if (normalizePathname(homePath) !== normalizePathname(pathname)) {

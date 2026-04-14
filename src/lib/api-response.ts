@@ -33,6 +33,23 @@ export function jsonError(
   return NextResponse.json(body, { status });
 }
 
+/** Structured server logging for route handlers (never swallow errors silently). */
+export function logCaughtError(scope: string, error: unknown): void {
+  console.error(`ERROR:${scope}`, error);
+}
+
+/** JSON error body with `success: false`, user-facing `error`, and `details` from the caught value. */
+export function jsonCaughtError(
+  scope: string,
+  error: unknown,
+  status = 500,
+  publicMessage = "Something failed",
+): NextResponse<ApiErrorBody> {
+  logCaughtError(scope, error);
+  const details = error instanceof Error ? error.message : String(error);
+  return jsonError(status, "SERVER_ERROR", publicMessage, details);
+}
+
 export function zodValidationErrorResponse(error: z.ZodError): NextResponse<ApiErrorBody> {
   return jsonError(400, "VALIDATION_ERROR", "Invalid request", error.flatten());
 }
@@ -50,7 +67,8 @@ export async function parseJsonBody(
     }
     const data = JSON.parse(text) as unknown;
     return { ok: true, data };
-  } catch {
+  } catch (e) {
+    console.error("[api] Invalid JSON body", e);
     return { ok: false, response: jsonError(400, "BAD_REQUEST", "Invalid JSON body") };
   }
 }
@@ -66,7 +84,8 @@ export async function parseJsonBodyOptional(
     }
     const data = JSON.parse(text) as unknown;
     return { ok: true, data };
-  } catch {
+  } catch (e) {
+    console.error("[api] Invalid JSON body (optional)", e);
     return { ok: false, response: jsonError(400, "BAD_REQUEST", "Invalid JSON body") };
   }
 }
