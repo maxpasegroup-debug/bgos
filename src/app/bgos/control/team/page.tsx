@@ -48,13 +48,25 @@ export default function ControlTeamPage() {
     setError(null);
     try {
       const res = await fetch("/api/bgos/control/team", { credentials: "include" });
-      const j = (await res.json()) as TeamJson;
+      const j = (await res.json()) as TeamJson & {
+        error?: string;
+        code?: string;
+      };
       if (!res.ok || !j.ok || !j.departments) {
-        setError("Could not load team.");
+        const hint =
+          typeof j.error === "string" && j.error.trim()
+            ? j.error
+            : j.code === "FORBIDDEN"
+              ? "Sign in with the platform boss account (BGOS_BOSS_EMAIL)."
+              : j.code === "MISCONFIGURED"
+                ? "Server: set BGOS_BOSS_EMAIL in environment."
+                : "Could not load team.";
+        setError(hint);
         return;
       }
       setData(j.departments);
-    } catch {
+    } catch (err) {
+      console.error("ERROR:control/team load", err);
       setError("Network error.");
     }
   }, []);

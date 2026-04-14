@@ -44,21 +44,38 @@ export default function ControlClientsPage() {
         fetch("/api/bgos/control/clients", { credentials: "include" }),
         fetch("/api/bgos/control/summary", { credentials: "include" }),
       ]);
+      const cj = (await cRes.json()) as {
+        ok?: boolean;
+        companies?: CompanyRow[];
+        error?: string;
+        code?: string;
+        details?: string;
+      };
       if (!cRes.ok) {
-        setError("Could not load clients.");
+        const hint =
+          typeof cj.error === "string" && cj.error.trim()
+            ? cj.error
+            : cj.code === "FORBIDDEN"
+              ? "Sign in with the platform boss account (BGOS_BOSS_EMAIL)."
+              : cj.code === "MISCONFIGURED"
+                ? "Server: set BGOS_BOSS_EMAIL in environment."
+                : "Could not load clients.";
+        setError(hint);
         return;
       }
-      const cj = (await cRes.json()) as { ok?: boolean; companies?: CompanyRow[] };
       if (cj.ok && Array.isArray(cj.companies)) setCompanies(cj.companies);
 
       if (sRes.ok) {
         const sj = (await sRes.json()) as {
           ok?: boolean;
           metrics?: { totalCompanies: number; totalLeads: number; activeUsers: number };
+          error?: string;
+          code?: string;
         };
         if (sj.ok && sj.metrics) setSummary(sj.metrics);
       }
-    } catch {
+    } catch (err) {
+      console.error("ERROR:control/clients load", err);
       setError("Network error.");
     }
   }, []);

@@ -1,19 +1,21 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { logCaughtError } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
 import { requireSuperBossApi } from "@/lib/require-super-boss";
 import { bossControlClientCategory, type BossControlClientCategory } from "@/lib/bgos-control-client-category";
 
 export async function GET(request: NextRequest) {
-  const session = requireSuperBossApi(request);
-  if (session instanceof NextResponse) return session;
+  try {
+    const session = requireSuperBossApi(request);
+    if (session instanceof NextResponse) return session;
 
-  const { searchParams } = new URL(request.url);
-  const filter = searchParams.get("category") as BossControlClientCategory | null;
+    const { searchParams } = new URL(request.url);
+    const filter = searchParams.get("category") as BossControlClientCategory | null;
 
-  const includeArchived = request.nextUrl.searchParams.get("includeArchived") === "1";
+    const includeArchived = request.nextUrl.searchParams.get("includeArchived") === "1";
 
-  const rows = await prisma.company.findMany({
+    const rows = await prisma.company.findMany({
     where: {
       internalSalesOrg: false,
       ...(includeArchived ? {} : { archivedAt: null }),
@@ -52,10 +54,22 @@ export async function GET(request: NextRequest) {
     bossName: string;
   }[];
 
-  const filtered =
-    filter && ["TRIAL", "BASIC", "PRO", "ENTERPRISE", "LOST"].includes(filter)
-      ? companies.filter((x) => x.category === filter)
-      : companies;
+    const filtered =
+      filter && ["TRIAL", "BASIC", "PRO", "ENTERPRISE", "LOST"].includes(filter)
+        ? companies.filter((x) => x.category === filter)
+        : companies;
 
-  return NextResponse.json({ ok: true as const, companies: filtered });
+    return NextResponse.json({ ok: true as const, companies: filtered });
+  } catch (e) {
+    logCaughtError("GET /api/bgos/control/clients", e);
+    return NextResponse.json(
+      {
+        ok: false as const,
+        error: "Could not load clients",
+        code: "SERVER_ERROR" as const,
+        details: e instanceof Error ? e.message : String(e),
+      },
+      { status: 500 },
+    );
+  }
 }
