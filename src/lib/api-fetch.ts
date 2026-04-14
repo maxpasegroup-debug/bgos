@@ -101,3 +101,20 @@ export async function readApiErrorMessage(res: Response, fallback: string): Prom
   }
   return formatFetchFailure(null, fallback, { status: res.status });
 }
+
+/**
+ * Safe JSON parse for API responses (handles empty/non-JSON bodies).
+ */
+export async function readApiJson<T = unknown>(
+  res: Response,
+  context = "api",
+): Promise<T | null> {
+  const text = await res.text();
+  if (!text.trim()) return null;
+  try {
+    return JSON.parse(text) as T;
+  } catch (e) {
+    console.error("API JSON PARSE ERROR:", { context, status: res.status, body: text, error: e });
+    return null;
+  }
+}

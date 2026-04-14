@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
 import { logCaughtError } from "@/lib/api-response";
+import { getApiCache, setApiCache } from "@/lib/api-runtime-cache";
 import { prisma } from "@/lib/prisma";
 import { requireSuperBossApi } from "@/lib/require-super-boss";
 import { getOrCreateInternalSalesCompanyId } from "@/lib/internal-sales-org";
@@ -20,6 +21,21 @@ export async function GET(request: NextRequest) {
         { ok: false as const, error: org.error, code: "INTERNAL_ORG" as const },
         { status: 500 },
       );
+    }
+    const cacheKey = `control:team:${org.companyId}`;
+    const cached = getApiCache<{
+      internalCompanyId: string;
+      departments: {
+        sales: { userId: string; name: string; email: string; role: UserRole }[];
+        tech: { userId: string; name: string; email: string; role: UserRole }[];
+      };
+    }>(cacheKey);
+    if (cached) {
+      return NextResponse.json({
+        ok: true as const,
+        internalCompanyId: cached.internalCompanyId,
+        departments: cached.departments,
+      });
     }
 
     const memberships = await prisma.userCompany.findMany({
@@ -49,14 +65,19 @@ export async function GET(request: NextRequest) {
       role: m.jobRole,
     }));
 
-    return NextResponse.json({
+    const payload = {
       ok: true as const,
       internalCompanyId: org.companyId,
       departments: {
         sales,
         tech,
       },
+    };
+    setApiCache(cacheKey, {
+      internalCompanyId: payload.internalCompanyId,
+      departments: payload.departments,
     });
+    return NextResponse.json(payload);
   } catch (e) {
     logCaughtError("GET /api/bgos/control/team", e);
     return NextResponse.json(

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useBgosTheme } from "@/components/bgos/BgosThemeContext";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
-import { formatFetchFailure, apiFetch } from "@/lib/api-fetch";
+import { apiFetch, formatFetchFailure, readApiJson } from "@/lib/api-fetch";
 
 type Category = "TRIAL" | "BASIC" | "PRO" | "ENTERPRISE" | "LOST";
 
@@ -45,7 +45,7 @@ export default function ControlClientsPage() {
         apiFetch("/api/bgos/control/clients", { credentials: "include" }),
         apiFetch("/api/bgos/control/summary", { credentials: "include" }),
       ]);
-      const cj = (await cRes.json()) as {
+      const cj = ((await readApiJson(cRes, "control/clients")) ?? {}) as {
         ok?: boolean;
         companies?: CompanyRow[];
         error?: string;
@@ -67,7 +67,7 @@ export default function ControlClientsPage() {
       if (cj.ok && Array.isArray(cj.companies)) setCompanies(cj.companies);
 
       if (sRes.ok) {
-        const sj = (await sRes.json()) as {
+        const sj = ((await readApiJson(sRes, "control/summary")) ?? {}) as {
           ok?: boolean;
           metrics?: { totalCompanies: number; totalLeads: number; activeUsers: number };
           error?: string;

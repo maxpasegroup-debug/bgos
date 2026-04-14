@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useBgosTheme } from "@/components/bgos/BgosThemeContext";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
-import { formatFetchFailure, apiFetch } from "@/lib/api-fetch";
+import { apiFetch, formatFetchFailure, readApiJson } from "@/lib/api-fetch";
 
 type Item = {
   id: string;
@@ -25,7 +25,12 @@ export default function ControlTechnicalPage() {
     setError(null);
     try {
       const res = await apiFetch("/api/bgos/control/tech-queue", { credentials: "include" });
-      const j = (await res.json()) as { ok?: boolean; items?: Item[]; error?: string; code?: string };
+      const j = ((await readApiJson(res, "control/technical")) ?? {}) as {
+        ok?: boolean;
+        items?: Item[];
+        error?: string;
+        code?: string;
+      };
       if (!res.ok || !j.ok || !j.items) {
         const hint =
           typeof j.error === "string" && j.error.trim()

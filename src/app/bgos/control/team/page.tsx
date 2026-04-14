@@ -10,7 +10,7 @@ import {
   EMAIL_ALREADY_IN_USE_MESSAGE,
   NAME_SIMILARITY_EMAIL_UNIQUE_HINT,
 } from "@/lib/user-identity-messages";
-import { formatFetchFailure, apiFetch } from "@/lib/api-fetch";
+import { apiFetch, formatFetchFailure, readApiJson } from "@/lib/api-fetch";
 
 const iceconnectEmployeeSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
@@ -49,7 +49,7 @@ export default function ControlTeamPage() {
     setError(null);
     try {
       const res = await apiFetch("/api/bgos/control/team", { credentials: "include" });
-      const j = (await res.json()) as TeamJson & {
+      const j = ((await readApiJson(res, "control/team")) ?? {}) as TeamJson & {
         error?: string;
         code?: string;
       };
@@ -107,7 +107,7 @@ export default function ControlTeamPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...fields.data, role }),
       });
-      const j = (await res.json()) as {
+      const j = ((await readApiJson(res, "control/team/employees")) ?? {}) as {
         ok?: boolean;
         error?: string;
         message?: string;

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useBgosTheme } from "@/components/bgos/BgosThemeContext";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
-import { formatFetchFailure, apiFetch } from "@/lib/api-fetch";
+import { apiFetch, formatFetchFailure, readApiJson } from "@/lib/api-fetch";
 
 type AccountsJson = {
   ok?: boolean;
@@ -30,7 +30,10 @@ export default function ControlAccountsPage() {
     setError(null);
     try {
       const res = await apiFetch("/api/bgos/control/accounts-overview", { credentials: "include" });
-      const j = (await res.json()) as AccountsJson & { error?: string; code?: string };
+      const j = ((await readApiJson(res, "control/accounts")) ?? {}) as AccountsJson & {
+        error?: string;
+        code?: string;
+      };
       if (!res.ok || !j.ok) {
         const hint =
           typeof j.error === "string" && j.error.trim()

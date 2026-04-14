@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { logCaughtError } from "@/lib/api-response";
+import { getApiCache, setApiCache } from "@/lib/api-runtime-cache";
 import { prisma } from "@/lib/prisma";
 import { requireSuperBossApi } from "@/lib/require-super-boss";
 import { bossControlClientCategory, type BossControlClientCategory } from "@/lib/bgos-control-client-category";
@@ -14,6 +15,11 @@ export async function GET(request: NextRequest) {
     const filter = searchParams.get("category") as BossControlClientCategory | null;
 
     const includeArchived = request.nextUrl.searchParams.get("includeArchived") === "1";
+    const cacheKey = `control:clients:includeArchived=${includeArchived}:filter=${filter ?? "all"}`;
+    const cached = getApiCache<{ companies: unknown[] }>(cacheKey);
+    if (cached) {
+      return NextResponse.json({ ok: true as const, companies: cached.companies });
+    }
 
     const rows = await prisma.company.findMany({
     where: {
@@ -59,6 +65,7 @@ export async function GET(request: NextRequest) {
         ? companies.filter((x) => x.category === filter)
         : companies;
 
+    setApiCache(cacheKey, { companies: filtered });
     return NextResponse.json({ ok: true as const, companies: filtered });
   } catch (e) {
     logCaughtError("GET /api/bgos/control/clients", e);

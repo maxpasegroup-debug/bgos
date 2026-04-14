@@ -8,6 +8,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { ACTIVITY_TYPES, logActivity } from "@/lib/activity-log";
+import { deleteApiCacheByPrefix, getApiCache, setApiCache } from "@/lib/api-runtime-cache";
 import { bossControlClientCategory } from "@/lib/bgos-control-client-category";
 import { prisma } from "@/lib/prisma";
 import { requireSuperBossApi } from "@/lib/require-super-boss";
@@ -42,10 +43,26 @@ const patchSchema = z
 
 type Ctx = { params: Promise<{ companyId: string }> };
 
+function invalidateControlCaches(companyId: string): void {
+  deleteApiCacheByPrefix("control:clients:");
+  deleteApiCacheByPrefix("control:summary");
+  deleteApiCacheByPrefix("control:sales-overview");
+  deleteApiCacheByPrefix("control:tech-queue");
+  deleteApiCacheByPrefix("control:vision");
+  deleteApiCacheByPrefix("control:accounts-overview");
+  deleteApiCacheByPrefix("control:team:");
+  deleteApiCacheByPrefix(`control:client:${companyId}`);
+}
+
 export async function GET(request: NextRequest, ctx: Ctx) {
   const session = requireSuperBossApi(request);
   if (session instanceof NextResponse) return session;
   const { companyId } = await ctx.params;
+  const cacheKey = `control:client:${companyId}`;
+  const cached = getApiCache<Record<string, unknown>>(cacheKey);
+  if (cached) {
+    return NextResponse.json(cached);
+  }
 
   const company = await prisma.company.findFirst({
     where: { id: companyId, internalSalesOrg: false },
@@ -192,7 +209,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
     })),
   ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  return NextResponse.json({
+  const payload = {
     ok: true as const,
     company: {
       id: company.id,
@@ -236,7 +253,9 @@ export async function GET(request: NextRequest, ctx: Ctx) {
       : null,
     assignableSalesExecutives,
     activityTimeline,
-  });
+  };
+  setApiCache(cacheKey, payload);
+  return NextResponse.json(payload);
 }
 
 export async function PATCH(request: NextRequest, ctx: Ctx) {
@@ -405,6 +424,7 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     });
   }
 
+  invalidateControlCaches(companyId);
   return NextResponse.json({ ok: true as const });
 }
 
@@ -434,5 +454,6 @@ export async function DELETE(request: NextRequest, ctx: Ctx) {
 
   await prisma.company.delete({ where: { id: companyId } });
 
+  invalidateControlCaches(companyId);
   return NextResponse.json({ ok: true as const });
 }

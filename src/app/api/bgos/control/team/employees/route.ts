@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { parseJsonBodyZod, jsonError, prismaKnownErrorResponse } from "@/lib/api-response";
+import { deleteApiCacheByPrefix } from "@/lib/api-runtime-cache";
 import { requireSuperBossApi } from "@/lib/require-super-boss";
 import { hashPassword } from "@/lib/password";
 import { handleApiError } from "@/lib/route-error";
@@ -80,6 +81,8 @@ export async function POST(request: NextRequest) {
       return { user: u, membership: mem };
     });
 
+    deleteApiCacheByPrefix("control:team:");
+    deleteApiCacheByPrefix("control:summary");
     return NextResponse.json(
       {
         ok: true as const,

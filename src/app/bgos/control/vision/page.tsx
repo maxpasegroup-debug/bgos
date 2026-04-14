@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useBgosTheme } from "@/components/bgos/BgosThemeContext";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
-import { formatFetchFailure, apiFetch } from "@/lib/api-fetch";
+import { apiFetch, formatFetchFailure, readApiJson } from "@/lib/api-fetch";
 
 type VisionJson = {
   ok?: boolean;
@@ -31,7 +31,10 @@ export default function ControlVisionPage() {
     setError(null);
     try {
       const res = await apiFetch("/api/bgos/control/vision", { credentials: "include" });
-      const j = (await res.json()) as VisionJson & { error?: string; code?: string };
+      const j = ((await readApiJson(res, "control/vision")) ?? {}) as VisionJson & {
+        error?: string;
+        code?: string;
+      };
       if (!res.ok || !j.ok) {
         const hint =
           typeof j.error === "string" && j.error.trim()
@@ -74,7 +77,10 @@ export default function ControlVisionPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ companyId: companyId.trim(), targetRevenueOneMonth, targetLeadsOneMonth }),
     });
-    const j = (await res.json()) as { ok?: boolean; error?: string };
+    const j = ((await readApiJson(res, "control/vision/company-target")) ?? {}) as {
+      ok?: boolean;
+      error?: string;
+    };
     setSaveMsg(j.ok ? "Saved company target." : j.error ?? "Save failed");
     if (j.ok) void load();
   }
