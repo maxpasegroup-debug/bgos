@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -98,7 +100,7 @@ export function IceconnectSalesLeadsClient() {
     setLoading(true);
     try {
       const qs = buildQuery(range, customFrom, customTo, statusFilter);
-      const res = await fetch(`/api/iceconnect/executive/leads?${qs}`, { credentials: "include" });
+      const res = await apiFetch(`/api/iceconnect/executive/leads?${qs}`, { credentials: "include" });
       const j = (await res.json()) as {
         ok?: boolean;
         leads?: LeadItem[];
@@ -118,8 +120,9 @@ export function IceconnectSalesLeadsClient() {
       setLeads(j.leads ?? []);
       if (j.stats) setStats(j.stats);
       setManagerView(j.view?.manager === true);
-    } catch {
-      setErr("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     } finally {
       setLoading(false);
     }
@@ -146,7 +149,7 @@ export function IceconnectSalesLeadsClient() {
     setBusy("create");
     setErr(null);
     try {
-      const res = await fetch("/api/iceconnect/executive/leads", {
+      const res = await apiFetch("/api/iceconnect/executive/leads", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -163,8 +166,9 @@ export function IceconnectSalesLeadsClient() {
       setNotes("");
       setModalOpen(false);
       await load();
-    } catch {
-      setErr("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     } finally {
       setBusy(null);
     }
@@ -174,7 +178,7 @@ export function IceconnectSalesLeadsClient() {
     setBusy(leadId);
     setErr(null);
     try {
-      const res = await fetch("/api/iceconnect/executive/leads/stage", {
+      const res = await apiFetch("/api/iceconnect/executive/leads/stage", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -186,8 +190,9 @@ export function IceconnectSalesLeadsClient() {
         return;
       }
       await load();
-    } catch {
-      setErr("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     } finally {
       setBusy(null);
     }
@@ -197,7 +202,7 @@ export function IceconnectSalesLeadsClient() {
     setBusy(leadId);
     setErr(null);
     try {
-      const res = await fetch("/api/iceconnect/executive/leads/account", {
+      const res = await apiFetch("/api/iceconnect/executive/leads/account", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -218,8 +223,9 @@ export function IceconnectSalesLeadsClient() {
       } else {
         await load();
       }
-    } catch {
-      setErr("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     } finally {
       setBusy(null);
     }

@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { PaymentStatus } from "@prisma/client";
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
@@ -38,7 +40,7 @@ export function IceconnectAccountsDashboard() {
     setErr(null);
     setLoading(true);
     try {
-      const res = await fetch("/api/iceconnect/accounts/payments", { credentials: "include" });
+      const res = await apiFetch("/api/iceconnect/accounts/payments", { credentials: "include" });
       if (!res.ok) {
         let msg = "Could not load payments.";
         try {
@@ -63,8 +65,9 @@ export function IceconnectAccountsDashboard() {
           ? data.summary
           : null,
       );
-    } catch {
-      setErr("Network error — check your connection.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     } finally {
       setLoading(false);
     }
@@ -80,7 +83,7 @@ export function IceconnectAccountsDashboard() {
     if (!Number.isFinite(n) || n <= 0) return;
     setSubmitting(true);
     try {
-      const res = await fetch("/api/iceconnect/accounts/entry", {
+      const res = await apiFetch("/api/iceconnect/accounts/entry", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

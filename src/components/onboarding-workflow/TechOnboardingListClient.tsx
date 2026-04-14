@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useBgosTheme } from "@/components/bgos/BgosThemeContext";
@@ -24,15 +26,16 @@ export function TechOnboardingListClient() {
   const load = useCallback(async () => {
     setErr(null);
     try {
-      const res = await fetch("/api/onboarding/workflow/tech", { credentials: "include" });
+      const res = await apiFetch("/api/onboarding/workflow/tech", { credentials: "include" });
       const j = (await res.json()) as { ok?: boolean; submissions?: Row[]; error?: string };
       if (!res.ok || !j.ok) {
         setErr(j.error ?? "Could not load");
         return;
       }
       setRows(j.submissions ?? []);
-    } catch {
-      setErr("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     }
   }, []);
 

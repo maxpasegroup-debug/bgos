@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -27,7 +29,7 @@ function formatInr(n: number) {
 }
 
 async function fetchDashboardJson(range: string): Promise<DashboardPayload | null> {
-  const res = await fetch(`/api/dashboard?range=${encodeURIComponent(range)}`, { credentials: "include" });
+  const res = await apiFetch(`/api/dashboard?range=${encodeURIComponent(range)}`, { credentials: "include" });
   if (!res.ok) return null;
   return (await res.json()) as DashboardPayload;
 }
@@ -144,7 +146,7 @@ export function BgosIntelligenceHome() {
     let c = false;
     (async () => {
       try {
-        const res = await fetch("/api/bgos/growth-plan", { credentials: "include" });
+        const res = await apiFetch("/api/bgos/growth-plan", { credentials: "include" });
         const j = (await res.json()) as {
           data?: { targetRevenueOneMonth?: number; targetLeadsOneMonth?: number };
           targetRevenueOneMonth?: number;
@@ -204,7 +206,7 @@ export function BgosIntelligenceHome() {
   async function saveGrowthPlan() {
     setGrowthSaving(true);
     try {
-      await fetch("/api/bgos/growth-plan", {
+      await apiFetch("/api/bgos/growth-plan", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

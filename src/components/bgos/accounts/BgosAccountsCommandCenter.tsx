@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import { UserManualCategory } from "@prisma/client";
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -131,7 +133,7 @@ export function BgosAccountsCommandCenter() {
         expenseMonth: expenseFilterMonth,
       });
       if (expenseFilterCategory.trim()) qs.set("expenseCategory", expenseFilterCategory.trim());
-      const res = await fetch(`/api/bgos/accounts?${qs.toString()}`, { credentials: "include" });
+      const res = await apiFetch(`/api/bgos/accounts?${qs.toString()}`, { credentials: "include" });
       const j = (await res.json()) as { data?: AccountsData; message?: string; error?: string };
       if (!res.ok) {
         setError(j.message ?? j.error ?? "Could not load accounts.");
@@ -153,13 +155,13 @@ export function BgosAccountsCommandCenter() {
 
   async function openInvoice(id: string) {
     setDetailId(id);
-    const res = await fetch(`/api/invoice/${encodeURIComponent(id)}`, { credentials: "include" });
+    const res = await apiFetch(`/api/invoice/${encodeURIComponent(id)}`, { credentials: "include" });
     const j = (await res.json()) as InvoiceDetail;
     setDetail(j);
   }
   async function addPayment() {
     if (!detail) return;
-    await fetch("/api/payment/add", {
+    await apiFetch("/api/payment/add", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -174,7 +176,7 @@ export function BgosAccountsCommandCenter() {
     await load();
   }
   async function addExpense() {
-    await fetch("/api/expense/create", {
+    await apiFetch("/api/expense/create", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -190,7 +192,7 @@ export function BgosAccountsCommandCenter() {
     await load();
   }
   async function addLco() {
-    await fetch("/api/bgos/accounts/lco", {
+    await apiFetch("/api/bgos/accounts/lco", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -206,7 +208,7 @@ export function BgosAccountsCommandCenter() {
     await load();
   }
   async function setLcoStatus(id: string, status: "PENDING" | "APPROVED" | "REJECTED") {
-    await fetch("/api/bgos/accounts/lco", {
+    await apiFetch("/api/bgos/accounts/lco", {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },

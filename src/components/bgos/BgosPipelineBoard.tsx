@@ -12,6 +12,7 @@ import {
 } from "@/lib/lead-pipeline";
 import { useBgosDashboardContext } from "./BgosDataProvider";
 import { fadeUp } from "./motion";
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 
 type PipelineLeadCard = {
   id: string;
@@ -195,13 +196,14 @@ export function BgosPipelineBoard() {
   const loadPipeline = useCallback(async () => {
     setBanner(null);
     try {
-      const res = await fetch("/api/leads/pipeline", { credentials: "include" });
+      const res = await apiFetch("/api/leads/pipeline");
       let json: unknown;
       try {
         json = await res.json();
-      } catch {
+      } catch (e) {
+        console.error("API ERROR:", e);
         setStages(emptyBoard());
-        setBanner("Could not read pipeline data.");
+        setBanner(`Could not read pipeline data. (HTTP ${res.status})`);
         return;
       }
       const parsed = parsePipelinePayload(json);
@@ -209,15 +211,16 @@ export function BgosPipelineBoard() {
         setStages(emptyBoard());
         const msg =
           json && typeof json === "object" && typeof (json as { error?: string }).error === "string"
-            ? (json as { error: string }).error
-            : "Pipeline could not be loaded.";
+            ? `${(json as { error: string }).error} (HTTP ${res.status})`
+            : `Pipeline could not be loaded. (HTTP ${res.status})`;
         setBanner(msg);
         return;
       }
       setStages(parsed);
-    } catch {
+    } catch (e) {
+      console.error("API ERROR:", e);
       setStages(emptyBoard());
-      setBanner("Network error — check your connection.");
+      setBanner(formatFetchFailure(e, "Could not reach pipeline API"));
     }
   }, []);
 
@@ -227,14 +230,15 @@ export function BgosPipelineBoard() {
       return;
     }
     try {
-      const res = await fetch("/api/users", { credentials: "include" });
+      const res = await apiFetch("/api/users");
       const data = (await res.json()) as { ok?: boolean; users?: PublicUser[] };
       if (res.ok && Array.isArray(data.users)) {
         setUsers(data.users.filter((u) => u.isActive));
       } else {
         setUsers([]);
       }
-    } catch {
+    } catch (e) {
+      console.error("API ERROR:", e);
       setUsers([]);
     }
   }, [isAdmin]);
@@ -264,8 +268,8 @@ export function BgosPipelineBoard() {
     void (async () => {
       try {
         const [qRes, iRes] = await Promise.all([
-          fetch("/api/quotation/list", { credentials: "include" }),
-          fetch("/api/invoice/list", { credentials: "include" }),
+          apiFetch("/api/quotation/list"),
+          apiFetch("/api/invoice/list"),
         ]);
         const qData = (await qRes.json()) as {
           ok?: boolean;
@@ -308,7 +312,8 @@ export function BgosPipelineBoard() {
           }
           setInvoiceTipByLead(inv);
         }
-      } catch {
+      } catch (e) {
+        console.error("API ERROR:", e);
         if (!cancelled) {
           setQuotationTipByLead({});
           setInvoiceTipByLead({});
@@ -325,17 +330,16 @@ export function BgosPipelineBoard() {
     status?: LeadStatus;
     assignedToUserId?: string | null;
   }) {
-    const res = await fetch("/api/leads/update-status", {
+    const res = await apiFetch("/api/leads/update-status", {
       method: "PATCH",
-      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     let data: { ok?: boolean; lead?: unknown; error?: string; code?: string } = {};
     try {
       data = (await res.json()) as typeof data;
-    } catch {
-      /* ignore */
+    } catch (e) {
+      console.error("API ERROR:", e);
     }
     return { res, data };
   }
@@ -378,9 +382,10 @@ export function BgosPipelineBoard() {
         }
       }
       void refetchDashboard();
-    } catch {
+    } catch (e) {
+      console.error("API ERROR:", e);
       setStages(prev);
-      setBanner("Network error — stage reverted.");
+      setBanner(formatFetchFailure(e, "Stage change failed — reverted"));
       window.setTimeout(() => setBanner(null), 6000);
     } finally {
       setBusyLeadId(null);
@@ -445,9 +450,10 @@ export function BgosPipelineBoard() {
         }
       }
       void refetchDashboard();
-    } catch {
+    } catch (e) {
+      console.error("API ERROR:", e);
       setStages(prev);
-      setBanner("Network error — assignment reverted.");
+      setBanner(formatFetchFailure(e, "Assignment failed — reverted"));
       window.setTimeout(() => setBanner(null), 6000);
     } finally {
       setBusyLeadId(null);

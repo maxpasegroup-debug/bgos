@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -29,8 +31,8 @@ export default function SelectCompanyPage() {
     setLoading(true);
     try {
       const [listRes, meRes] = await Promise.all([
-        fetch("/api/company/list", { credentials: "include" }),
-        fetch("/api/auth/me", { credentials: "include" }),
+        apiFetch("/api/company/list", { credentials: "include" }),
+        apiFetch("/api/auth/me", { credentials: "include" }),
       ]);
       const listJson = (await listRes.json()) as {
         ok?: boolean;
@@ -52,8 +54,9 @@ export default function SelectCompanyPage() {
       }
       setCompanies(listJson.companies);
       if (meJson.user?.role) setRole(meJson.user.role);
-    } catch {
-      setErr("Network error.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     } finally {
       setLoading(false);
     }
@@ -67,7 +70,7 @@ export default function SelectCompanyPage() {
     setBusyId(companyId);
     setErr(null);
     try {
-      const res = await fetch("/api/company/switch", {
+      const res = await apiFetch("/api/company/switch", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -79,15 +82,16 @@ export default function SelectCompanyPage() {
         return;
       }
       clearStoredCompanyBrand();
-      const cur = await fetch("/api/company/current", { credentials: "include" });
+      const cur = await apiFetch("/api/company/current", { credentials: "include" });
       const cj = (await cur.json()) as { ok?: boolean; company?: { name: string; logoUrl: string | null; primaryColor: string | null; secondaryColor: string | null } };
       if (cj.ok === true && cj.company) {
         writeStoredCompanyBrand(cj.company);
       }
       const r = role ?? "SALES_EXECUTIVE";
       window.location.href = getRoleHome(r);
-    } catch {
-      setErr("Network error.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     } finally {
       setBusyId(null);
     }

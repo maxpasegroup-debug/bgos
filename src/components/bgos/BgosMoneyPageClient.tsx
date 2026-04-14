@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DashboardSurface } from "@/components/dashboard/DashboardSurface";
 import { useBgosDashboardContext } from "@/components/bgos/BgosDataProvider";
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 
 type QuotationRow = {
   id: string;
@@ -57,19 +58,20 @@ export function BgosMoneyPageClient({
   const loadQuotations = useCallback(async () => {
     setLoadErr(null);
     try {
-      const res = await fetch("/api/quotation/list", { credentials: "include" });
-      const data = (await res.json()) as { ok?: boolean; quotations?: QuotationRow[] };
+      const res = await apiFetch("/api/quotation/list");
+      const data = (await res.json()) as { ok?: boolean; quotations?: QuotationRow[]; error?: string };
       if (!res.ok || !data.ok || !Array.isArray(data.quotations)) {
-        setLoadErr(
-          typeof (data as { error?: string }).error === "string"
-            ? (data as { error: string }).error
-            : "Load failed",
-        );
+        const err =
+          typeof data.error === "string" && data.error.trim()
+            ? `${data.error} (HTTP ${res.status})`
+            : `Load failed (HTTP ${res.status})`;
+        setLoadErr(err);
         return;
       }
       setQuotations(data.quotations);
-    } catch {
-      setLoadErr("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setLoadErr(formatFetchFailure(e, "Could not reach quotation list API"));
     }
   }, []);
 
@@ -99,9 +101,8 @@ export function BgosMoneyPageClient({
     }
     setBusy(true);
     try {
-      const res = await fetch("/api/quotation/status", {
+      const res = await apiFetch("/api/quotation/status", {
         method: "PATCH",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, status }),
       });
@@ -117,6 +118,9 @@ export function BgosMoneyPageClient({
         return;
       }
       await loadQuotations();
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setLoadErr(formatFetchFailure(e, "Could not reach quotation status API"));
     } finally {
       setBusy(false);
     }
@@ -130,9 +134,8 @@ export function BgosMoneyPageClient({
     setBusy(true);
     setLoadErr(null);
     try {
-      const res = await fetch("/api/invoice/create", {
+      const res = await apiFetch("/api/invoice/create", {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ quotationId }),
       });
@@ -150,6 +153,9 @@ export function BgosMoneyPageClient({
         return;
       }
       router.push(`/bgos/money/invoices?quotationId=${encodeURIComponent(quotationId)}`);
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setLoadErr(formatFetchFailure(e, "Could not reach invoice create API"));
     } finally {
       setBusy(false);
     }

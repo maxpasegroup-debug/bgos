@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { PLAN, type PaidPlan } from "@/lib/company-plan-values";
 import { fetchStripeCheckoutUrl } from "@/lib/stripe-plan-checkout";
 import { useBgosDashboardContext } from "./BgosDataProvider";
+import { formatFetchFailure } from "@/lib/api-fetch";
 
 const LABEL_PRO =
   process.env.NEXT_PUBLIC_BILLING_PRO_LABEL?.trim() || "Pro — subscription (Stripe Checkout)";
@@ -32,8 +33,9 @@ export function PlanPricingModal({ open, onOpenChange }: PlanPricingModalProps) 
         return;
       }
       window.location.assign(result.url);
-    } catch {
-      setError("Network error — try again.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Could not start checkout"));
     } finally {
       setBusy(null);
     }

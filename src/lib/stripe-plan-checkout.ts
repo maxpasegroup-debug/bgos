@@ -1,14 +1,15 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-fetch";
+
 export type StripeCheckoutPlan = "PRO" | "ENTERPRISE";
 
 export async function fetchStripeCheckoutUrl(plan: StripeCheckoutPlan): Promise<
   { ok: true; url: string } | { ok: false; message: string }
 > {
-  const res = await fetch("/api/payment/checkout", {
+  const res = await apiFetch("/api/payment/checkout", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    credentials: "include",
     body: JSON.stringify({ plan }),
   });
   const j = (await res.json()) as {

@@ -8,6 +8,7 @@ import { DashboardSurface } from "@/components/dashboard/DashboardSurface";
 import { useBgosDashboardContext } from "./BgosDataProvider";
 import { fadeUp } from "./motion";
 import { BGOS_MAIN_PAD } from "./layoutTokens";
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 
 type SerializedLead = {
   id: string;
@@ -55,20 +56,25 @@ export function BgosLeadsAssignmentPanel({
   const loadLeads = useCallback(async () => {
     setLoadError(null);
     try {
-      const res = await fetch("/api/leads?limit=100&offset=0", { credentials: "include" });
+      const res = await apiFetch("/api/leads?limit=100&offset=0");
       const data = (await res.json()) as {
         ok?: boolean;
         leads?: SerializedLead[];
         error?: string;
       };
       if (!res.ok) {
-        setLoadError(typeof data.error === "string" ? data.error : "Could not load leads");
+        const msg =
+          typeof data.error === "string" && data.error.trim()
+            ? `${data.error} (HTTP ${res.status})`
+            : `Could not load leads (HTTP ${res.status})`;
+        setLoadError(msg);
         setLeads([]);
         return;
       }
       setLeads(Array.isArray(data.leads) ? data.leads : []);
-    } catch {
-      setLoadError("Network error loading leads");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setLoadError(formatFetchFailure(e, "Could not reach leads API"));
       setLeads([]);
     }
   }, []);
@@ -79,14 +85,15 @@ export function BgosLeadsAssignmentPanel({
       return;
     }
     try {
-      const res = await fetch("/api/users", { credentials: "include" });
+      const res = await apiFetch("/api/users");
       const data = (await res.json()) as { ok?: boolean; users?: PublicUser[] };
       if (!res.ok || !Array.isArray(data.users)) {
         setUsers([]);
         return;
       }
       setUsers(data.users.filter((u) => u.isActive));
-    } catch {
+    } catch (e) {
+      console.error("API ERROR:", e);
       setUsers([]);
     }
   }, [isAdmin]);
@@ -116,8 +123,8 @@ export function BgosLeadsAssignmentPanel({
     void (async () => {
       try {
         const [qRes, iRes] = await Promise.all([
-          fetch("/api/quotation/list", { credentials: "include" }),
-          fetch("/api/invoice/list", { credentials: "include" }),
+          apiFetch("/api/quotation/list"),
+          apiFetch("/api/invoice/list"),
         ]);
         const qData = (await qRes.json()) as {
           ok?: boolean;
@@ -160,7 +167,8 @@ export function BgosLeadsAssignmentPanel({
           }
           setInvoiceTipByLead(inv);
         }
-      } catch {
+      } catch (e) {
+        console.error("API ERROR:", e);
         if (!cancelled) {
           setQuotationTipByLead({});
           setInvoiceTipByLead({});
@@ -205,9 +213,8 @@ export function BgosLeadsAssignmentPanel({
     setAssigningId(lead.id);
 
     try {
-      const res = await fetch("/api/leads/update-status", {
+      const res = await apiFetch("/api/leads/update-status", {
         method: "PATCH",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           leadId: lead.id,
@@ -240,9 +247,10 @@ export function BgosLeadsAssignmentPanel({
         setLeads((ls) => ls.map((l) => (l.id === lead.id ? { ...l, ...data.lead! } : l)));
       }
       void refetch();
-    } catch {
+    } catch (e) {
+      console.error("API ERROR:", e);
       setLeads(prevLeads);
-      setLoadError("Network error — try again");
+      setLoadError(formatFetchFailure(e, "Could not reach lead assignment API"));
       window.setTimeout(() => setLoadError(null), 5000);
     } finally {
       setAssigningId(null);

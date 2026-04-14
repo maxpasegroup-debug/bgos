@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 
 type Filter = "all" | "low_stock" | "out_of_stock";
 type ProductRow = {
@@ -88,18 +89,18 @@ export function BgosInventoryCommandCenter() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/bgos/inventory?filter=${encodeURIComponent(filter)}`, {
-        credentials: "include",
-      });
+      const res = await apiFetch(`/api/bgos/inventory?filter=${encodeURIComponent(filter)}`);
       const j = (await res.json()) as { data?: InventoryData; message?: string; error?: string };
       if (!res.ok) {
-        setError(j.message ?? j.error ?? "Could not load inventory.");
+        const base = j.message ?? j.error ?? "Could not load inventory.";
+        setError(`${base} (HTTP ${res.status})`);
         setData(null);
       } else {
         setData(j.data ?? (j as unknown as InventoryData));
       }
-    } catch {
-      setError("Could not load inventory.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Could not reach inventory API"));
       setData(null);
     } finally {
       setLoading(false);
@@ -117,9 +118,8 @@ export function BgosInventoryCommandCenter() {
   );
 
   async function createProduct() {
-    await fetch("/api/bgos/inventory/product", {
+    await apiFetch("/api/bgos/inventory/product", {
       method: "POST",
-      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: productForm.name,
@@ -134,9 +134,8 @@ export function BgosInventoryCommandCenter() {
   }
 
   async function addStock() {
-    await fetch("/api/bgos/inventory/stock?mode=add", {
+    await apiFetch("/api/bgos/inventory/stock?mode=add", {
       method: "POST",
-      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         productId: stockForm.productId,
@@ -151,9 +150,8 @@ export function BgosInventoryCommandCenter() {
 
   async function useStock() {
     if (!selected) return;
-    await fetch("/api/bgos/inventory/stock?mode=use", {
+    await apiFetch("/api/bgos/inventory/stock?mode=use", {
       method: "POST",
-      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         productId: selected.id,

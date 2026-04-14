@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { postSalesBoosterUpgradeRequest } from "@/lib/sales-booster-client";
 import { useOpenPlanUpgrade } from "./BgosUpgradeModalContext";
+import { formatFetchFailure } from "@/lib/api-fetch";
 
 type ProFeatureLockProps = {
   locked: boolean;
@@ -32,8 +33,9 @@ export function ProFeatureLock({
     try {
       const { ok, message } = await postSalesBoosterUpgradeRequest();
       setMsg(message ?? (ok ? "Request sent." : null));
-    } catch {
-      setMsg("Network error — try again.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setMsg(formatFetchFailure(e, "Could not send upgrade request"));
     } finally {
       setBusy(false);
     }

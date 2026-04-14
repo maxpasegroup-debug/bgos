@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import { UserManualCategory, UserRole } from "@prisma/client";
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -122,7 +124,7 @@ export function BgosHrCommandCenter() {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch("/api/company/current", { credentials: "include" });
+        const res = await apiFetch("/api/company/current", { credentials: "include" });
         const j = (await res.json()) as { ok?: boolean; company?: { internalSalesOrg?: boolean } };
         if (!cancelled && res.ok && j.ok && j.company?.internalSalesOrg) setInternalOrg(true);
       } catch {
@@ -141,7 +143,7 @@ export function BgosHrCommandCenter() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/bgos/hr?filter=${encodeURIComponent(filter)}`, {
+      const res = await apiFetch(`/api/bgos/hr?filter=${encodeURIComponent(filter)}`, {
         credentials: "include",
       });
       const j = (await res.json()) as { data?: HrData; error?: string; message?: string };
@@ -168,7 +170,7 @@ export function BgosHrCommandCenter() {
     setDetailLoading(true);
     setDetail(null);
     try {
-      const res = await fetch(`/api/bgos/hr/employee/${encodeURIComponent(id)}`, { credentials: "include" });
+      const res = await apiFetch(`/api/bgos/hr/employee/${encodeURIComponent(id)}`, { credentials: "include" });
       const j = (await res.json()) as { data?: EmployeeDetail };
       setDetail(j.data ?? (j as unknown as EmployeeDetail));
     } finally {
@@ -183,7 +185,7 @@ export function BgosHrCommandCenter() {
     if (!detail) return;
     setBusy(true);
     try {
-      await fetch("/api/users/update", {
+      await apiFetch("/api/users/update", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -202,7 +204,7 @@ export function BgosHrCommandCenter() {
     if (!password) return;
     setBusy(true);
     try {
-      await fetch("/api/users/reset-password", {
+      await apiFetch("/api/users/reset-password", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -218,7 +220,7 @@ export function BgosHrCommandCenter() {
     if (!window.confirm(`Remove ${detail.employee.name} from active team?`)) return;
     setBusy(true);
     try {
-      await fetch("/api/users/update", {
+      await apiFetch("/api/users/update", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -232,15 +234,15 @@ export function BgosHrCommandCenter() {
   }
 
   async function checkIn() {
-    await fetch("/api/hr/attendance/checkin", { method: "POST", credentials: "include" });
+    await apiFetch("/api/hr/attendance/checkin", { method: "POST", credentials: "include" });
     await load();
   }
   async function checkOut() {
-    await fetch("/api/hr/attendance/checkout", { method: "POST", credentials: "include" });
+    await apiFetch("/api/hr/attendance/checkout", { method: "POST", credentials: "include" });
     await load();
   }
   async function applyLeave() {
-    await fetch("/api/hr/leave/apply", {
+    await apiFetch("/api/hr/leave/apply", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -250,7 +252,7 @@ export function BgosHrCommandCenter() {
     await load();
   }
   async function setLeaveStatus(id: string, status: "APPROVED" | "REJECTED") {
-    await fetch("/api/hr/leave/status", {
+    await apiFetch("/api/hr/leave/status", {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -260,7 +262,7 @@ export function BgosHrCommandCenter() {
   }
   async function createPip() {
     if (!detail) return;
-    await fetch("/api/bgos/hr/pip", {
+    await apiFetch("/api/bgos/hr/pip", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -275,7 +277,7 @@ export function BgosHrCommandCenter() {
     await load();
   }
   async function updatePip(id: string, progress: number, done: boolean) {
-    await fetch("/api/bgos/hr/pip", {
+    await apiFetch("/api/bgos/hr/pip", {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },

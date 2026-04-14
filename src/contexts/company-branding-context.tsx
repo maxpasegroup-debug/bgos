@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import {
   createContext,
   useCallback,
@@ -83,7 +85,7 @@ export function CompanyBrandingProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch("/api/company/current", { credentials: "include" });
+      const res = await apiFetch("/api/company/current", { credentials: "include" });
       if (!res.ok) {
         setReady(true);
         return;

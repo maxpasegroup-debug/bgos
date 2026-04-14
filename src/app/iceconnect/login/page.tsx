@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { motion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -62,7 +64,7 @@ function IceconnectLoginForm() {
 
     setPending(true);
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await apiFetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -139,8 +141,8 @@ function IceconnectLoginForm() {
 
       try {
         const [listRes, curRes] = await Promise.all([
-          fetch("/api/company/list", { credentials: "include" }),
-          fetch("/api/company/current", { credentials: "include" }),
+          apiFetch("/api/company/list", { credentials: "include" }),
+          apiFetch("/api/company/current", { credentials: "include" }),
         ]);
         const listJson = (await listRes.json()) as { ok?: boolean; companies?: unknown[] };
         const multiCompany =
@@ -152,7 +154,7 @@ function IceconnectLoginForm() {
           router.refresh();
           return;
         }
-        const refreshRes = await fetch("/api/auth/refresh-session", {
+        const refreshRes = await apiFetch("/api/auth/refresh-session", {
           method: "POST",
           credentials: "include",
         });
@@ -178,8 +180,8 @@ function IceconnectLoginForm() {
       router.push("/iceconnect");
       router.refresh();
     } catch (err) {
-      console.error("[iceconnect/login] network or unexpected error", err);
-      setFormError("Network error");
+      console.error("API ERROR:", err);
+      setFormError(formatFetchFailure(err, "Request failed"));
     } finally {
       setPending(false);
     }

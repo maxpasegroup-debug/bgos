@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { TechPipelineStage } from "@prisma/client";
 import { useCallback, useEffect, useState } from "react";
 
@@ -47,15 +49,16 @@ export function InternalOnboardingQueue({ theme }: { theme: "bgos" | "ice" }) {
     setErr(null);
     setLoading(true);
     try {
-      const res = await fetch("/api/internal-sales/onboarding", { credentials: "include" });
+      const res = await apiFetch("/api/internal-sales/onboarding", { credentials: "include" });
       const j: unknown = await res.json();
       if (!res.ok) {
         setErr(typeof j === "object" && j && "error" in j ? String((j as { error: string }).error) : "Load failed");
         return;
       }
       setQueue(readQueue(j) ?? []);
-    } catch {
-      setErr("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     } finally {
       setLoading(false);
     }
@@ -68,7 +71,7 @@ export function InternalOnboardingQueue({ theme }: { theme: "bgos" | "ice" }) {
   async function advancePipeline(id: string) {
     setBusy(id);
     try {
-      const res = await fetch(`/api/internal-sales/onboarding/${id}`, {
+      const res = await apiFetch(`/api/internal-sales/onboarding/${id}`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

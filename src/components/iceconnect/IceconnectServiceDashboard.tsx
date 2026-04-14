@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { ServiceTicketStatus } from "@prisma/client";
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
@@ -68,7 +70,7 @@ export function IceconnectServiceDashboard() {
     setErr(null);
     setLoading(true);
     try {
-      const res = await fetch("/api/iceconnect/service/tickets", { credentials: "include" });
+      const res = await apiFetch("/api/iceconnect/service/tickets", { credentials: "include" });
       if (!res.ok) {
         let msg = "Could not load tickets.";
         try {
@@ -94,8 +96,9 @@ export function IceconnectServiceDashboard() {
         setMyTickets([]);
         setPoolTickets([]);
       }
-    } catch {
-      setErr("Network error — check your connection.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     } finally {
       setLoading(false);
     }
@@ -108,7 +111,7 @@ export function IceconnectServiceDashboard() {
   async function resolve(ticketId: string) {
     setBusy(ticketId);
     try {
-      const res = await fetch("/api/iceconnect/service/resolve", {
+      const res = await apiFetch("/api/iceconnect/service/resolve", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

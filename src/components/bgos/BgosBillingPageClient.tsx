@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import { CompanySubscriptionStatus } from "@prisma/client";
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -74,7 +76,7 @@ export function BgosBillingPageClient() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch("/api/bgos/billing", { credentials: "include" });
+      const res = await apiFetch("/api/bgos/billing", { credentials: "include" });
       const j = (await res.json()) as BillingPayload & {
         message?: string;
         error?: string;

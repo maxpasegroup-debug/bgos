@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -47,7 +49,7 @@ export function SalesBoosterDashboardClient() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch("/api/bgos/sales-booster/module-data", { credentials: "include" });
+      const res = await apiFetch("/api/bgos/sales-booster/module-data", { credentials: "include" });
       const j = (await res.json()) as {
         ok?: boolean;
         booster?: SalesBoosterPro;
@@ -107,7 +109,7 @@ export function SalesBoosterDashboardClient() {
     async (patchBody: Record<string, unknown>, key: string) => {
       setBusy(key);
       try {
-        const res = await fetch("/api/sales-booster/config", {
+        const res = await apiFetch("/api/sales-booster/config", {
           method: "PATCH",
           credentials: "include",
           headers: { "Content-Type": "application/json" },

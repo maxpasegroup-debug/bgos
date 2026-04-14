@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -34,7 +36,7 @@ export function CustomOnboardingFormClient() {
   const probe = useCallback(async () => {
     setErr(null);
     try {
-      const res = await fetch("/api/onboarding/custom/status", { credentials: "include" });
+      const res = await apiFetch("/api/onboarding/custom/status", { credentials: "include" });
       const j = (await res.json()) as StatusJson;
       if (!res.ok || !j.ok) {
         setErr(j.error ?? "Could not load status.");
@@ -53,8 +55,9 @@ export function CustomOnboardingFormClient() {
         return;
       }
       setTier(tierFromPlan(j.plan));
-    } catch {
-      setErr("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     }
   }, [router]);
 
@@ -70,7 +73,7 @@ export function CustomOnboardingFormClient() {
     setBusy(true);
     setErr(null);
     try {
-      const res = await fetch("/api/onboarding/custom/submit", {
+      const res = await apiFetch("/api/onboarding/custom/submit", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -83,8 +86,9 @@ export function CustomOnboardingFormClient() {
       }
       router.replace(j.redirect ?? "/bgos");
       router.refresh();
-    } catch {
-      setErr("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     } finally {
       setBusy(false);
     }

@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { IceconnectWorkspaceView } from "@/components/iceconnect/IceconnectWorkspaceView";
 import { IcPanel } from "@/components/iceconnect/IcPanel";
@@ -69,7 +71,7 @@ export function IceconnectOperationsDashboard({ module }: { module: Module }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(cfg.list, { credentials: "include" });
+      const res = await apiFetch(cfg.list);
       const j = (await res.json()) as any;
       if (!res.ok || !j.ok) {
         setError(j.error ?? "Could not load operations data");
@@ -85,8 +87,9 @@ export function IceconnectOperationsDashboard({ module }: { module: Module }) {
               ? "installations"
               : "serviceTickets";
       setRows(Array.isArray(j[key]) ? j[key] : []);
-    } catch {
-      setError("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Request failed"));
       setRows([]);
     } finally {
       setLoading(false);
@@ -98,9 +101,8 @@ export function IceconnectOperationsDashboard({ module }: { module: Module }) {
   }, [load]);
 
   async function createItem() {
-    const res = await fetch(cfg.create, {
+    const res = await apiFetch(cfg.create, {
       method: "POST",
-      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(cfg.createBody()),
     });
@@ -116,9 +118,8 @@ export function IceconnectOperationsDashboard({ module }: { module: Module }) {
   }
 
   async function updateItem() {
-    const res = await fetch(cfg.update, {
+    const res = await apiFetch(cfg.update, {
       method: "PATCH",
-      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(cfg.updateBody()),
     });

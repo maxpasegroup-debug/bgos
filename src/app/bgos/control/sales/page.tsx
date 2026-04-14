@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useBgosTheme } from "@/components/bgos/BgosThemeContext";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
+import { formatFetchFailure, apiFetch } from "@/lib/api-fetch";
 
 type SalesJson = {
   ok?: boolean;
@@ -22,15 +23,22 @@ export default function ControlSalesPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch("/api/bgos/control/sales-overview", { credentials: "include" });
-      const j = (await res.json()) as SalesJson;
+      const res = await apiFetch("/api/bgos/control/sales-overview", { credentials: "include" });
+      const j = (await res.json()) as SalesJson & { error?: string; code?: string };
       if (!res.ok || !j.ok) {
-        setError("Could not load sales data.");
+        const hint =
+          typeof j.error === "string" && j.error.trim()
+            ? `${j.error} (HTTP ${res.status})`
+            : j.code === "FORBIDDEN"
+              ? "Sign in with the platform boss account (BGOS_BOSS_EMAIL)."
+              : `Could not load sales data. (HTTP ${res.status})`;
+        setError(hint);
         return;
       }
       setData(j);
-    } catch {
-      setError("Network error.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Could not reach sales API"));
     }
   }, []);
 

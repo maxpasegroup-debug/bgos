@@ -10,6 +10,7 @@ import { hostTenantFromHeader, type HostTenant } from "@/lib/host-routing";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
 import { signAccessToken } from "@/lib/jwt";
+import { isBossReady } from "@/lib/boss-ready";
 import { postLoginDestination } from "@/lib/role-routing";
 import {
   applyProductionBossJwtMembershipOverrides,
@@ -39,11 +40,13 @@ function crossDomainLoginRequired(hostHeader: string | null, role: UserRole): bo
   return false;
 }
 
-/** Resolve same-origin path after login (cookies are set on this response). */
+/**
+ * Post-login path: boss + company ⇒ dashboard only; new user ⇒ onboarding; else role home.
+ * `needsOnboarding` / `workspaceActivatedAt` do not apply to ADMIN once `companyId` exists.
+ */
 function internalPostLoginLocation(
   role: UserRole,
   from: string | null | undefined,
-  needsOnboardingFlow: boolean,
   companyId: string | null,
   workspaceActivated: boolean,
   userEmail: string,
@@ -51,7 +54,13 @@ function internalPostLoginLocation(
   if (isSuperBossEmail(userEmail)) {
     return "/bgos/dashboard";
   }
-  if (needsOnboardingFlow || companyId == null || !workspaceActivated) {
+  if (isBossReady(role, companyId)) {
+    return "/bgos/dashboard";
+  }
+  if (companyId == null || companyId === "") {
+    return "/onboarding";
+  }
+  if (!workspaceActivated) {
     return "/onboarding";
   }
   return postLoginDestination(String(role), from?.trim() ?? null);
@@ -223,15 +232,21 @@ export async function POST(request: Request) {
       );
     }
 
+    const resolvedCompanyId = primary?.companyId ?? companyId;
+    const bossLockedJwt = isBossReady(effectiveRole, resolvedCompanyId);
+    const workspaceReady = bossLockedJwt
+      ? true
+      : needsOnboarding
+        ? false
+        : Boolean(user.workspaceActivatedAt);
+
     const token = signAccessToken({
       sub: user.id,
       email: user.email,
       role: effectiveRole,
-      companyId: primary?.companyId ?? companyId,
+      companyId: resolvedCompanyId,
       companyPlan: jwtCompanyPlan,
-      workspaceReady: needsOnboarding
-        ? false
-        : Boolean(user.workspaceActivatedAt),
+      workspaceReady,
       ...(mems.length ? { memberships: mems } : {}),
       ...(boss ? { superBoss: true as const } : {}),
     });
@@ -243,40 +258,58 @@ export async function POST(request: Request) {
         jobRole: m.jobRole,
       })) ?? [];
 
-    const userPayload = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: effectiveRole,
-      companyId,
-      companyPlan: productionBossBypass && companyId ? CompanyPlan.PRO : companyPlan,
-      ...(needsOnboarding
-        ? { needsOnboarding: true as const }
-        : {
-            workspaceReady: Boolean(user.workspaceActivatedAt),
-            ...(user.workspaceActivatedAt
-              ? {}
-              : { needsWorkspaceActivation: true as const }),
-          }),
-    };
+    const bossLockedResponse = isBossReady(effectiveRole, companyId);
+    const userPayload = bossLockedResponse
+      ? {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: effectiveRole,
+          companyId,
+          companyPlan: productionBossBypass && companyId ? CompanyPlan.PRO : companyPlan,
+          workspaceReady: true as const,
+        }
+      : {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: effectiveRole,
+          companyId,
+          companyPlan: productionBossBypass && companyId ? CompanyPlan.PRO : companyPlan,
+          ...(needsOnboarding
+            ? { needsOnboarding: true as const }
+            : {
+                workspaceReady: Boolean(user.workspaceActivatedAt),
+                ...(user.workspaceActivatedAt
+                  ? {}
+                  : { needsWorkspaceActivation: true as const }),
+              }),
+        };
 
-    console.info("[auth/login] After success", {
+    console.info("[auth/login] session-routing", {
       userId: user.id,
+      email: user.email,
+      sessionRole,
+      effectiveRole,
       companyId,
-      role: sessionRole,
-      plan: companyPlan,
+      membershipCount: user.memberships.length,
+      needsOnboarding,
+      workspaceActivatedAt: user.workspaceActivatedAt?.toISOString() ?? null,
+      isSuperBoss: boss,
+      companyPlan,
     });
 
     const hostHeader = request.headers.get("host");
     const needsCrossDomainHandoff = crossDomainLoginRequired(hostHeader, effectiveRole);
-    const nextPath = internalPostLoginLocation(
-      effectiveRole,
-      parsed.data.from?.trim() || undefined,
-      needsOnboarding,
-      companyId,
-      Boolean(user.workspaceActivatedAt),
-      user.email,
-    );
+    const nextPath = isBossReady(effectiveRole, companyId)
+      ? "/bgos/dashboard"
+      : internalPostLoginLocation(
+          effectiveRole,
+          parsed.data.from?.trim() || undefined,
+          companyId,
+          Boolean(user.workspaceActivatedAt),
+          user.email,
+        );
 
     // Cookie setting — structured body: { success, user } plus fields used by existing clients.
     const res = NextResponse.json(
@@ -296,10 +329,13 @@ export async function POST(request: Request) {
     if (companyId) {
       await setActiveCompanyCookie(res, companyId);
     }
-    console.info("[auth/login] Before response", {
+    console.info("[auth/login] response", {
       userId: user.id,
       nextPath,
       needsCrossDomainHandoff,
+      userPayloadRole: userPayload.role,
+      userPayloadCompanyId: userPayload.companyId,
+      userPayloadKeys: Object.keys(userPayload),
     });
     return res;
   } catch (e) {

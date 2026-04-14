@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -68,7 +70,7 @@ export function BgosHeader() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/auth/me", { credentials: "include" });
+        const res = await apiFetch("/api/auth/me", { credentials: "include" });
         const j = (await res.json()) as {
           billing?: {
             planLabel?: string;
@@ -133,7 +135,7 @@ export function BgosHeader() {
   async function doLogout() {
     setLogoutBusy(true);
     try {
-      await fetch("/api/auth/logout", {
+      await apiFetch("/api/auth/logout", {
         method: "POST",
         credentials: "include",
       });

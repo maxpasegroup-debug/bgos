@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -45,7 +47,7 @@ export function WorkflowManageClient() {
   const load = useCallback(async () => {
     setErr(null);
     try {
-      const res = await fetch(`/api/onboarding/workflow/submissions/${encodeURIComponent(id)}`, {
+      const res = await apiFetch(`/api/onboarding/workflow/submissions/${encodeURIComponent(id)}`, {
         credentials: "include",
       });
       if (res.status === 401) {
@@ -59,8 +61,9 @@ export function WorkflowManageClient() {
       }
       setD(j);
       setData((j.submission?.data ?? {}) as Record<string, string>);
-    } catch {
-      setErr("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     }
   }, [id, router]);
 
@@ -71,7 +74,7 @@ export function WorkflowManageClient() {
   async function patchData() {
     setBusy("save");
     try {
-      const res = await fetch(`/api/onboarding/workflow/submissions/${encodeURIComponent(id)}/data`, {
+      const res = await apiFetch(`/api/onboarding/workflow/submissions/${encodeURIComponent(id)}/data`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -91,7 +94,7 @@ export function WorkflowManageClient() {
   async function submitSales() {
     setBusy("submit");
     try {
-      const res = await fetch(`/api/onboarding/workflow/submissions/${encodeURIComponent(id)}/submit`, {
+      const res = await apiFetch(`/api/onboarding/workflow/submissions/${encodeURIComponent(id)}/submit`, {
         method: "POST",
         credentials: "include",
       });
@@ -111,7 +114,7 @@ export function WorkflowManageClient() {
   ) {
     setBusy("tech");
     try {
-      const res = await fetch(`/api/onboarding/workflow/submissions/${encodeURIComponent(id)}/tech`, {
+      const res = await apiFetch(`/api/onboarding/workflow/submissions/${encodeURIComponent(id)}/tech`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -131,7 +134,7 @@ export function WorkflowManageClient() {
   async function deliver() {
     setBusy("deliver");
     try {
-      const res = await fetch(`/api/onboarding/workflow/submissions/${encodeURIComponent(id)}/deliver`, {
+      const res = await apiFetch(`/api/onboarding/workflow/submissions/${encodeURIComponent(id)}/deliver`, {
         method: "POST",
         credentials: "include",
       });

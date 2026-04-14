@@ -10,6 +10,7 @@ import {
 import type { SalesBoosterPayload, SalesBoosterPro } from "@/types";
 import { BgosShineButton } from "./BgosShineButton";
 import { easePremium, fadeUp } from "./motion";
+import { formatFetchFailure } from "@/lib/api-fetch";
 
 function formatInr(n: number | null) {
   if (n == null) return "—";
@@ -102,8 +103,9 @@ export function SalesBoosterModule({
       );
       setUpgradeMsg(message);
       if (ok) setUpgradeNote("");
-    } catch {
-      setUpgradeMsg("Network error — try again.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setUpgradeMsg(formatFetchFailure(e, "Could not send upgrade request"));
     } finally {
       setUpgradeBusy(false);
     }

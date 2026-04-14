@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { IceconnectCustomerPlan, UserRole } from "@prisma/client";
 import { useCallback, useEffect, useState } from "react";
 import { CUSTOMER_PLAN_LABEL } from "@/lib/iceconnect-sales-hub";
@@ -35,7 +37,7 @@ export function IceconnectManagerTargetsPanel() {
   const load = useCallback(async () => {
     setErr(null);
     try {
-      const res = await fetch("/api/iceconnect/executive/team", { credentials: "include" });
+      const res = await apiFetch("/api/iceconnect/executive/team", { credentials: "include" });
       const j = (await res.json()) as TeamJson;
       if (res.status === 403 || res.status === 401) {
         setData(null);
@@ -57,8 +59,9 @@ export function IceconnectManagerTargetsPanel() {
       setCounts(nc);
       setPlans(np);
       setSalaries(ns);
-    } catch {
-      setErr("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     }
   }, []);
 
@@ -73,7 +76,7 @@ export function IceconnectManagerTargetsPanel() {
     setSaving(userId);
     setErr(null);
     try {
-      const res = await fetch("/api/iceconnect/executive/target", {
+      const res = await apiFetch("/api/iceconnect/executive/target", {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -92,8 +95,9 @@ export function IceconnectManagerTargetsPanel() {
         return;
       }
       await load();
-    } catch {
-      setErr("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     } finally {
       setSaving(null);
     }

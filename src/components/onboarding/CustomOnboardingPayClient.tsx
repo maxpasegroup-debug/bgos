@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
@@ -41,7 +43,7 @@ export function CustomOnboardingPayClient() {
   const load = useCallback(async () => {
     setErr(null);
     try {
-      const res = await fetch("/api/onboarding/custom/status", { credentials: "include" });
+      const res = await apiFetch("/api/onboarding/custom/status", { credentials: "include" });
       const j = (await res.json()) as StatusJson;
       if (!res.ok || !j.ok) {
         setErr(j.error ?? "Could not load account status.");
@@ -56,8 +58,9 @@ export function CustomOnboardingPayClient() {
         return;
       }
       setPlanLabel(j.plan === "PRO" ? "Pro" : j.plan === "ENTERPRISE" ? "Enterprise" : "Basic");
-    } catch {
-      setErr("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     }
   }, [router]);
 
@@ -73,7 +76,7 @@ export function CustomOnboardingPayClient() {
     setBusy(true);
     setErr(null);
     try {
-      const st = await fetch("/api/onboarding/custom/status", { credentials: "include" });
+      const st = await apiFetch("/api/onboarding/custom/status", { credentials: "include" });
       const sj = (await st.json()) as StatusJson;
       if (!st.ok || !sj.ok || sj.subscriptionStatus !== "PAYMENT_PENDING") {
         setBusy(false);
@@ -83,7 +86,7 @@ export function CustomOnboardingPayClient() {
       }
       const plan = planToCheckout(sj.plan);
       await loadRazorpayScript();
-      const orderRes = await fetch("/api/payment/razorpay/order", {
+      const orderRes = await apiFetch("/api/payment/razorpay/order", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -112,7 +115,7 @@ export function CustomOnboardingPayClient() {
         return;
       }
 
-      const meRes = await fetch("/api/auth/me", { credentials: "include" });
+      const meRes = await apiFetch("/api/auth/me", { credentials: "include" });
       const meJson = (await meRes.json()) as { user?: { name?: string; email?: string } };
       const prefillName = (meJson.user?.name ?? "").trim() || "Customer";
       const prefillEmail = (meJson.user?.email ?? "").trim() || "customer@example.com";
@@ -139,7 +142,7 @@ export function CustomOnboardingPayClient() {
         }) => {
           void (async () => {
             try {
-              const vRes = await fetch("/api/payment/razorpay/verify", {
+              const vRes = await apiFetch("/api/payment/razorpay/verify", {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
@@ -155,7 +158,7 @@ export function CustomOnboardingPayClient() {
                 setBusy(false);
                 return;
               }
-              await fetch("/api/auth/refresh-session", { method: "POST", credentials: "include" });
+              await apiFetch("/api/auth/refresh-session", { method: "POST", credentials: "include" });
               setBusy(false);
               router.replace("/onboarding/custom");
               router.refresh();

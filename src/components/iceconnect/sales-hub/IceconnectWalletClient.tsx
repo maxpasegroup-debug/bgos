@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -29,7 +31,7 @@ export function IceconnectWalletClient() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/iceconnect/executive/wallet", { credentials: "include" });
+      const res = await apiFetch("/api/iceconnect/executive/wallet", { credentials: "include" });
       const j = (await res.json()) as WalletJson;
       if (res.status === 403 && j.code === "NOT_INTERNAL_SALES_ORG") {
         router.replace("/iceconnect/internal-sales");
@@ -40,8 +42,9 @@ export function IceconnectWalletClient() {
         return;
       }
       setD(j);
-    } catch {
-      setErr("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     }
   }, [router]);
 

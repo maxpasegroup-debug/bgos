@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -100,7 +102,7 @@ function IceconnectSalesHubChrome({
     let cancelled = false;
     const load = async () => {
       try {
-        const res = await fetch("/api/nexa/next-action", { credentials: "include" });
+        const res = await apiFetch("/api/nexa/next-action", { credentials: "include" });
         if (!res.ok) return;
         const j = (await res.json()) as { ok?: boolean; badgeCount?: number };
         if (cancelled || j.ok !== true) return;
@@ -206,7 +208,7 @@ function IceconnectClassicChrome({
     let cancelled = false;
     const load = async () => {
       try {
-        const res = await fetch("/api/nexa/next-action", { credentials: "include" });
+        const res = await apiFetch("/api/nexa/next-action", { credentials: "include" });
         if (!res.ok) return;
         const j = (await res.json()) as { ok?: boolean; nextAction?: string; badgeCount?: number };
         if (cancelled || j.ok !== true) return;

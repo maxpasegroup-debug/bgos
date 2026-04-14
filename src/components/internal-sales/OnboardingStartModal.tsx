@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import { LeadOnboardingType, OnboardingWorkflowPlanTier } from "@prisma/client";
 import Link from "next/link";
 import { useState } from "react";
@@ -56,7 +58,7 @@ export function OnboardingStartModal({
     setErr(null);
     setSaving(true);
     try {
-      const res = await fetch(`/api/internal-sales/leads/${lead.id}`, {
+      const res = await apiFetch(`/api/internal-sales/leads/${lead.id}`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -82,7 +84,7 @@ export function OnboardingStartModal({
     setErr(null);
     setWorkflowBusy(true);
     try {
-      const res = await fetch("/api/onboarding/workflow/create", {
+      const res = await apiFetch("/api/onboarding/workflow/create", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

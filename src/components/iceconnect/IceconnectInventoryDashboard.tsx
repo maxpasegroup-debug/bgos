@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { useCallback, useEffect, useState } from "react";
 import { IceconnectWorkspaceView } from "@/components/iceconnect/IceconnectWorkspaceView";
 import { IcPanel } from "@/components/iceconnect/IcPanel";
@@ -55,8 +57,8 @@ export function IceconnectInventoryDashboard() {
     setLoading(true);
     try {
       const [pRes, sRes] = await Promise.all([
-        fetch("/api/inventory/product/list", { credentials: "include" }),
-        fetch("/api/inventory/stock/list", { credentials: "include" }),
+        apiFetch("/api/inventory/product/list", { credentials: "include" }),
+        apiFetch("/api/inventory/stock/list", { credentials: "include" }),
       ]);
       const pj = (await pRes.json()) as { ok?: boolean; products?: ProductRow[]; error?: string };
       const sj = (await sRes.json()) as {
@@ -80,8 +82,9 @@ export function IceconnectInventoryDashboard() {
         if (!stockProductId) setStockProductId(pj.products[0].id);
         if (!useProductId) setUseProductId(pj.products[0].id);
       }
-    } catch {
-      setError("Network error.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Request failed"));
     } finally {
       setLoading(false);
     }
@@ -92,7 +95,7 @@ export function IceconnectInventoryDashboard() {
   }, [load]);
 
   async function createProduct() {
-    const res = await fetch("/api/inventory/product/create", {
+    const res = await apiFetch("/api/inventory/product/create", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -113,7 +116,7 @@ export function IceconnectInventoryDashboard() {
       setError("Enter valid stock quantity.");
       return;
     }
-    const res = await fetch("/api/inventory/stock/add", {
+    const res = await apiFetch("/api/inventory/stock/add", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -134,7 +137,7 @@ export function IceconnectInventoryDashboard() {
       setError("Enter valid usage quantity.");
       return;
     }
-    const res = await fetch("/api/inventory/stock/use", {
+    const res = await apiFetch("/api/inventory/stock/use", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },

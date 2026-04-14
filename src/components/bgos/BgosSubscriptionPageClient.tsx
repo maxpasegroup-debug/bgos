@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { CompanyPlan, CompanySubscriptionStatus } from "@prisma/client";
@@ -81,7 +83,7 @@ export function BgosSubscriptionPageClient() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch("/api/bgos/subscription", { credentials: "include" });
+      const res = await apiFetch("/api/bgos/subscription", { credentials: "include" });
       const j = (await res.json()) as {
         ok?: boolean;
         data?: SubscriptionPayload;
@@ -135,7 +137,7 @@ export function BgosSubscriptionPageClient() {
       setError(null);
       try {
         await loadRazorpayScript();
-        const orderRes = await fetch("/api/payment/razorpay/order", {
+        const orderRes = await apiFetch("/api/payment/razorpay/order", {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -164,7 +166,7 @@ export function BgosSubscriptionPageClient() {
           return;
         }
 
-        const meRes = await fetch("/api/auth/me", { credentials: "include" });
+        const meRes = await apiFetch("/api/auth/me", { credentials: "include" });
         const meJson = (await meRes.json()) as { user?: { name?: string; email?: string } };
         const prefillName = (meJson.user?.name ?? "").trim() || "Customer";
         const prefillEmail = (meJson.user?.email ?? "").trim() || "customer@example.com";
@@ -191,7 +193,7 @@ export function BgosSubscriptionPageClient() {
           }) => {
             void (async () => {
               try {
-                const vRes = await fetch("/api/payment/razorpay/verify", {
+                const vRes = await apiFetch("/api/payment/razorpay/verify", {
                   method: "POST",
                   credentials: "include",
                   headers: { "Content-Type": "application/json" },
@@ -207,7 +209,7 @@ export function BgosSubscriptionPageClient() {
                   setCheckoutBusy(false);
                   return;
                 }
-                await fetch("/api/auth/refresh-session", {
+                await apiFetch("/api/auth/refresh-session", {
                   method: "POST",
                   credentials: "include",
                 });

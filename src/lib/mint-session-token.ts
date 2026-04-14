@@ -47,7 +47,8 @@ export async function mintSessionAccessToken(input: {
     throw new MintSessionTokenError("NO_MEMBERSHIP");
   }
 
-  const workspaceReady = Boolean(user.workspaceActivatedAt);
+  const workspaceReady =
+    row.jobRole === UserRole.ADMIN ? true : Boolean(user.workspaceActivatedAt);
 
   return signAccessToken({
     sub: input.userId,
@@ -125,7 +126,8 @@ export async function mintSessionAccessTokenForUser(input: {
     throw new MintSessionTokenError("NO_MEMBERSHIP");
   }
 
-  const workspaceReady = Boolean(user.workspaceActivatedAt);
+  const workspaceReady =
+    activeRow.jobRole === UserRole.ADMIN ? true : Boolean(user.workspaceActivatedAt);
 
   return signAccessToken({
     sub: input.userId,

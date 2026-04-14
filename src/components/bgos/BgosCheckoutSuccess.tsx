@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { useBgosDashboardContext } from "./BgosDataProvider";
@@ -19,7 +21,7 @@ function BgosCheckoutSuccessInner() {
     async function run() {
       if (checkout === "success") {
         try {
-          await fetch("/api/auth/refresh-session", { method: "POST", credentials: "include" });
+          await apiFetch("/api/auth/refresh-session", { method: "POST", credentials: "include" });
           if (!cancelled) refetch();
         } catch {
           /* still show toast; user can refresh */

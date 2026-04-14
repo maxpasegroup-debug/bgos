@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { IceconnectCustomerPlan } from "@prisma/client";
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -47,7 +49,7 @@ export function IceconnectMyJourneyClient() {
     setErr(null);
     setLoading(true);
     try {
-      const res = await fetch("/api/iceconnect/executive/dashboard", { credentials: "include" });
+      const res = await apiFetch("/api/iceconnect/executive/dashboard", { credentials: "include" });
       const j = (await res.json()) as DashboardJson;
       if (res.status === 403 && j.code === "NOT_INTERNAL_SALES_ORG") {
         router.replace("/iceconnect/internal-sales");
@@ -58,8 +60,9 @@ export function IceconnectMyJourneyClient() {
         return;
       }
       setData(j);
-    } catch {
-      setErr("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     } finally {
       setLoading(false);
     }
@@ -73,7 +76,7 @@ export function IceconnectMyJourneyClient() {
     let c = false;
     void (async () => {
       try {
-        const res = await fetch("/api/auth/me", { credentials: "include" });
+        const res = await apiFetch("/api/auth/me", { credentials: "include" });
         const j = (await res.json()) as { user?: { role?: string } };
         if (c) return;
         const r = j.user?.role;

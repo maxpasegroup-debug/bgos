@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useBgosTheme } from "@/components/bgos/BgosThemeContext";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
+import { formatFetchFailure, apiFetch } from "@/lib/api-fetch";
 
 type AccountsJson = {
   ok?: boolean;
@@ -28,15 +29,22 @@ export default function ControlAccountsPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch("/api/bgos/control/accounts-overview", { credentials: "include" });
-      const j = (await res.json()) as AccountsJson;
+      const res = await apiFetch("/api/bgos/control/accounts-overview", { credentials: "include" });
+      const j = (await res.json()) as AccountsJson & { error?: string; code?: string };
       if (!res.ok || !j.ok) {
-        setError("Could not load accounts.");
+        const hint =
+          typeof j.error === "string" && j.error.trim()
+            ? `${j.error} (HTTP ${res.status})`
+            : j.code === "FORBIDDEN"
+              ? "Sign in with the platform boss account (BGOS_BOSS_EMAIL)."
+              : `Could not load accounts. (HTTP ${res.status})`;
+        setError(hint);
         return;
       }
       setData(j);
-    } catch {
-      setError("Network error.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Could not reach accounts API"));
     }
   }, []);
 

@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -41,7 +43,7 @@ export default function SignupPage() {
 
     setPending(true);
     try {
-      const res = await fetch("/api/auth/signup", {
+      const res = await apiFetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -72,8 +74,9 @@ export default function SignupPage() {
 
       router.push(data.redirect ?? "/onboarding");
       router.refresh();
-    } catch {
-      setError("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Request failed"));
     } finally {
       setPending(false);
     }

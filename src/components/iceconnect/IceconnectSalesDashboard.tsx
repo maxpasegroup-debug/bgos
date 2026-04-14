@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { LeadStatus, TaskStatus } from "@prisma/client";
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -141,7 +143,7 @@ export function IceconnectSalesDashboard() {
     let c = true;
     (async () => {
       try {
-        const res = await fetch("/api/auth/me", { credentials: "include" });
+        const res = await apiFetch("/api/auth/me", { credentials: "include" });
         const j = (await res.json()) as { user?: { name?: string; role?: string } };
         if (!c) return;
         if (typeof j.user?.name === "string" && j.user.name.trim()) {
@@ -160,7 +162,7 @@ export function IceconnectSalesDashboard() {
     setErr(null);
     setLoading(true);
     try {
-      const res = await fetch("/api/iceconnect/sales/data", { credentials: "include" });
+      const res = await apiFetch("/api/iceconnect/sales/data", { credentials: "include" });
       let json: unknown;
       try {
         json = await res.json();
@@ -204,8 +206,9 @@ export function IceconnectSalesDashboard() {
       } else {
         setStats(null);
       }
-    } catch {
-      setErr("Network error — check your connection.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     } finally {
       setLoading(false);
     }
@@ -270,7 +273,7 @@ export function IceconnectSalesDashboard() {
     setBusy(leadId);
     setErr(null);
     try {
-      const res = await fetch("/api/iceconnect/sales/lead-status", {
+      const res = await apiFetch("/api/iceconnect/sales/lead-status", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -297,7 +300,7 @@ export function IceconnectSalesDashboard() {
     setBusy(taskId);
     setErr(null);
     try {
-      const res = await fetch("/api/tasks/complete", {
+      const res = await apiFetch("/api/tasks/complete", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

@@ -217,7 +217,19 @@ export function forbidden(message = "Forbidden"): NextResponse {
  */
 export function requireAuth(request: NextRequest | Request): AuthUser | NextResponse {
   const user = getAuthUser(request);
-  if (!user) return unauthorized();
+  if (!user) {
+    const debug = process.env.DEBUG_AUTH === "1" || process.env.NODE_ENV === "development";
+    if (debug) {
+      const token = getTokenFromRequest(request);
+      console.warn(
+        "[auth] requireAuth 401:",
+        token
+          ? "invalid JWT or header/cookie mismatch vs middleware"
+          : `no session token (cookie ${AUTH_COOKIE_NAME} or Bearer)`,
+      );
+    }
+    return unauthorized();
+  }
   return user;
 }
 

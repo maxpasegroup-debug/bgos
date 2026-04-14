@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useBgosTheme } from "@/components/bgos/BgosThemeContext";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
+import { formatFetchFailure, apiFetch } from "@/lib/api-fetch";
 
 type Category = "TRIAL" | "BASIC" | "PRO" | "ENTERPRISE" | "LOST";
 
@@ -41,8 +42,8 @@ export default function ControlClientsPage() {
     setError(null);
     try {
       const [cRes, sRes] = await Promise.all([
-        fetch("/api/bgos/control/clients", { credentials: "include" }),
-        fetch("/api/bgos/control/summary", { credentials: "include" }),
+        apiFetch("/api/bgos/control/clients", { credentials: "include" }),
+        apiFetch("/api/bgos/control/summary", { credentials: "include" }),
       ]);
       const cj = (await cRes.json()) as {
         ok?: boolean;
@@ -74,9 +75,9 @@ export default function ControlClientsPage() {
         };
         if (sj.ok && sj.metrics) setSummary(sj.metrics);
       }
-    } catch (err) {
-      console.error("ERROR:control/clients load", err);
-      setError("Network error.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Could not reach clients API"));
     }
   }, []);
 
@@ -109,7 +110,7 @@ export default function ControlClientsPage() {
           </p>
         </div>
         <Link
-          href="/onboarding"
+          href="/onboarding?addBusiness=1"
           className={
             light
               ? "shrink-0 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-center text-sm font-semibold text-indigo-900 hover:bg-indigo-100"

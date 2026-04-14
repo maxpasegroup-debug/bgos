@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import Link from "next/link";
 import { useEffect } from "react";
 
@@ -15,7 +17,7 @@ export default function IceconnectWorkspaceError({
   }, [error]);
 
   async function reloadSession() {
-    await fetch("/api/auth/refresh-session", {
+    await apiFetch("/api/auth/refresh-session", {
       method: "POST",
       credentials: "include",
     }).catch(() => undefined);

@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { useCompanyBranding } from "@/contexts/company-branding-context";
@@ -30,7 +32,7 @@ export function IceconnectInstallerDashboard() {
     setErr(null);
     setLoading(true);
     try {
-      const res = await fetch("/api/iceconnect/installer/jobs", { credentials: "include" });
+      const res = await apiFetch("/api/iceconnect/installer/jobs", { credentials: "include" });
       if (!res.ok) {
         let msg = "Could not load jobs.";
         try {
@@ -44,8 +46,9 @@ export function IceconnectInstallerDashboard() {
       }
       const data = (await res.json()) as { jobs: Job[] };
       setJobs(Array.isArray(data.jobs) ? data.jobs : []);
-    } catch {
-      setErr("Network error — check your connection.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     } finally {
       setLoading(false);
     }
@@ -59,7 +62,7 @@ export function IceconnectInstallerDashboard() {
     const notes = completionNotes[id]?.trim() || "Marked complete from ICECONNECT";
     setBusy(id);
     try {
-      const res = await fetch("/api/iceconnect/installer/complete", {
+      const res = await apiFetch("/api/iceconnect/installer/complete", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

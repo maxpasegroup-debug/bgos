@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { InternalSalesStage, LeadOnboardingType } from "@prisma/client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -88,7 +90,7 @@ export function InternalClientOnboardingForm({
     setProbe("loading");
     setErr(null);
     try {
-      const res = await fetch(`/api/internal-sales/leads/${leadId}`, { credentials: "include" });
+      const res = await apiFetch(`/api/internal-sales/leads/${leadId}`, { credentials: "include" });
       const j = (await res.json()) as {
         ok?: boolean;
         lead?: {
@@ -124,9 +126,10 @@ export function InternalClientOnboardingForm({
       setCompanyName(j.lead.companyName ?? "");
       setBusinessType(j.lead.businessType ?? "");
       setProbe("ok");
-    } catch {
+    } catch (e) {
+      console.error("API ERROR:", e);
       setProbe("err");
-      setErr("Network error");
+      setErr(formatFetchFailure(e, "Request failed"));
     }
   }, [leadId, tier]);
 
@@ -233,7 +236,7 @@ export function InternalClientOnboardingForm({
         body.integrations = integrations.trim();
       }
 
-      const res = await fetch(`/api/internal-sales/leads/${leadId}/onboarding`, {
+      const res = await apiFetch(`/api/internal-sales/leads/${leadId}/onboarding`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

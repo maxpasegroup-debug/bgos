@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { useCallback, useEffect, useState } from "react";
 import { IceconnectWorkspaceView } from "@/components/iceconnect/IceconnectWorkspaceView";
 import { IcPanel } from "@/components/iceconnect/IcPanel";
@@ -55,8 +57,8 @@ export function IceconnectPartnerDashboard() {
     setError(null);
     try {
       const [pRes, cRes] = await Promise.all([
-        fetch("/api/partner/list", { credentials: "include" }),
-        fetch("/api/commission/list", { credentials: "include" }),
+        apiFetch("/api/partner/list", { credentials: "include" }),
+        apiFetch("/api/commission/list", { credentials: "include" }),
       ]);
       const pj = (await pRes.json()) as { ok?: boolean; partners?: PartnerRow[]; error?: string };
       const cj = (await cRes.json()) as {
@@ -75,8 +77,9 @@ export function IceconnectPartnerDashboard() {
       setPartners(pj.partners);
       setCommissions(cj.commissions);
       if (pj.partners.length > 0 && !partnerId) setPartnerId(pj.partners[0].id);
-    } catch {
-      setError("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Request failed"));
     } finally {
       setLoading(false);
     }
@@ -87,7 +90,7 @@ export function IceconnectPartnerDashboard() {
   }, [load]);
 
   async function addPartner() {
-    const res = await fetch("/api/partner/create", {
+    const res = await apiFetch("/api/partner/create", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -109,7 +112,7 @@ export function IceconnectPartnerDashboard() {
       setError("Enter valid commission amount.");
       return;
     }
-    const res = await fetch("/api/commission/create", {
+    const res = await apiFetch("/api/commission/create", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },

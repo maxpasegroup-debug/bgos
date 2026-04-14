@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -15,7 +17,7 @@ export function IceconnectNotificationsClient() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/iceconnect/executive/notifications", { credentials: "include" });
+      const res = await apiFetch("/api/iceconnect/executive/notifications", { credentials: "include" });
       const j = (await res.json()) as { ok?: boolean; notifications?: N[]; code?: string; error?: string };
       if (res.status === 403 && j.code === "NOT_INTERNAL_SALES_ORG") {
         router.replace("/iceconnect/internal-sales");
@@ -26,8 +28,9 @@ export function IceconnectNotificationsClient() {
         return;
       }
       setItems(j.notifications ?? []);
-    } catch {
-      setErr("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     }
   }, [router]);
 

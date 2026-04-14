@@ -2,6 +2,7 @@
 
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 
 type StatusData = {
   plan: "BASIC" | "PRO" | "ENTERPRISE";
@@ -23,12 +24,12 @@ export function BgosAutomationPageClient() {
     setError(null);
     try {
       const [statusRes, settingsRes, tasksRes] = await Promise.all([
-        fetch("/api/automation/status", { credentials: "include" }),
-        fetch("/api/automation/settings", { credentials: "include" }),
-        fetch("/api/tasks?status=PENDING&limit=1", { credentials: "include" }),
+        apiFetch("/api/automation/status"),
+        apiFetch("/api/automation/settings"),
+        apiFetch("/api/tasks?status=PENDING&limit=1"),
       ]);
       if (!statusRes.ok) {
-        setError("Automation is available only on Pro and Enterprise.");
+        setError(`Automation is available only on Pro and Enterprise. (HTTP ${statusRes.status})`);
         setStatus(null);
         return;
       }
@@ -42,8 +43,9 @@ export function BgosAutomationPageClient() {
       const pending = Number(t.count ?? t.meta?.count ?? 0);
       setFollowUpsPending(Number.isFinite(pending) ? pending : 0);
       setActiveAutomations(3);
-    } catch {
-      setError("Could not load automation.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Could not reach automation API"));
       setStatus(null);
     } finally {
       setLoading(false);
@@ -56,9 +58,8 @@ export function BgosAutomationPageClient() {
 
   async function toggle(next: boolean) {
     setEnabled(next);
-    const res = await fetch("/api/automation/settings", {
+    const res = await apiFetch("/api/automation/settings", {
       method: "PATCH",
-      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ enabled: next }),
     });

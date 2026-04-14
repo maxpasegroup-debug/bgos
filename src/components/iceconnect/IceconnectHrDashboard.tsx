@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { IceconnectWorkspaceView } from "@/components/iceconnect/IceconnectWorkspaceView";
 import { IcPanel } from "@/components/iceconnect/IcPanel";
@@ -74,11 +76,11 @@ export function IceconnectHrDashboard() {
     setLoading(true);
     try {
       const [meRes, leavesRes, attendanceRes, salaryRes, usersRes] = await Promise.all([
-        fetch("/api/auth/me", { credentials: "include" }),
-        fetch("/api/hr/leave/list", { credentials: "include" }),
-        fetch("/api/hr/attendance/list", { credentials: "include" }),
-        fetch("/api/hr/salary/list", { credentials: "include" }),
-        fetch("/api/hr/users/list", { credentials: "include" }),
+        apiFetch("/api/auth/me", { credentials: "include" }),
+        apiFetch("/api/hr/leave/list", { credentials: "include" }),
+        apiFetch("/api/hr/attendance/list", { credentials: "include" }),
+        apiFetch("/api/hr/salary/list", { credentials: "include" }),
+        apiFetch("/api/hr/users/list", { credentials: "include" }),
       ]);
 
       const me = (await meRes.json()) as { user?: { role?: string; id?: string } };
@@ -111,7 +113,7 @@ export function IceconnectHrDashboard() {
 
   async function applyLeave() {
     setError(null);
-    const res = await fetch("/api/hr/leave/apply", {
+    const res = await apiFetch("/api/hr/leave/apply", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -131,7 +133,7 @@ export function IceconnectHrDashboard() {
   }
 
   async function setLeaveStatus(id: string, status: "APPROVED" | "REJECTED") {
-    const res = await fetch("/api/hr/leave/status", {
+    const res = await apiFetch("/api/hr/leave/status", {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -146,7 +148,7 @@ export function IceconnectHrDashboard() {
   }
 
   async function checkIn() {
-    const res = await fetch("/api/hr/attendance/checkin", { method: "POST", credentials: "include" });
+    const res = await apiFetch("/api/hr/attendance/checkin", { method: "POST", credentials: "include" });
     const j = (await res.json()) as { ok?: boolean; error?: string };
     if (!res.ok || !j.ok) {
       setError(j.error ?? "Check-in failed");
@@ -156,7 +158,7 @@ export function IceconnectHrDashboard() {
   }
 
   async function checkOut() {
-    const res = await fetch("/api/hr/attendance/checkout", { method: "POST", credentials: "include" });
+    const res = await apiFetch("/api/hr/attendance/checkout", { method: "POST", credentials: "include" });
     const j = (await res.json()) as { ok?: boolean; error?: string };
     if (!res.ok || !j.ok) {
       setError(j.error ?? "Check-out failed");
@@ -171,7 +173,7 @@ export function IceconnectHrDashboard() {
       setError("Enter valid salary amount.");
       return;
     }
-    const res = await fetch("/api/hr/salary/create", {
+    const res = await apiFetch("/api/hr/salary/create", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },

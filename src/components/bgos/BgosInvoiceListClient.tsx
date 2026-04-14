@@ -11,6 +11,7 @@ import {
   statusBadgeClass,
   type InvoiceApiRow,
 } from "@/components/bgos/money-invoice-shared";
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 
 const btnPrimary =
   "inline-flex min-h-[44px] items-center justify-center rounded-xl border border-[#FFC300]/45 bg-[#FFC300]/18 px-5 text-sm font-bold text-[#FFC300] transition hover:bg-[#FFC300]/24 disabled:opacity-50";
@@ -30,20 +31,25 @@ export function BgosInvoiceListClient({ initialQuotationId }: { initialQuotation
   const load = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch("/api/invoice/list", { credentials: "include" });
+      const res = await apiFetch("/api/invoice/list");
       const data = (await res.json()) as {
         ok?: boolean;
         invoices?: InvoiceApiRow[];
         error?: string;
       };
       if (!res.ok || !data.ok || !Array.isArray(data.invoices)) {
-        setError(typeof data.error === "string" ? data.error : "Could not load invoices");
+        const msg =
+          typeof data.error === "string" && data.error.trim()
+            ? `${data.error} (HTTP ${res.status})`
+            : `Could not load invoices (HTTP ${res.status})`;
+        setError(msg);
         setRows([]);
         return;
       }
       setRows(data.invoices);
-    } catch {
-      setError("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Could not reach invoice list API"));
       setRows([]);
     } finally {
       setLoading(false);
@@ -62,9 +68,8 @@ export function BgosInvoiceListClient({ initialQuotationId }: { initialQuotation
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/invoice/create", {
+      const res = await apiFetch("/api/invoice/create", {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ quotationId: qid }),
       });
@@ -82,8 +87,9 @@ export function BgosInvoiceListClient({ initialQuotationId }: { initialQuotation
         return;
       }
       await load();
-    } catch {
-      setError("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Could not reach invoice create API"));
     } finally {
       setBusy(false);
     }

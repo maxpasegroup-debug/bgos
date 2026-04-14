@@ -2,6 +2,7 @@
 
 import type { UserManualCategory } from "@prisma/client";
 import { useCallback, useEffect, useState } from "react";
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 
 type Cat = { id: UserManualCategory; label: string };
 
@@ -17,20 +18,25 @@ export function UserManualsAdminClient({ categories }: { categories: Cat[] }) {
     setErr(null);
     setLoading(true);
     try {
-      const res = await fetch("/api/user-manuals", { credentials: "include" });
+      const res = await apiFetch("/api/user-manuals");
       const j = (await res.json()) as {
         ok?: boolean;
         manuals?: { id: string; category: UserManualCategory; title: string; updatedAt: string }[];
         error?: string;
       };
       if (!res.ok) {
-        setErr(j.error ?? "Load failed");
+        setErr(
+          typeof j.error === "string" && j.error.trim()
+            ? `${j.error} (HTTP ${res.status})`
+            : `Load failed (HTTP ${res.status})`,
+        );
         setRows([]);
         return;
       }
       setRows(Array.isArray(j.manuals) ? j.manuals : []);
-    } catch {
-      setErr("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Could not reach user manuals API"));
       setRows([]);
     } finally {
       setLoading(false);
@@ -50,13 +56,16 @@ export function UserManualsAdminClient({ categories }: { categories: Cat[] }) {
       fd.set("file", file);
       fd.set("category", category);
       fd.set("title", title.trim() || file.name);
-      const res = await fetch("/api/user-manuals", { method: "POST", body: fd, credentials: "include" });
+      const res = await apiFetch("/api/user-manuals", { method: "POST", body: fd });
       const j = (await res.json()) as { ok?: boolean; error?: string; message?: string };
       if (!res.ok) {
         setErr(j.error ?? j.message ?? "Upload failed");
         return;
       }
       await load();
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Could not upload manual"));
     } finally {
       setBusy(null);
     }

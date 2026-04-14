@@ -347,6 +347,9 @@ export async function middleware(request: NextRequest) {
 
   if (!token) {
     if (pathname.startsWith("/api")) {
+      if (process.env.DEBUG_AUTH === "1" || process.env.NODE_ENV === "development") {
+        console.warn("[middleware] NO_TOKEN", pathname, "cookie:", AUTH_COOKIE_NAME);
+      }
       return authErrorResponse(AUTH_ERROR_CODES.NO_TOKEN);
     }
     return NextResponse.redirect(loginRedirectUrl(request, pathname, tenant));

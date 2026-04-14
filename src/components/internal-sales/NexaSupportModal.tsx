@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import { useState } from "react";
 import { readError } from "@/components/internal-sales/internal-sales-read-api";
 
@@ -48,7 +50,7 @@ export function NexaSupportModal({
     setErr(null);
     setBusy(true);
     try {
-      const res = await fetch("/api/internal-sales/nexa-support", {
+      const res = await apiFetch("/api/internal-sales/nexa-support", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

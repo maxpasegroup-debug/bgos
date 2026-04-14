@@ -8,6 +8,7 @@ import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
 import { BgosDocumentsClient } from "@/components/bgos/BgosDocumentsClient";
 import { useBgosDashboardContext } from "@/components/bgos/BgosDataProvider";
 import type { InvoiceApiRow } from "@/components/bgos/money-invoice-shared";
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 
 type LeadPayload = {
   id: string;
@@ -46,9 +47,9 @@ export function BgosLeadDetailClient({ leadId }: { leadId: string }) {
     setLoading(true);
     try {
       const [lr, qr, ir] = await Promise.all([
-        fetch(`/api/leads/${encodeURIComponent(leadId)}`, { credentials: "include" }),
-        fetch(`/api/quotation/list?leadId=${encodeURIComponent(leadId)}`, { credentials: "include" }),
-        fetch(`/api/invoice/list?leadId=${encodeURIComponent(leadId)}`, { credentials: "include" }),
+        apiFetch(`/api/leads/${encodeURIComponent(leadId)}`),
+        apiFetch(`/api/quotation/list?leadId=${encodeURIComponent(leadId)}`),
+        apiFetch(`/api/invoice/list?leadId=${encodeURIComponent(leadId)}`),
       ]);
       const lj = (await lr.json()) as { ok?: boolean; lead?: LeadPayload; error?: string };
       const qj = (await qr.json()) as { ok?: boolean; quotations?: QuotationRow[] };
@@ -56,15 +57,20 @@ export function BgosLeadDetailClient({ leadId }: { leadId: string }) {
 
       if (!lr.ok || !lj.ok || !lj.lead) {
         setLead(null);
-        setError(typeof lj.error === "string" ? lj.error : "Lead not found");
+        const msg =
+          typeof lj.error === "string" && lj.error.trim()
+            ? `${lj.error} (HTTP ${lr.status})`
+            : `Lead not found (HTTP ${lr.status})`;
+        setError(msg);
         return;
       }
       setLead(lj.lead);
       setQuotations(Array.isArray(qj.quotations) ? qj.quotations : []);
       setInvoices(Array.isArray(ij.invoices) ? ij.invoices : []);
-    } catch {
+    } catch (e) {
+      console.error("API ERROR:", e);
       setLead(null);
-      setError("Network error");
+      setError(formatFetchFailure(e, "Could not reach lead API"));
     } finally {
       setLoading(false);
     }
@@ -86,9 +92,8 @@ export function BgosLeadDetailClient({ leadId }: { leadId: string }) {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/invoice/create", {
+      const res = await apiFetch("/api/invoice/create", {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ quotationId: activeQuotation.id }),
       });
@@ -121,8 +126,9 @@ export function BgosLeadDetailClient({ leadId }: { leadId: string }) {
         return;
       }
       await load();
-    } catch {
-      setError("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Could not reach invoice create API"));
     } finally {
       setBusy(false);
     }

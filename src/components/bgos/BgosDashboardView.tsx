@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import { useEffect, useState } from "react";
 import { BgosDashboardGrid } from "./BgosDashboardGrid";
 import { BgosDashboardSkeletons, BgosIntelligenceHomeSkeleton } from "./BgosDashboardSkeletons";
@@ -28,7 +30,7 @@ export function BgosDashboardView({ section }: { section?: string }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/auth/me", { credentials: "include" });
+        const res = await apiFetch("/api/auth/me", { credentials: "include" });
         const j = (await res.json()) as { user?: { name?: string } };
         const name = j.user?.name?.trim();
         if (!cancelled && name) setUserName(name);

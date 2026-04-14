@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import { UserRole } from "@prisma/client";
 import { motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
@@ -1128,7 +1130,7 @@ function NexaChatPanel({
                 disabled={actionBusy !== null}
                 onClick={async () => {
                   setActionBusy("auto");
-                  const res = await fetch("/api/nexa/auto-handle", {
+                  const res = await apiFetch("/api/nexa/auto-handle", {
                     method: "POST",
                     credentials: "include",
                   });

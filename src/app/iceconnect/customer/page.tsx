@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import { type ReactNode, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -22,7 +24,7 @@ export default function IceconnectCustomerPortalPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/customer/overview", { credentials: "include" });
+      const res = await apiFetch("/api/customer/overview", { credentials: "include" });
       const j = (await res.json()) as { data?: PortalData; message?: string; error?: string };
       if (!res.ok) {
         if (res.status === 401) router.replace("/iceconnect/customer-login");
@@ -44,7 +46,7 @@ export default function IceconnectCustomerPortalPage() {
   }, []);
 
   async function logout() {
-    await fetch("/api/customer/auth/logout", { method: "POST", credentials: "include" });
+    await apiFetch("/api/customer/auth/logout", { method: "POST", credentials: "include" });
     router.replace("/iceconnect/customer-login");
   }
 

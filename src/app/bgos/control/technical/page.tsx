@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useBgosTheme } from "@/components/bgos/BgosThemeContext";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
+import { formatFetchFailure, apiFetch } from "@/lib/api-fetch";
 
 type Item = {
   id: string;
@@ -23,15 +24,22 @@ export default function ControlTechnicalPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch("/api/bgos/control/tech-queue", { credentials: "include" });
-      const j = (await res.json()) as { ok?: boolean; items?: Item[] };
+      const res = await apiFetch("/api/bgos/control/tech-queue", { credentials: "include" });
+      const j = (await res.json()) as { ok?: boolean; items?: Item[]; error?: string; code?: string };
       if (!res.ok || !j.ok || !j.items) {
-        setError("Could not load queue.");
+        const hint =
+          typeof j.error === "string" && j.error.trim()
+            ? `${j.error} (HTTP ${res.status})`
+            : j.code === "FORBIDDEN"
+              ? "Sign in with the platform boss account (BGOS_BOSS_EMAIL)."
+              : `Could not load queue. (HTTP ${res.status})`;
+        setError(hint);
         return;
       }
       setItems(j.items);
-    } catch {
-      setError("Network error.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Could not reach technical queue API"));
     }
   }, []);
 

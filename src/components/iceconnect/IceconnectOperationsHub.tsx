@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { useCallback, useEffect, useState } from "react";
 import { IceconnectWorkspaceView } from "@/components/iceconnect/IceconnectWorkspaceView";
 
@@ -62,10 +64,10 @@ export function IceconnectOperationsHub() {
     setLoading(true);
     try {
       const [sr, ir, tr, ar] = await Promise.all([
-        fetch("/api/operations/site/list", { credentials: "include" }),
-        fetch("/api/operations/install/list", { credentials: "include" }),
-        fetch("/api/operations/service/list", { credentials: "include" }),
-        fetch("/api/operations/approval/list", { credentials: "include" }),
+        apiFetch("/api/operations/site/list", { credentials: "include" }),
+        apiFetch("/api/operations/install/list", { credentials: "include" }),
+        apiFetch("/api/operations/service/list", { credentials: "include" }),
+        apiFetch("/api/operations/approval/list", { credentials: "include" }),
       ]);
 
       const siteJ = await readJson<{ siteVisits?: SiteRow[] }>(sr);
@@ -83,8 +85,9 @@ export function IceconnectOperationsHub() {
       const appJ = await readJson<{ approvals?: ApprovalRow[] }>(ar);
       if (appJ.ok) setApprovals(Array.isArray(appJ.data.approvals) ? appJ.data.approvals : []);
       else setSectionErr((s) => ({ ...s, approvals: appJ.error ?? "Could not load approvals" }));
-    } catch {
-      setErr("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     } finally {
       setLoading(false);
     }
@@ -97,7 +100,7 @@ export function IceconnectOperationsHub() {
   async function patchInstall(id: string, status: "PENDING" | "IN_PROGRESS" | "COMPLETED") {
     setBusy(`i:${id}`);
     try {
-      const res = await fetch("/api/operations/install/update", {
+      const res = await apiFetch("/api/operations/install/update", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -117,7 +120,7 @@ export function IceconnectOperationsHub() {
   async function patchService(id: string, status: "OPEN" | "IN_PROGRESS" | "CLOSED") {
     setBusy(`s:${id}`);
     try {
-      const res = await fetch("/api/operations/service/update", {
+      const res = await apiFetch("/api/operations/service/update", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -137,7 +140,7 @@ export function IceconnectOperationsHub() {
   async function patchSite(id: string, status: "SCHEDULED" | "COMPLETED") {
     setBusy(`v:${id}`);
     try {
-      const res = await fetch("/api/operations/site/update", {
+      const res = await apiFetch("/api/operations/site/update", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -157,7 +160,7 @@ export function IceconnectOperationsHub() {
   async function patchApproval(id: string, status: "PENDING" | "APPROVED" | "REJECTED") {
     setBusy(`a:${id}`);
     try {
-      const res = await fetch("/api/operations/approval/update", {
+      const res = await apiFetch("/api/operations/approval/update", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

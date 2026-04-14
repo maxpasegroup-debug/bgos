@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import { UserManualCategory } from "@prisma/client";
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -108,7 +110,7 @@ export function BgosOperationsCommandCenter() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/bgos/operations?range=${encodeURIComponent(mapRangeToApi(range))}`, {
+      const res = await apiFetch(`/api/bgos/operations?range=${encodeURIComponent(mapRangeToApi(range))}`, {
         credentials: "include",
       });
       const j = (await res.json()) as { data?: OpsData; message?: string; error?: string };
@@ -132,7 +134,7 @@ export function BgosOperationsCommandCenter() {
 
   const onDropStage = useCallback(
     async (card: WorkflowCard, stage: WorkflowStage) => {
-      await fetch("/api/operations/update-status", {
+      await apiFetch("/api/operations/update-status", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -153,7 +155,7 @@ export function BgosOperationsCommandCenter() {
   );
 
   async function scheduleSiteVisit() {
-    await fetch("/api/bgos/operations/site-visit", {
+    await apiFetch("/api/bgos/operations/site-visit", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -165,7 +167,7 @@ export function BgosOperationsCommandCenter() {
   }
 
   async function createServiceRequest() {
-    await fetch("/api/bgos/operations/service-request", {
+    await apiFetch("/api/bgos/operations/service-request", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -296,7 +298,7 @@ export function BgosOperationsCommandCenter() {
                                 onClick={async (e) => {
                                   e.stopPropagation();
                                   const report = window.prompt("Add site visit report (optional):", card.notes ?? "");
-                                  await fetch("/api/operations/update-status", {
+                                  await apiFetch("/api/operations/update-status", {
                                     method: "PATCH",
                                     credentials: "include",
                                     headers: { "Content-Type": "application/json" },
@@ -325,7 +327,7 @@ export function BgosOperationsCommandCenter() {
                                   onClick={async (e) => {
                                     e.stopPropagation();
                                     const note = window.prompt("Approval notes (optional):", card.notes ?? "");
-                                    await fetch("/api/operations/update-status", {
+                                    await apiFetch("/api/operations/update-status", {
                                       method: "PATCH",
                                       credentials: "include",
                                       headers: { "Content-Type": "application/json" },
@@ -353,7 +355,7 @@ export function BgosOperationsCommandCenter() {
                                 type="button"
                                 onClick={async (e) => {
                                   e.stopPropagation();
-                                  await fetch("/api/operations/update-status", {
+                                  await apiFetch("/api/operations/update-status", {
                                     method: "PATCH",
                                     credentials: "include",
                                     headers: { "Content-Type": "application/json" },
@@ -373,7 +375,7 @@ export function BgosOperationsCommandCenter() {
                                 type="button"
                                 onClick={async (e) => {
                                   e.stopPropagation();
-                                  await fetch("/api/operations/update-status", {
+                                  await apiFetch("/api/operations/update-status", {
                                     method: "PATCH",
                                     credentials: "include",
                                     headers: { "Content-Type": "application/json" },
@@ -493,7 +495,7 @@ export function BgosOperationsCommandCenter() {
                         value={t.status}
                         onChange={async (e) => {
                           const next = e.target.value as "OPEN" | "IN_PROGRESS" | "CLOSED";
-                          await fetch("/api/operations/update-status", {
+                          await apiFetch("/api/operations/update-status", {
                             method: "PATCH",
                             credentials: "include",
                             headers: { "Content-Type": "application/json" },

@@ -12,6 +12,7 @@ import {
   type InvoiceDetailApi,
 } from "@/components/bgos/money-invoice-shared";
 import { roundMoney } from "@/lib/money-items";
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 
 type CompanyProfile = {
   name: string;
@@ -68,8 +69,8 @@ export function BgosInvoiceDetailClient({ invoiceId }: { invoiceId: string }) {
     setError(null);
     try {
       const [invRes, coRes] = await Promise.all([
-        fetch(`/api/invoice/${encodeURIComponent(invoiceId)}`, { credentials: "include" }),
-        fetch("/api/company/current", { credentials: "include" }),
+        apiFetch(`/api/invoice/${encodeURIComponent(invoiceId)}`),
+        apiFetch("/api/company/current"),
       ]);
       const invJson = (await invRes.json()) as { ok?: boolean; invoice?: InvoiceDetailApi; error?: string };
       const coJson = (await coRes.json()) as { ok?: boolean; company?: CompanyProfile };
@@ -86,8 +87,9 @@ export function BgosInvoiceDetailClient({ invoiceId }: { invoiceId: string }) {
       } else {
         setCompany(null);
       }
-    } catch {
-      setError("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Could not reach invoice API"));
       setInvoice(null);
     } finally {
       setLoading(false);
@@ -137,9 +139,8 @@ export function BgosInvoiceDetailClient({ invoiceId }: { invoiceId: string }) {
     const method = methodLabels[payMethod] ?? payMethod;
 
     try {
-      const res = await fetch("/api/payment/add", {
+      const res = await apiFetch("/api/payment/add", {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           invoiceId: invoice.id,
@@ -175,8 +176,9 @@ export function BgosInvoiceDetailClient({ invoiceId }: { invoiceId: string }) {
       } else {
         await loadAll();
       }
-    } catch {
-      setPayError("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setPayError(formatFetchFailure(e, "Could not reach payment API"));
     } finally {
       setPayBusy(false);
     }

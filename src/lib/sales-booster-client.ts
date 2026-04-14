@@ -2,6 +2,8 @@
  * Client-side helper (import only from Client Components).
  */
 
+import { apiFetch } from "@/lib/api-fetch";
+
 export type SalesBoosterClientConfig = {
   onLeadCreated: "assign" | "whatsapp" | "both";
   followUpScheduleEnabled: boolean;
@@ -18,7 +20,7 @@ export async function fetchSalesBoosterConfig(): Promise<{
   config?: SalesBoosterClientConfig;
   message?: string;
 }> {
-  const res = await fetch("/api/sales-booster/config", { credentials: "include" });
+  const res = await apiFetch("/api/sales-booster/config");
   const j = (await res.json()) as {
     ok?: boolean;
     message?: string;
@@ -36,9 +38,8 @@ export async function fetchSalesBoosterConfig(): Promise<{
 export async function patchSalesBoosterConfig(
   patch: Partial<Pick<SalesBoosterClientConfig, "onLeadCreated" | "followUpScheduleEnabled">>,
 ): Promise<{ ok: boolean; config?: SalesBoosterClientConfig; message?: string }> {
-  const res = await fetch("/api/sales-booster/config", {
+  const res = await apiFetch("/api/sales-booster/config", {
     method: "PATCH",
-    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(patch),
   });
@@ -60,9 +61,8 @@ export async function postSalesBoosterUpgradeRequest(note?: string): Promise<{
   ok: boolean;
   message: string;
 }> {
-  const res = await fetch("/api/sales-booster/upgrade-request", {
+  const res = await apiFetch("/api/sales-booster/upgrade-request", {
     method: "POST",
-    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(note ? { note } : {}),
   });

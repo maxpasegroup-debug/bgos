@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useCompanyBranding } from "@/contexts/company-branding-context";
@@ -24,7 +26,7 @@ export function IceconnectProfileClient() {
     let c = false;
     void (async () => {
       try {
-        const res = await fetch("/api/auth/me", { credentials: "include" });
+        const res = await apiFetch("/api/auth/me", { credentials: "include" });
         const j = (await res.json()) as { user?: { name?: string; email?: string; role?: string } };
         if (c) return;
         if (j.user) {
@@ -43,7 +45,7 @@ export function IceconnectProfileClient() {
 
   const logout = useCallback(async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+      await apiFetch("/api/auth/logout", { method: "POST", credentials: "include" });
     } catch {
       /* ignore */
     }

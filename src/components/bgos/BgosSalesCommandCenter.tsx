@@ -8,6 +8,7 @@ import { UserManualCategory } from "@prisma/client";
 import { BgosAddLeadModal } from "./BgosAddLeadModal";
 import { BGOS_MAIN_PAD } from "./layoutTokens";
 import { ViewModuleGuideButton } from "./ViewModuleGuideButton";
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 
 type RangePreset = "today" | "this_month" | "3_months" | "1_year";
 
@@ -125,12 +126,11 @@ export function BgosSalesCommandCenter() {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/api/bgos/sales?range=${encodeURIComponent(range)}`, {
-        credentials: "include",
-      });
+      const res = await apiFetch(`/api/bgos/sales?range=${encodeURIComponent(range)}`);
       const j = (await res.json()) as { data?: SalesData; error?: string; message?: string };
       if (!res.ok) {
-        setError(j.error ?? j.message ?? "Could not load sales.");
+        const base = j.error ?? j.message ?? "Could not load sales.";
+        setError(`${base} (HTTP ${res.status})`);
         setData(null);
       } else {
         setData(j.data ?? (j as unknown as SalesData));
@@ -152,9 +152,7 @@ export function BgosSalesCommandCenter() {
     setDetailBusy(true);
     setDetail(null);
     try {
-      const res = await fetch(`/api/bgos/sales/lead/${encodeURIComponent(leadId)}`, {
-        credentials: "include",
-      });
+      const res = await apiFetch(`/api/bgos/sales/lead/${encodeURIComponent(leadId)}`);
       const j = (await res.json()) as { data?: LeadDetail };
       setDetail(j.data ?? (j as unknown as LeadDetail));
       setNoteDraft((j.data ?? (j as unknown as LeadDetail)).lead.notes ?? "");
@@ -165,9 +163,8 @@ export function BgosSalesCommandCenter() {
 
   const patchLead = useCallback(
     async (leadId: string, payload: { status?: LeadStatus; assignedToUserId?: string | null; notes?: string }) => {
-      await fetch(`/api/bgos/sales/lead/${encodeURIComponent(leadId)}`, {
+      await apiFetch(`/api/bgos/sales/lead/${encodeURIComponent(leadId)}`, {
         method: "PATCH",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
@@ -178,9 +175,8 @@ export function BgosSalesCommandCenter() {
   const moveLead = useCallback(
     async (leadId: string, stageKey: string) => {
       const status = nextStatusForStage(stageKey);
-      await fetch("/api/leads/update-status", {
+      await apiFetch("/api/leads/update-status", {
         method: "PATCH",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ leadId, status }),
       });

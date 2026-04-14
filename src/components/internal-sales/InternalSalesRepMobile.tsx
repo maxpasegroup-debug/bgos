@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { InternalCallStatus, InternalSalesStage } from "@prisma/client";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -35,7 +37,7 @@ export function InternalSalesRepMobile({ theme }: { theme: "bgos" | "ice" }) {
     setErr(null);
     setLoading(true);
     try {
-      const res = await fetch("/api/internal-sales/leads", { credentials: "include" });
+      const res = await apiFetch("/api/internal-sales/leads", { credentials: "include" });
       const j: unknown = await res.json();
       if (!res.ok) {
         setErr(readError(j, "Could not load."));
@@ -43,8 +45,9 @@ export function InternalSalesRepMobile({ theme }: { theme: "bgos" | "ice" }) {
       }
       const pipe = readPipelinePayload(j);
       setPipeline(pipe ?? []);
-    } catch {
-      setErr("Network error.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     } finally {
       setLoading(false);
     }
@@ -69,7 +72,7 @@ export function InternalSalesRepMobile({ theme }: { theme: "bgos" | "ice" }) {
     setBusyId(id);
     setErr(null);
     try {
-      const res = await fetch(`/api/internal-sales/leads/${id}`, {
+      const res = await apiFetch(`/api/internal-sales/leads/${id}`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

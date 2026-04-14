@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { normalizeFinancialOverview } from "@/lib/dashboard-client-defaults";
@@ -123,7 +125,7 @@ export function CommandCenterSection() {
 
   useEffect(() => {
     const fetchData = () => {
-      fetch("/api/dashboard", { credentials: "include" })
+      apiFetch("/api/dashboard", { credentials: "include" })
         .then((res) => {
           if (!res.ok) throw new Error("Request failed");
           return res.json();

@@ -10,6 +10,7 @@ import {
   EMAIL_ALREADY_IN_USE_MESSAGE,
   NAME_SIMILARITY_EMAIL_UNIQUE_HINT,
 } from "@/lib/user-identity-messages";
+import { formatFetchFailure, apiFetch } from "@/lib/api-fetch";
 
 const iceconnectEmployeeSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
@@ -47,7 +48,7 @@ export default function ControlTeamPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch("/api/bgos/control/team", { credentials: "include" });
+      const res = await apiFetch("/api/bgos/control/team", { credentials: "include" });
       const j = (await res.json()) as TeamJson & {
         error?: string;
         code?: string;
@@ -65,9 +66,9 @@ export default function ControlTeamPage() {
         return;
       }
       setData(j.departments);
-    } catch (err) {
-      console.error("ERROR:control/team load", err);
-      setError("Network error.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Could not reach team API"));
     }
   }, []);
 
@@ -100,7 +101,7 @@ export default function ControlTeamPage() {
     }
     setSaving(true);
     try {
-      const res = await fetch("/api/bgos/control/team/employees", {
+      const res = await apiFetch("/api/bgos/control/team/employees", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -131,8 +132,9 @@ export default function ControlTeamPage() {
       setEmail("");
       setPassword("");
       await load();
-    } catch {
-      setFormMsg("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setFormMsg(formatFetchFailure(e, "Could not reach team API"));
       setFormMsgIsError(true);
     } finally {
       setSaving(false);

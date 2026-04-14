@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { WorkflowTemplateSections } from "@/lib/onboarding-workflow-types";
@@ -31,7 +33,7 @@ export function WorkflowFillClient() {
   const fetchForm = useCallback(async () => {
     setErr(null);
     try {
-      const res = await fetch(`/api/onboarding/workflow/public/${encodeURIComponent(token)}`);
+      const res = await apiFetch(`/api/onboarding/workflow/public/${encodeURIComponent(token)}`);
       const j = (await res.json()) as LoadJson;
       if (!res.ok || !j.ok) {
         setErr(j.error ?? "Could not load form");
@@ -39,8 +41,9 @@ export function WorkflowFillClient() {
       }
       setLoad(j);
       setData((j.data ?? {}) as Record<string, string>);
-    } catch {
-      setErr("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     }
   }, [token]);
 
@@ -53,7 +56,7 @@ export function WorkflowFillClient() {
       if (!token || !load?.editable) return;
       setSaving(true);
       try {
-        await fetch(`/api/onboarding/workflow/public/${encodeURIComponent(token)}`, {
+        await apiFetch(`/api/onboarding/workflow/public/${encodeURIComponent(token)}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ data: next }),
@@ -85,8 +88,7 @@ export function WorkflowFillClient() {
     setErr(null);
     try {
       await savePatch(data);
-      const res = await fetch(
-        `/api/onboarding/workflow/public/${encodeURIComponent(token)}/submit`,
+      const res = await apiFetch(`/api/onboarding/workflow/public/${encodeURIComponent(token)}/submit`,
         { method: "POST" },
       );
       const j = (await res.json()) as { ok?: boolean; error?: string };
@@ -95,8 +97,9 @@ export function WorkflowFillClient() {
         return;
       }
       await fetchForm();
-    } catch {
-      setErr("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     } finally {
       setSubmitting(false);
     }

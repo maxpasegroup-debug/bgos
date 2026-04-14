@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { motion } from "framer-motion";
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
@@ -62,7 +64,7 @@ export function BgosCustomerCommandCenter() {
     setError(null);
     try {
       const url = `/api/bgos/customer?filter=${encodeURIComponent(filter)}${leadId ? `&leadId=${encodeURIComponent(leadId)}` : ""}`;
-      const res = await fetch(url, { credentials: "include" });
+      const res = await apiFetch(url);
       const j = (await res.json()) as { data?: Payload; message?: string; error?: string };
       if (!res.ok) {
         setError(j.message ?? j.error ?? "Could not load customers.");
@@ -70,8 +72,9 @@ export function BgosCustomerCommandCenter() {
       } else {
         setData(j.data ?? (j as unknown as Payload));
       }
-    } catch {
-      setError("Could not load customers.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Could not reach customer API"));
       setData(null);
     } finally {
       setLoading(false);
@@ -85,7 +88,7 @@ export function BgosCustomerCommandCenter() {
   const selected = useMemo(() => data?.detail ?? null, [data?.detail]);
 
   async function createCustomer() {
-    await fetch("/api/bgos/customer/create", {
+    await apiFetch("/api/bgos/customer/create", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -104,7 +107,7 @@ export function BgosCustomerCommandCenter() {
   async function createService(leadId?: string) {
     const targetLeadId = serviceForm.leadId || leadId || selectedId || "";
     if (!targetLeadId) return;
-    await fetch("/api/bgos/customer/service", {
+    await apiFetch("/api/bgos/customer/service", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -121,7 +124,7 @@ export function BgosCustomerCommandCenter() {
 
   async function addComplaint() {
     if (!selectedId || !complaintText.trim()) return;
-    await fetch("/api/bgos/customer/complaint", {
+    await apiFetch("/api/bgos/customer/complaint", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -132,7 +135,7 @@ export function BgosCustomerCommandCenter() {
   }
 
   async function resolveComplaint(id: string) {
-    await fetch("/api/bgos/customer/complaint", {
+    await apiFetch("/api/bgos/customer/complaint", {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -147,7 +150,7 @@ export function BgosCustomerCommandCenter() {
     fd.set("file", file);
     fd.set("type", "OTHER");
     fd.set("leadId", selectedId);
-    await fetch("/api/document/upload", {
+    await apiFetch("/api/document/upload", {
       method: "POST",
       credentials: "include",
       body: fd,

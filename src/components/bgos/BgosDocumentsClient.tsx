@@ -6,6 +6,7 @@ import { DashboardSurface } from "@/components/dashboard/DashboardSurface";
 import { DOCUMENT_TYPES, DOCUMENT_TYPE_LABELS, type DocumentType } from "@/lib/document-types";
 import type { PublicDocumentRow, PublicUploaderFilterOption } from "@/lib/document-serialize";
 import { useBgosTrialReadOnly } from "@/components/bgos/BgosDataProvider";
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 
 type LeadOption = { id: string; name: string };
 
@@ -90,7 +91,7 @@ export function BgosDocumentsClient({
         if (filterCustomerId.trim()) p.set("customerId", filterCustomerId.trim());
         if (filterType.trim()) p.set("type", filterType.trim());
         if (filterUploadedBy.trim()) p.set("uploadedByUserId", filterUploadedBy.trim());
-        const res = await fetch(`/api/documents/list?${p}`, { credentials: "include" });
+        const res = await apiFetch(`/api/documents/list?${p}`);
         const data = (await res.json()) as {
           ok?: boolean;
           vaultScope?: "all" | "mine";
@@ -100,7 +101,11 @@ export function BgosDocumentsClient({
         };
         if (!res.ok || !data.ok || !Array.isArray(data.documents)) {
           if (!opts?.silent) {
-            setError(typeof data.error === "string" ? data.error : "Could not load documents");
+            const msg =
+              typeof data.error === "string" && data.error.trim()
+                ? `${data.error} (HTTP ${res.status})`
+                : `Could not load documents (HTTP ${res.status})`;
+            setError(msg);
             setDocuments([]);
           }
           return;
@@ -110,9 +115,10 @@ export function BgosDocumentsClient({
         }
         setDocuments(data.documents);
         if (Array.isArray(data.uploaders)) setUploaders(data.uploaders);
-      } catch {
+      } catch (e) {
+        console.error("API ERROR:", e);
         if (!opts?.silent) {
-          setError("Network error");
+          setError(formatFetchFailure(e, "Could not reach documents API"));
           setDocuments([]);
         }
       } finally {
@@ -127,15 +133,15 @@ export function BgosDocumentsClient({
     try {
       const qs =
         vaultScope === "mine" ? "limit=200&assignedTo=me" : "limit=200";
-      const res = await fetch(`/api/leads?${qs}`, { credentials: "include" });
+      const res = await apiFetch(`/api/leads?${qs}`);
       const data = (await res.json()) as {
         ok?: boolean;
         leads?: { id: string; name: string }[];
       };
       if (!res.ok || !data.ok || !Array.isArray(data.leads)) return;
       setLeads(data.leads.map((l) => ({ id: l.id, name: l.name })));
-    } catch {
-      /* optional */
+    } catch (e) {
+      console.error("API ERROR:", e);
     }
   }, [embeddedLeadId, vaultScope]);
 
@@ -173,9 +179,8 @@ export function BgosDocumentsClient({
       fd.set("type", uploadType);
       if (uploadTargetLeadId) fd.set("leadId", uploadTargetLeadId);
 
-      const res = await fetch("/api/documents/upload", {
+      const res = await apiFetch("/api/documents/upload", {
         method: "POST",
-        credentials: "include",
         body: fd,
       });
       const data = (await res.json()) as { ok?: boolean; error?: string; code?: string };
@@ -197,8 +202,9 @@ export function BgosDocumentsClient({
       ) as HTMLInputElement | null;
       if (input) input.value = "";
       await loadDocuments({ silent: true });
-    } catch {
-      setError("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Could not reach document upload API"));
     } finally {
       setBusy(false);
     }

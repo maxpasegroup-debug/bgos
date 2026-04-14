@@ -12,6 +12,7 @@ import { syncCompanySubscriptionStatus, trialDaysRemaining } from "@/lib/subscri
 import { isCompanyBasicTrialExpired } from "@/lib/trial";
 import { isBgosProductionBossBypassEmail } from "@/lib/bgos-production-boss-bypass";
 import { jwtSaysSubscriptionExpired } from "@/lib/trial-middleware";
+import { isBossReady } from "@/lib/boss-ready";
 import { isSuperBossEmail } from "@/lib/super-boss";
 
 function planLabel(plan: CompanyPlan): string {
@@ -155,6 +156,7 @@ export async function GET() {
       }
       const isSuperBoss =
         jwtSuperBoss === true && isSuperBossEmail(session.user.email) === true;
+      const bossLocked = isBossReady(session.user.role, session.user.companyId);
       return jsonSuccess({
         authenticated: true as const,
         planLockedToBasic: bossBillingBypass ? false : isPlanLockedToBasic(),
@@ -169,10 +171,11 @@ export async function GET() {
           companyId: session.user.companyId,
           companyName,
           companyPlan: bossBillingBypass ? CompanyPlan.PRO : session.user.companyPlan,
-          needsOnboarding: session.user.companyId === null,
-          workspaceReady: session.user.workspaceReady,
-          needsWorkspaceActivation:
-            session.user.companyId !== null && !session.user.workspaceReady,
+          needsOnboarding: bossLocked ? false : session.user.companyId === null,
+          workspaceReady: bossLocked ? true : session.user.workspaceReady,
+          needsWorkspaceActivation: bossLocked
+            ? false
+            : session.user.companyId !== null && !session.user.workspaceReady,
           activeCompanyIdCookie,
           memberships: session.user.memberships ?? null,
           isSuperBoss,

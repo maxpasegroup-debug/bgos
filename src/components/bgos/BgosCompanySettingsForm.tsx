@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useBgosDashboardContext } from "./BgosDataProvider";
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 
 type CompanySettings = {
   id: string;
@@ -30,15 +31,20 @@ export function BgosCompanySettingsForm() {
     setError(null);
     setLoading(true);
     try {
-      const res = await fetch("/api/company/settings", { credentials: "include" });
+      const res = await apiFetch("/api/company/settings");
       const data = (await res.json()) as { ok?: boolean; company?: CompanySettings; error?: string };
       if (!res.ok || !data.ok || !data.company) {
-        setError(typeof data.error === "string" ? data.error : "Could not load settings.");
+        const msg =
+          typeof data.error === "string" && data.error.trim()
+            ? `${data.error} (HTTP ${res.status})`
+            : `Could not load settings. (HTTP ${res.status})`;
+        setError(msg);
         return;
       }
       setForm(data.company);
-    } catch {
-      setError("Network error.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Could not reach company settings API"));
     } finally {
       setLoading(false);
     }
@@ -58,9 +64,8 @@ export function BgosCompanySettingsForm() {
     setSaved(false);
     setSaving(true);
     try {
-      const res = await fetch("/api/company/settings", {
+      const res = await apiFetch("/api/company/settings", {
         method: "PATCH",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: form.name,
@@ -90,8 +95,9 @@ export function BgosCompanySettingsForm() {
       }
       setForm(data.company);
       setSaved(true);
-    } catch {
-      setError("Network error.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Could not reach company settings API"));
     } finally {
       setSaving(false);
     }

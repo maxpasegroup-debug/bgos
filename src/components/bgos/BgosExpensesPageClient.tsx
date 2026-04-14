@@ -19,6 +19,7 @@ import { DashboardSurface } from "@/components/dashboard/DashboardSurface";
 import { useBgosDashboardContext } from "@/components/bgos/BgosDataProvider";
 import { EXPENSE_CATEGORIES } from "@/lib/expense-categories";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 
 type ExpenseRow = {
   id: string;
@@ -76,16 +77,21 @@ export function BgosExpensesPageClient() {
       const p = new URLSearchParams();
       if (filterMonth) p.set("monthly", filterMonth);
       if (filterCategory.trim()) p.set("category", filterCategory.trim());
-      const res = await fetch(`/api/expense/list?${p}`, { credentials: "include" });
+      const res = await apiFetch(`/api/expense/list?${p}`);
       const data = (await res.json()) as { ok?: boolean; expenses?: ExpenseRow[]; error?: string };
       if (!res.ok || !data.ok || !Array.isArray(data.expenses)) {
-        setError(typeof data.error === "string" ? data.error : "Could not load expenses");
+        const msg =
+          typeof data.error === "string" && data.error.trim()
+            ? `${data.error} (HTTP ${res.status})`
+            : `Could not load expenses (HTTP ${res.status})`;
+        setError(msg);
         setRows([]);
         return;
       }
       setRows(data.expenses);
-    } catch {
-      setError("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Could not reach expense list API"));
       setRows([]);
     }
   }, [filterMonth, filterCategory]);
@@ -94,7 +100,7 @@ export function BgosExpensesPageClient() {
     try {
       const p = new URLSearchParams();
       p.set("monthly", filterMonth);
-      const res = await fetch(`/api/expense/analytics?${p}`, { credentials: "include" });
+      const res = await apiFetch(`/api/expense/analytics?${p}`);
       const data = (await res.json()) as { ok?: boolean } & Partial<AnalyticsPayload>;
       if (!res.ok || !data.ok) {
         setAnalytics(null);
@@ -111,7 +117,8 @@ export function BgosExpensesPageClient() {
         monthlyBars: Array.isArray(data.monthlyBars) ? data.monthlyBars : [],
         highThreshold: typeof data.highThreshold === "number" ? data.highThreshold : 0,
       });
-    } catch {
+    } catch (e) {
+      console.error("API ERROR:", e);
       setAnalytics(null);
     }
   }, [filterMonth]);
@@ -153,9 +160,8 @@ export function BgosExpensesPageClient() {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/expense/create", {
+      const res = await apiFetch("/api/expense/create", {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: title.trim(),
@@ -180,8 +186,9 @@ export function BgosExpensesPageClient() {
       setTitle("");
       setAmount("");
       await refresh();
-    } catch {
-      setError("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Could not reach expense create API"));
     } finally {
       setBusy(false);
     }

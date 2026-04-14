@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { useBgosDashboardContext } from "./BgosDataProvider";
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 
 const inputClass =
   "mt-1 w-full rounded-lg border border-white/10 bg-black/35 px-3 py-2 text-sm text-white outline-none focus:border-[#FFC300]/40";
@@ -73,10 +74,7 @@ export function BgosAddLeadModal({
     setLoadingUsers(true);
     setUsersNote(null);
     try {
-      const [meRes, usersRes] = await Promise.all([
-        fetch("/api/auth/me", { credentials: "include" }),
-        fetch("/api/users", { credentials: "include" }),
-      ]);
+      const [meRes, usersRes] = await Promise.all([apiFetch("/api/auth/me"), apiFetch("/api/users")]);
 
       let meId: string | null = null;
       let meRole: string | null = null;
@@ -89,8 +87,8 @@ export function BgosAddLeadModal({
           meId = meJson.user.id;
           meRole = meJson.user.role;
         }
-      } catch {
-        /* ignore */
+      } catch (e) {
+        console.error("API ERROR:", e);
       }
       setCurrentUser(meId && meRole ? { id: meId, role: meRole } : null);
 
@@ -110,10 +108,11 @@ export function BgosAddLeadModal({
       }
       const list = Array.isArray(data.users) ? data.users.filter((u) => u.isActive) : [];
       setUsers(list);
-    } catch {
+    } catch (e) {
+      console.error("API ERROR:", e);
       setUsers([]);
       setCurrentUser(null);
-      setUsersNote("Could not load team — assignment defaults to you.");
+      setUsersNote(formatFetchFailure(e, "Could not load team — assignment defaults to you"));
     } finally {
       setLoadingUsers(false);
     }
@@ -207,9 +206,8 @@ export function BgosAddLeadModal({
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/leads/create", {
+      const res = await apiFetch("/api/leads/create", {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
@@ -243,8 +241,9 @@ export function BgosAddLeadModal({
       setSuccess(`Lead “${parsed.data.name}” added.`);
       void refetch();
       window.setTimeout(() => setSuccess(null), 5000);
-    } catch {
-      setSubmitError("Network error — try again.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setSubmitError(formatFetchFailure(e, "Could not reach lead create API"));
     } finally {
       setSubmitting(false);
     }

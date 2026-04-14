@@ -13,6 +13,7 @@ import {
 import { DashboardSurface } from "@/components/dashboard/DashboardSurface";
 import { useBgosDashboardContext } from "@/components/bgos/BgosDataProvider";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { roundMoney } from "@/lib/money-items";
 
 type LineRow = { id: string; name: string; qty: string; price: string };
@@ -83,9 +84,7 @@ export function BgosQuotationCreateClient({ initialLeadId }: { initialLeadId: st
     setLeadError(null);
     void (async () => {
       try {
-        const res = await fetch(`/api/leads/${encodeURIComponent(leadId)}`, {
-          credentials: "include",
-        });
+        const res = await apiFetch(`/api/leads/${encodeURIComponent(leadId)}`);
         const data = (await res.json()) as {
           ok?: boolean;
           lead?: { name?: string; phone?: string };
@@ -99,8 +98,9 @@ export function BgosQuotationCreateClient({ initialLeadId }: { initialLeadId: st
         }
         setCustomerName(typeof data.lead.name === "string" ? data.lead.name : "");
         setCustomerPhone(typeof data.lead.phone === "string" ? data.lead.phone : "");
-      } catch {
-        if (!cancelled) setLeadError("Network error loading lead");
+      } catch (e) {
+        console.error("API ERROR:", e);
+        if (!cancelled) setLeadError(formatFetchFailure(e, "Could not reach lead API"));
       } finally {
         if (!cancelled) setLeadLoading(false);
       }
@@ -224,9 +224,8 @@ export function BgosQuotationCreateClient({ initialLeadId }: { initialLeadId: st
     setBusy(true);
     setFormError(null);
     try {
-      const res = await fetch("/api/quotation/create", {
+      const res = await apiFetch("/api/quotation/create", {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           leadId: effectiveLeadId || null,
@@ -262,8 +261,9 @@ export function BgosQuotationCreateClient({ initialLeadId }: { initialLeadId: st
         return;
       }
       router.push("/bgos/money?tab=quotations&success=quotation");
-    } catch {
-      setFormError("Network error — try again.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setFormError(formatFetchFailure(e, "Could not reach quotation create API"));
     } finally {
       setBusy(false);
     }

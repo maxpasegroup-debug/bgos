@@ -7,6 +7,7 @@ import {
   emptyFinancialOverview,
   normalizeFinancialOverview,
 } from "@/lib/dashboard-client-defaults";
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import type {
   DashboardAnalytics,
   DashboardAnalyticsRangeMeta,
@@ -185,7 +186,7 @@ export function useBgosData(
   }, []);
 
   useEffect(() => {
-    fetch("/api/auth/me", { credentials: "include" })
+    apiFetch("/api/auth/me")
       .then((r) => (r.ok ? r.json() : null))
       .then(
         (j: {
@@ -271,7 +272,7 @@ export function useBgosData(
       if (bossLandingPath && !sbLandingMeChecked.current) {
         sbLandingMeChecked.current = true;
         try {
-          const meRes = await fetch("/api/auth/me", { credentials: "include" });
+          const meRes = await apiFetch("/api/auth/me");
           if (meRes.ok) {
             const mj = (await meRes.json()) as {
               user?: { isSuperBoss?: boolean; companyId?: string | null };
@@ -290,14 +291,15 @@ export function useBgosData(
               return;
             }
           }
-        } catch {
+        } catch (e) {
+          console.error("API ERROR:", e);
           /* fall through to live dashboard */
         }
       }
 
       try {
         const dashUrl = `/api/dashboard?range=${encodeURIComponent(analyticsRangePreset)}`;
-        const res = await fetch(dashUrl, { credentials: "include" });
+        const res = await apiFetch(dashUrl);
         const text = await res.text();
         if (!res.ok) {
           if (res.status === 403) {
@@ -378,9 +380,10 @@ export function useBgosData(
           okOnce.current = true;
           setSyncGeneration((n) => n + 1);
         }
-      } catch {
+      } catch (e) {
+        console.error("API ERROR:", e);
         if (!cancelled && !okOnce.current) {
-          setError("Network error — check your connection.");
+          setError(formatFetchFailure(e, "Could not reach the dashboard API"));
         }
       }
     };

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { z } from "zod";
 import { resolveAfterLoginNavigation } from "@/lib/cross-domain-login";
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 
 const clientLoginSchema = z.object({
   email: z.string().trim().min(1, "Email is required").email("Enter a valid email"),
@@ -33,10 +34,9 @@ function LoginForm() {
     setPending(true);
     try {
       const from = searchParams.get("from");
-      const res = await fetch("/api/auth/login", {
+      const res = await apiFetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         redirect: "manual",
         body: JSON.stringify({
           email: fields.data.email,
@@ -86,35 +86,36 @@ function LoginForm() {
       }
       if (data.isSuperBoss === true) {
         try {
-          await fetch("/api/auth/refresh-session", {
-            method: "POST",
-            credentials: "include",
-          }).catch(() => undefined);
-        } catch {
-          /* non-fatal */
+          await apiFetch("/api/auth/refresh-session", { method: "POST" }).catch(() => undefined);
+        } catch (e) {
+          console.error("API ERROR:", e);
         }
         router.replace("/bgos/dashboard");
         router.refresh();
         return;
       }
 
-      if (
-        data.user?.needsOnboarding ||
-        data.user?.companyId == null ||
-        data.user?.needsWorkspaceActivation
-      ) {
-        router.replace("/onboarding");
-        router.refresh();
-        return;
-      }
       const role = data.user?.role;
       if (!role) {
         setError("Invalid sign-in response");
         return;
       }
 
+      const u = data.user;
+      const bossHasCompany = role === "ADMIN" && typeof u?.companyId === "string" && u.companyId.length > 0;
+      if (
+        !bossHasCompany &&
+        (u?.needsOnboarding === true ||
+          u?.companyId == null ||
+          u?.needsWorkspaceActivation === true)
+      ) {
+        router.replace("/onboarding");
+        router.refresh();
+        return;
+      }
+
       try {
-        const listRes = await fetch("/api/company/list", { credentials: "include" });
+        const listRes = await apiFetch("/api/company/list");
         const listJson = (await listRes.json()) as { ok?: boolean; companies?: unknown[] };
         const multiCompany =
           data.needsCompanySelection === true ||
@@ -125,12 +126,9 @@ function LoginForm() {
           router.refresh();
           return;
         }
-        await fetch("/api/auth/refresh-session", {
-          method: "POST",
-          credentials: "include",
-        }).catch(() => undefined);
-      } catch {
-        /* non-fatal */
+        await apiFetch("/api/auth/refresh-session", { method: "POST" }).catch(() => undefined);
+      } catch (e) {
+        console.error("API ERROR:", e);
       }
 
       if (role === "ADMIN") {
@@ -152,8 +150,9 @@ function LoginForm() {
         typeof data.nextPath === "string" && data.nextPath.startsWith("/") ? data.nextPath : null;
       router.replace(serverPath ?? nav.path);
       router.refresh();
-    } catch {
-      setError("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Sign-in request failed"));
     } finally {
       setPending(false);
     }

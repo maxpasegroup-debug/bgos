@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { useCompanyBranding } from "@/contexts/company-branding-context";
@@ -29,7 +31,7 @@ export function IceconnectEngineerDashboard() {
     setErr(null);
     setLoading(true);
     try {
-      const res = await fetch("/api/iceconnect/engineer/visits", { credentials: "include" });
+      const res = await apiFetch("/api/iceconnect/engineer/visits", { credentials: "include" });
       if (!res.ok) {
         let msg = "Could not load visits.";
         try {
@@ -43,8 +45,9 @@ export function IceconnectEngineerDashboard() {
       }
       const data = (await res.json()) as { visits: Visit[] };
       setVisits(Array.isArray(data.visits) ? data.visits : []);
-    } catch {
-      setErr("Network error — check your connection.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     } finally {
       setLoading(false);
     }
@@ -59,7 +62,7 @@ export function IceconnectEngineerDashboard() {
     if (!report) return;
     setBusy(leadId);
     try {
-      const res = await fetch("/api/iceconnect/engineer/report", {
+      const res = await apiFetch("/api/iceconnect/engineer/report", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

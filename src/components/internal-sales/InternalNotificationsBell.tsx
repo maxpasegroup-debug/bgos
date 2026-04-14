@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import { useCallback, useEffect, useState } from "react";
 
 type N = {
@@ -17,7 +19,7 @@ export function InternalNotificationsBell({ theme }: { theme: "bgos" | "ice" }) 
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/internal-sales/notifications", { credentials: "include" });
+      const res = await apiFetch("/api/internal-sales/notifications", { credentials: "include" });
       const j = (await res.json()) as Record<string, unknown>;
       if (!res.ok || j.ok !== true) return;
       const list = Array.isArray(j.notifications) ? (j.notifications as N[]) : [];
@@ -35,7 +37,7 @@ export function InternalNotificationsBell({ theme }: { theme: "bgos" | "ice" }) 
   }, [load]);
 
   async function markOne(id: string) {
-    await fetch(`/api/internal-sales/notifications/${id}`, {
+    await apiFetch(`/api/internal-sales/notifications/${id}`, {
       method: "PATCH",
       credentials: "include",
     });
@@ -43,7 +45,7 @@ export function InternalNotificationsBell({ theme }: { theme: "bgos" | "ice" }) 
   }
 
   async function markAll() {
-    await fetch("/api/internal-sales/notifications", {
+    await apiFetch("/api/internal-sales/notifications", {
       method: "PATCH",
       credentials: "include",
     });

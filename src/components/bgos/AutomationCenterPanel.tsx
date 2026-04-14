@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import { motion, useReducedMotion } from "framer-motion";
 import { useCallback, useState } from "react";
 import { DashboardSurface } from "@/components/dashboard/DashboardSurface";
@@ -14,7 +16,7 @@ type ActivityRow = {
 };
 
 async function patchAutomationEnabled(enabled: boolean): Promise<boolean> {
-  const res = await fetch("/api/automation/settings", {
+  const res = await apiFetch("/api/automation/settings", {
     method: "PATCH",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
@@ -30,7 +32,7 @@ async function fetchAutomationLogs(): Promise<ActivityRow[]> {
     types: "AUTOMATION_SIMULATED",
     limit: "25",
   });
-  const res = await fetch(`/api/activity?${params}`, { credentials: "include" });
+  const res = await apiFetch(`/api/activity?${params}`, { credentials: "include" });
   if (!res.ok) return [];
   const j = (await res.json()) as {
     ok?: boolean;

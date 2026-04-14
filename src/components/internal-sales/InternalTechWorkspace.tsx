@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { InternalSalesStage, InternalTechStage } from "@prisma/client";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -42,8 +44,7 @@ export function InternalTechWorkspace({ theme }: { theme: "bgos" | "ice" }) {
     setErr(null);
     setLoading(true);
     try {
-      const res = await fetch(
-        `/api/internal-sales/leads?stage=${encodeURIComponent(InternalSalesStage.SENT_TO_TECH)}`,
+      const res = await apiFetch(`/api/internal-sales/leads?stage=${encodeURIComponent(InternalSalesStage.SENT_TO_TECH)}`,
         { credentials: "include" },
       );
       const j: unknown = await res.json();
@@ -53,8 +54,9 @@ export function InternalTechWorkspace({ theme }: { theme: "bgos" | "ice" }) {
         return;
       }
       setPipeline(readPipelinePayload(j) ?? []);
-    } catch {
-      setErr("Network error.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     } finally {
       setLoading(false);
     }
@@ -71,7 +73,7 @@ export function InternalTechWorkspace({ theme }: { theme: "bgos" | "ice" }) {
     setBusyId(leadId);
     setErr(null);
     try {
-      const res = await fetch(`/api/internal-sales/leads/${leadId}/tech-pipeline`, {
+      const res = await apiFetch(`/api/internal-sales/leads/${leadId}/tech-pipeline`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

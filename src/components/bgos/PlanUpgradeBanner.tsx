@@ -5,6 +5,7 @@ import { CompanyPlan } from "@prisma/client";
 import { useState } from "react";
 import { postSalesBoosterUpgradeRequest } from "@/lib/sales-booster-client";
 import { useOpenPlanUpgrade } from "./BgosUpgradeModalContext";
+import { formatFetchFailure } from "@/lib/api-fetch";
 
 const UPGRADE_EMAIL = process.env.NEXT_PUBLIC_BGOS_UPGRADE_EMAIL?.trim();
 
@@ -24,8 +25,9 @@ export function PlanUpgradeBanner({ plan }: { plan: CompanyPlan | null }) {
       if (ok) {
         window.setTimeout(() => setMsg(null), 8000);
       }
-    } catch {
-      setMsg("Network error.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setMsg(formatFetchFailure(e, "Could not send upgrade request"));
     } finally {
       setBusy(false);
     }

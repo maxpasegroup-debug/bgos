@@ -13,6 +13,7 @@ import {
   SOLAR_FIELD_EMPLOYEE_ROLE_OPTIONS,
 } from "@/lib/internal-hr-roles";
 import { useBgosDashboardContext } from "./BgosDataProvider";
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 
 const addEmployeeClientSchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
@@ -55,7 +56,7 @@ export function BgosAddEmployeeForm() {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch("/api/company/current", { credentials: "include" });
+        const res = await apiFetch("/api/company/current");
         const j = (await res.json()) as { ok?: boolean; company?: { internalSalesOrg?: boolean } };
         if (!cancelled && res.ok && j.ok && j.company?.internalSalesOrg) setInternalOrg(true);
       } catch {
@@ -109,9 +110,8 @@ export function BgosAddEmployeeForm() {
       };
       if (mobileTrim) body.mobile = mobileTrim;
 
-      const res = await fetch("/api/users/create", {
+      const res = await apiFetch("/api/users/create", {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
@@ -163,8 +163,9 @@ export function BgosAddEmployeeForm() {
       setSuccess(true);
       setMsg("Success — employee added. They can sign in with email and password.");
       refetch();
-    } catch {
-      setMsg("Network error.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setMsg(formatFetchFailure(e, "Could not reach user create API"));
     } finally {
       setSubmitting(false);
     }

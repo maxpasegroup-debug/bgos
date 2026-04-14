@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -71,7 +73,7 @@ export function SalesBoosterLandingClient() {
 
   const loadMe = useCallback(async () => {
     try {
-      const res = await fetch("/api/auth/me", { credentials: "include" });
+      const res = await apiFetch("/api/auth/me", { credentials: "include" });
       const j = (await res.json()) as {
         authenticated?: boolean;
         user?: { companyPlan?: string };
@@ -120,7 +122,7 @@ export function SalesBoosterLandingClient() {
       }
 
       await loadRazorpayScript();
-      const orderRes = await fetch("/api/payment/razorpay/order", {
+      const orderRes = await apiFetch("/api/payment/razorpay/order", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -152,7 +154,7 @@ export function SalesBoosterLandingClient() {
         return;
       }
 
-      const meRes = await fetch("/api/auth/me", { credentials: "include" });
+      const meRes = await apiFetch("/api/auth/me", { credentials: "include" });
       const meJson = (await meRes.json()) as { user?: { name?: string; email?: string } };
       const prefillName = (meJson.user?.name ?? "").trim() || "Customer";
       const prefillEmail = (meJson.user?.email ?? "").trim() || "customer@example.com";
@@ -179,7 +181,7 @@ export function SalesBoosterLandingClient() {
         }) => {
           void (async () => {
             try {
-              const vRes = await fetch("/api/payment/razorpay/verify", {
+              const vRes = await apiFetch("/api/payment/razorpay/verify", {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
@@ -198,7 +200,7 @@ export function SalesBoosterLandingClient() {
                 });
                 return;
               }
-              await fetch("/api/auth/refresh-session", { method: "POST", credentials: "include" });
+              await apiFetch("/api/auth/refresh-session", { method: "POST", credentials: "include" });
               setUpgrading(false);
               setUpgradeOpen(false);
               window.location.assign("/sales-booster?upgraded=1");

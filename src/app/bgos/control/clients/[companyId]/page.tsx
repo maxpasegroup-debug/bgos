@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useBgosTheme } from "@/components/bgos/BgosThemeContext";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
+import { formatFetchFailure, apiFetch } from "@/lib/api-fetch";
 
 type DetailJson = {
   ok?: boolean;
@@ -41,15 +42,16 @@ export default function ControlClientDetailPage() {
     if (!companyId) return;
     setError(null);
     try {
-      const res = await fetch(`/api/bgos/control/clients/${companyId}`, { credentials: "include" });
+      const res = await apiFetch(`/api/bgos/control/clients/${companyId}`, { credentials: "include" });
       const j = (await res.json()) as DetailJson & { error?: string };
       if (!res.ok) {
         setError(typeof j.error === "string" ? j.error : "Failed to load");
         return;
       }
       setData(j);
-    } catch {
-      setError("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Could not reach client detail API"));
     }
   }, [companyId]);
 

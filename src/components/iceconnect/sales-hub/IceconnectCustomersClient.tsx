@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -25,7 +27,7 @@ export function IceconnectCustomersClient() {
     setErr(null);
     setLoading(true);
     try {
-      const res = await fetch("/api/iceconnect/executive/customers", { credentials: "include" });
+      const res = await apiFetch("/api/iceconnect/executive/customers", { credentials: "include" });
       const j = (await res.json()) as { ok?: boolean; customers?: Row[]; code?: string; error?: string };
       if (res.status === 403 && j.code === "NOT_INTERNAL_SALES_ORG") {
         router.replace("/iceconnect/internal-sales");
@@ -36,8 +38,9 @@ export function IceconnectCustomersClient() {
         return;
       }
       setRows(j.customers ?? []);
-    } catch {
-      setErr("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     } finally {
       setLoading(false);
     }

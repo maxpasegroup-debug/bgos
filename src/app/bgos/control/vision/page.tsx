@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useBgosTheme } from "@/components/bgos/BgosThemeContext";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
+import { formatFetchFailure, apiFetch } from "@/lib/api-fetch";
 
 type VisionJson = {
   ok?: boolean;
@@ -29,15 +30,22 @@ export default function ControlVisionPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch("/api/bgos/control/vision", { credentials: "include" });
-      const j = (await res.json()) as VisionJson;
+      const res = await apiFetch("/api/bgos/control/vision", { credentials: "include" });
+      const j = (await res.json()) as VisionJson & { error?: string; code?: string };
       if (!res.ok || !j.ok) {
-        setError("Could not load vision data.");
+        const hint =
+          typeof j.error === "string" && j.error.trim()
+            ? `${j.error} (HTTP ${res.status})`
+            : j.code === "FORBIDDEN"
+              ? "Sign in with the platform boss account (BGOS_BOSS_EMAIL)."
+              : `Could not load vision data. (HTTP ${res.status})`;
+        setError(hint);
         return;
       }
       setData(j);
-    } catch {
-      setError("Network error.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Could not reach vision API"));
     }
   }, []);
 
@@ -60,7 +68,7 @@ export default function ControlVisionPage() {
       setSaveMsg("Enter company ID and numeric targets.");
       return;
     }
-    const res = await fetch("/api/bgos/control/vision/company-target", {
+    const res = await apiFetch("/api/bgos/control/vision/company-target", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },

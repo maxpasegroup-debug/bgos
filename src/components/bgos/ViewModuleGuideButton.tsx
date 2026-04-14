@@ -2,6 +2,7 @@
 
 import type { UserManualCategory } from "@prisma/client";
 import { useCallback, useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api-fetch";
 
 export function ViewModuleGuideButton({
   category,
@@ -14,12 +15,11 @@ export function ViewModuleGuideButton({
 
   const probe = useCallback(async () => {
     try {
-      const res = await fetch(`/api/user-manuals?category=${encodeURIComponent(category)}`, {
-        credentials: "include",
-      });
+      const res = await apiFetch(`/api/user-manuals?category=${encodeURIComponent(category)}`);
       const j = (await res.json()) as { ok?: boolean; manual?: { id: string } | null };
       setAvailable(res.ok && !!j.manual?.id);
-    } catch {
+    } catch (e) {
+      console.error("API ERROR:", e);
       setAvailable(false);
     }
   }, [category]);

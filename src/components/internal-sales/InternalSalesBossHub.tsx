@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { InternalCallStatus, InternalSalesStage } from "@prisma/client";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -76,11 +78,11 @@ export function InternalSalesBossHub({ theme }: { theme: "bgos" | "ice" }) {
       if (filterStage) q.set("stage", filterStage);
       const qs = q.toString();
       const [plRes, dashRes, teamRes, setRes, apprRes] = await Promise.all([
-        fetch(`/api/internal-sales/leads${qs ? `?${qs}` : ""}`, { credentials: "include" }),
-        fetch(`/api/internal-sales/dashboard?range=${range}`, { credentials: "include" }),
-        fetch("/api/internal-sales/team", { credentials: "include" }),
-        fetch("/api/internal-sales/settings", { credentials: "include" }),
-        fetch("/api/internal-sales/onboarding-approvals", { credentials: "include" }),
+        apiFetch(`/api/internal-sales/leads${qs ? `?${qs}` : ""}`, { credentials: "include" }),
+        apiFetch(`/api/internal-sales/dashboard?range=${range}`, { credentials: "include" }),
+        apiFetch("/api/internal-sales/team", { credentials: "include" }),
+        apiFetch("/api/internal-sales/settings", { credentials: "include" }),
+        apiFetch("/api/internal-sales/onboarding-approvals", { credentials: "include" }),
       ]);
       const plJson: unknown = await plRes.json();
       if (!plRes.ok) {
@@ -101,8 +103,9 @@ export function InternalSalesBossHub({ theme }: { theme: "bgos" | "ice" }) {
       } else {
         setApprovalRows([]);
       }
-    } catch {
-      setErr("Network error.");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     } finally {
       setLoading(false);
     }
@@ -127,7 +130,7 @@ export function InternalSalesBossHub({ theme }: { theme: "bgos" | "ice" }) {
   async function patchLead(id: string, body: Record<string, unknown>) {
     setBusyId(id);
     try {
-      const res = await fetch(`/api/internal-sales/leads/${id}`, {
+      const res = await apiFetch(`/api/internal-sales/leads/${id}`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -144,7 +147,7 @@ export function InternalSalesBossHub({ theme }: { theme: "bgos" | "ice" }) {
     setBusyId(leadId);
     setErr(null);
     try {
-      const res = await fetch(`/api/internal-sales/leads/${leadId}/boss-approval`, {
+      const res = await apiFetch(`/api/internal-sales/leads/${leadId}/boss-approval`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -159,7 +162,7 @@ export function InternalSalesBossHub({ theme }: { theme: "bgos" | "ice" }) {
 
   async function loadActivity(leadId: string) {
     setActivityFor(leadId);
-    const res = await fetch(`/api/internal-sales/leads/${leadId}/activity`, { credentials: "include" });
+    const res = await apiFetch(`/api/internal-sales/leads/${leadId}/activity`, { credentials: "include" });
     const j = (await res.json()) as { ok?: boolean; activity?: typeof activityRows };
     if (res.ok && j.ok && Array.isArray(j.activity)) setActivityRows(j.activity);
     else setActivityRows([]);
@@ -169,7 +172,7 @@ export function InternalSalesBossHub({ theme }: { theme: "bgos" | "ice" }) {
     if (!bulkAssignee || selected.size === 0) return;
     setBusyId("bulk");
     try {
-      const res = await fetch("/api/internal-sales/leads/bulk-assign", {
+      const res = await apiFetch("/api/internal-sales/leads/bulk-assign", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -186,7 +189,7 @@ export function InternalSalesBossHub({ theme }: { theme: "bgos" | "ice" }) {
   }
 
   async function saveTarget(userId: string, targetLeads: number) {
-    await fetch("/api/internal-sales/targets", {
+    await apiFetch("/api/internal-sales/targets", {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -205,7 +208,7 @@ export function InternalSalesBossHub({ theme }: { theme: "bgos" | "ice" }) {
     const q = new URLSearchParams();
     if (p) q.set("phone", p);
     if (e) q.set("email", e);
-    const res = await fetch(`/api/internal-sales/duplicate-check?${q}`, { credentials: "include" });
+    const res = await apiFetch(`/api/internal-sales/duplicate-check?${q}`, { credentials: "include" });
     const j = (await res.json()) as { duplicate?: boolean; existingLead?: { id: string; name: string } };
     if (res.ok && j.duplicate && j.existingLead) setDupExisting(j.existingLead);
     else setDupExisting(null);
@@ -216,7 +219,7 @@ export function InternalSalesBossHub({ theme }: { theme: "bgos" | "ice" }) {
     setErr(null);
     setBusyId("new");
     try {
-      const res = await fetch("/api/internal-sales/leads", {
+      const res = await apiFetch("/api/internal-sales/leads", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -258,7 +261,7 @@ export function InternalSalesBossHub({ theme }: { theme: "bgos" | "ice" }) {
   async function saveDefaultAssignee(userId: string) {
     setBusyId("settings");
     try {
-      await fetch("/api/internal-sales/settings", {
+      await apiFetch("/api/internal-sales/settings", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

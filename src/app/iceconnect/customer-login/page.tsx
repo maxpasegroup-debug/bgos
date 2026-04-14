@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -14,7 +16,7 @@ export default function IceconnectCustomerLoginPage() {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/customer/auth/login", {
+      const res = await apiFetch("/api/customer/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

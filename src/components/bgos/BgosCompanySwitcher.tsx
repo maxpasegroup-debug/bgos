@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { prepareAddBusinessNavigation } from "@/lib/bgos-add-business-intent";
@@ -33,8 +35,8 @@ export function BgosCompanySwitcher({ light = false }: { light?: boolean }) {
 
   const load = useCallback(async () => {
     const [listRes, meRes] = await Promise.all([
-      fetch("/api/company/list", { credentials: "include" }),
-      fetch("/api/auth/me", { credentials: "include" }),
+      apiFetch("/api/company/list", { credentials: "include" }),
+      apiFetch("/api/auth/me", { credentials: "include" }),
     ]);
 
     if (!listRes.ok || !meRes.ok) {
@@ -101,7 +103,7 @@ export function BgosCompanySwitcher({ light = false }: { light?: boolean }) {
     setSwitchingId(companyId);
     setActiveCompanyId(companyId);
     try {
-      const res = await fetch("/api/company/switch", {
+      const res = await apiFetch("/api/company/switch", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -205,7 +207,7 @@ export function BgosCompanySwitcher({ light = false }: { light?: boolean }) {
               onClick={() => {
                 setOpen(false);
                 prepareAddBusinessNavigation();
-                router.push("/onboarding");
+                router.replace("/onboarding?addBusiness=1");
               }}
             >
               Add New Business

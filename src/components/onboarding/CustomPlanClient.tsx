@@ -1,5 +1,7 @@
 "use client";
 
+
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 
@@ -46,7 +48,7 @@ export function CustomPlanClient() {
     }
     setPending(true);
     try {
-      const res = await fetch("/api/company/create", {
+      const res = await apiFetch("/api/company/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -69,8 +71,9 @@ export function CustomPlanClient() {
       }
       router.replace("/onboarding/custom/pay");
       router.refresh();
-    } catch {
-      setErr("Network error");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setErr(formatFetchFailure(e, "Request failed"));
     } finally {
       setPending(false);
     }
