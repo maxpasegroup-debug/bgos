@@ -7,7 +7,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import { execFileSync } from "node:child_process";
 import { e2eFetch, waitForDevServer } from "./e2e-fetch.mjs";
 
 const envPath = path.join(process.cwd(), ".env");
@@ -87,7 +86,7 @@ async function main() {
   if (!bossPassword) fail("config", "Set E2E_BOSS_PASSWORD to the platform boss account password");
 
   const t = Date.now();
-  const phoneDigits = `9${String(t).slice(-9)}`.padEnd(10, "0").slice(0, 10);
+  const partnerPhone = `9${String(t).slice(-9)}`.padEnd(10, "0").slice(0, 10);
   const ownerEmail = `e2e-mf-owner-${t}@example.com`;
   const ownerPassword = "e2e-test-pass-8chars";
 
@@ -98,7 +97,7 @@ async function main() {
       method: "POST",
       body: {
         name: `E2E MF ${t}`,
-        phone: `+91 ${phoneDigits.slice(0, 5)} ${phoneDigits.slice(5)}`,
+        phone: `+91 ${partnerPhone.slice(0, 5)} ${partnerPhone.slice(5)}`,
         email: `e2e-mf-app-${t}@example.com`,
       },
     });
@@ -156,7 +155,7 @@ async function main() {
       body: {
         companyName: `E2E MF Co ${t}`,
         industry: "SOLAR",
-        referralPhone: phoneDigits,
+        referralPhone: partnerPhone,
       },
     });
     if (!res.ok || !json.ok) fail("onboarding/launch", `HTTP ${res.status}`, json);
@@ -190,16 +189,27 @@ async function main() {
     console.log("PASS: partner/me wallet pending=", w.pending);
   }
 
-  try {
-    process.env.E2E_MF_COMPANY_ID = companyId;
-    process.env.E2E_MF_PAYMENT_REF = `e2e-mf-pay-${t}`;
-    execFileSync("npx", ["tsx", "scripts/e2e-mf-accrue-commission.ts"], {
-      stdio: "inherit",
-      cwd: process.cwd(),
-      env: process.env,
+  {
+    const paymentRef = `e2e-mf-pay-${t}`;
+    const { res, json } = await req("/api/dev/trigger-commission", {
+      method: "POST",
+      jar: bossJar,
+      body: { companyId, amount: 10000, paymentRef },
     });
-  } catch {
-    fail("commission", "e2e-mf-accrue-commission.ts failed");
+    if (!res.ok || !json.ok) fail("commission trigger", `HTTP ${res.status}`, json);
+    if (!json.transaction?.id) fail("commission trigger", "missing transaction", json);
+    if (typeof json.wallet?.pending !== "number" || json.wallet.pending <= 0) {
+      fail("commission trigger", "wallet not incremented", json);
+    }
+    console.log("PASS: commission trigger", json.transaction.id, "pending=", json.wallet.pending);
+  }
+
+  if (mfJar) {
+    const { res, json } = await req("/api/micro-franchise/partner/me", { jar: mfJar });
+    if (!res.ok || !json.ok) fail("partner/me after commission", `HTTP ${res.status}`, json);
+    const pending = Number(json.partner?.wallet?.pending ?? 0);
+    if (!(pending > 0)) fail("partner/me after commission", "wallet pending not updated", json);
+    console.log("PASS: partner/me after commission pending=", pending);
   }
 
   console.log("PASS: full MF e2e flow");

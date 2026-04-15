@@ -35,7 +35,16 @@ export async function accrueMicroFranchiseCommission(
           subscriptionStatus: true,
         },
       });
-      if (!company?.microFranchisePartnerId) return false;
+      console.log("🔍 COMPANY CHECK:", company);
+      if (!company?.microFranchisePartnerId) {
+        throw new Error("❌ No MF partner linked to company");
+      }
+
+      console.log("🔥 Commission Triggered:", {
+        companyId: input.companyId,
+        partnerId: company.microFranchisePartnerId,
+        amountPaise: input.amountPaise,
+      });
 
       const partner = await tx.microFranchisePartner.findUnique({
         where: { id: company.microFranchisePartnerId },
@@ -49,7 +58,9 @@ export async function accrueMicroFranchiseCommission(
       if (!partner) return false;
 
       const plan = partner.commissionPlan;
-      if (!plan) return false;
+      if (!plan) {
+        throw new Error("❌ No commission plan found");
+      }
 
       let commission = 0;
       if (plan.type === "PERCENTAGE") {
@@ -88,6 +99,7 @@ export async function accrueMicroFranchiseCommission(
           totalEarned: { increment: commission },
         },
       });
+      console.log("💰 Commission Added:", commission);
 
       return true;
     });

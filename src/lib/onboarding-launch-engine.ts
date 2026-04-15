@@ -211,8 +211,12 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
   }
 
   if (referralRaw && normalizedPhone.length > 0) {
-    const partner = await prisma.microFranchisePartner.findUnique({
-      where: { phone: normalizedPhone },
+    const phoneCandidates =
+      normalizedPhone.length === 10
+        ? [normalizedPhone, `91${normalizedPhone}`]
+        : [normalizedPhone];
+    const partner = await prisma.microFranchisePartner.findFirst({
+      where: { phone: { in: phoneCandidates } },
       select: { id: true },
     });
     if (partner) {
@@ -262,12 +266,41 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
       team: teamForPlan,
     });
 
-    /** Default Prisma interactive tx is 5s; bcrypt + several employees exceeds that on dev / high-latency DB. */
-    const interactiveTxTimeoutMs = (() => {
-      const n = Number(process.env.ONBOARDING_LAUNCH_TX_TIMEOUT_MS);
-      return Number.isFinite(n) ? Math.min(600_000, Math.max(15_000, n)) : 180_000;
-    })();
+    const ownerEmailLower = owner.email.trim().toLowerCase();
+    const preparedUsersByProvidedEmail = new Map<
+      string,
+      { plain: string; passwordHash: string }
+    >();
+    const generatedCandidates = onboardingPlan.employees.filter((member) => {
+      const provided = member.email?.trim().toLowerCase();
+      return !provided;
+    });
+    const preparedGeneratedUsers = await Promise.all(
+      generatedCandidates.map(async (member) => {
+        const email = await uniqueEmail(generateEmail(name, member.name));
+        const plain = generatePassword(name, member.name);
+        return {
+          name: member.name.trim(),
+          role: member.userRole,
+          email,
+          plain,
+          passwordHash: await hashPassword(plain),
+        };
+      }),
+    );
+    for (const member of onboardingPlan.employees) {
+      const provided = member.email?.trim().toLowerCase();
+      if (!provided || provided === ownerEmailLower || preparedUsersByProvidedEmail.has(provided)) {
+        continue;
+      }
+      const plain = generatePassword(name, member.name);
+      preparedUsersByProvidedEmail.set(provided, {
+        plain,
+        passwordHash: await hashPassword(plain),
+      });
+    }
 
+    console.time("ONBOARDING_TX");
     const txResult = await prisma.$transaction(
       async (tx) => {
       const employeeCredentials: LaunchCredential[] = [];
@@ -329,7 +362,12 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
         },
       });
 
-      const ownerEmailLower = owner.email.trim().toLowerCase();
+      const preparedGeneratedByRole = new Map<
+        string,
+        { name: string; role: UserRole; email: string; plain: string; passwordHash: string }
+      >(
+        preparedGeneratedUsers.map((u) => [`${u.role}:${u.name.toLowerCase()}`, u]),
+      );
 
       for (const member of onboardingPlan.employees) {
         const role = member.userRole;
@@ -376,12 +414,15 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
             continue;
           }
 
-          const plain = generatePassword(name, member.name);
+          const preparedProvided = preparedUsersByProvidedEmail.get(provided);
+          if (!preparedProvided) {
+            continue;
+          }
           const user = await tx.user.create({
             data: {
               name: member.name.trim(),
               email: provided,
-              password: await hashPassword(plain),
+              password: preparedProvided.passwordHash,
               isActive: true,
               workspaceActivatedAt: new Date(),
               firstLogin: true,
@@ -402,19 +443,21 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
             name: user.name,
             role,
             email: user.email,
-            password: plain,
+            password: preparedProvided.plain,
             loginUrl: loginUrlForRole(role),
           });
           continue;
         }
 
-        const email = await uniqueEmail(generateEmail(name, member.name));
-        const plain = generatePassword(name, member.name);
+        const prepared = preparedGeneratedByRole.get(`${role}:${member.name.trim().toLowerCase()}`);
+        if (!prepared) {
+          continue;
+        }
         const user = await tx.user.create({
           data: {
-            name: member.name.trim(),
-            email,
-            password: await hashPassword(plain),
+            name: prepared.name,
+            email: prepared.email,
+            password: prepared.passwordHash,
             isActive: true,
             workspaceActivatedAt: new Date(),
             firstLogin: true,
@@ -435,7 +478,7 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
           name: user.name,
           role,
           email: user.email,
-          password: plain,
+          password: prepared.plain,
           loginUrl: loginUrlForRole(role),
         });
       }
@@ -474,8 +517,9 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
         employeeCredentials,
       };
       },
-      { maxWait: 20_000, timeout: interactiveTxTimeoutMs },
+      { timeout: 20_000 },
     );
+    console.timeEnd("ONBOARDING_TX");
 
     const { companyId, employeesProvisioned, rolesForDashboards, employeeCredentials } = txResult;
 

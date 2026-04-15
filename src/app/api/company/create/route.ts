@@ -21,6 +21,7 @@ import { setActiveCompanyCookie, setSessionCookie } from "@/lib/session-cookie";
 import { signAccessToken } from "@/lib/jwt";
 import { isSuperBossEmail } from "@/lib/super-boss";
 import { runOnboardingLaunch } from "@/lib/onboarding-launch-engine";
+import { normalizeMicroFranchisePhone } from "@/lib/micro-franchise-phone";
 
 const bodySchema = z
   .object({
@@ -168,6 +169,28 @@ export async function POST(request: NextRequest) {
     const industry =
       businessType === CompanyBusinessType.CUSTOM ? CompanyIndustry.CUSTOM : industryRaw;
 
+    // get referral from request and pre-resolve MF partner for explicit link safety
+    const referralPhoneRaw = referralPhone?.trim() || null;
+    let microFranchisePartnerId: string | null = null;
+    let referralPhoneForLaunch: string | null = referralPhoneRaw;
+    if (referralPhoneRaw) {
+      const normalized = normalizeMicroFranchisePhone(referralPhoneRaw);
+      if (normalized) {
+        referralPhoneForLaunch = normalized;
+        const phoneCandidates =
+          normalized.length === 10
+            ? [normalized, `91${normalized}`]
+            : [normalized];
+        const partner = await prisma.microFranchisePartner.findFirst({
+          where: { phone: { in: phoneCandidates } },
+          select: { id: true },
+        });
+        if (partner) {
+          microFranchisePartnerId = partner.id;
+        }
+      }
+    }
+
     const addingAnotherBusiness = jwtHasCompanyContext(jwtOnly);
 
     if (businessType === CompanyBusinessType.CUSTOM && addingAnotherBusiness) {
@@ -192,7 +215,7 @@ export async function POST(request: NextRequest) {
       companyName: name,
       industry: launchIndustry,
       team: [],
-      referralPhone: referralPhone?.trim() || null,
+      referralPhone: referralPhoneForLaunch,
       sessionId: null,
       addingAnotherBusiness: actor.addingAnotherBusiness,
       customWorkspacePlan:
@@ -214,6 +237,12 @@ export async function POST(request: NextRequest) {
         { ok: false as const, error: launch.error, code: launch.code },
         { status: launch.status ?? 400 },
       );
+    }
+    if (microFranchisePartnerId) {
+      await prisma.company.updateMany({
+        where: { id: launch.companyId, microFranchisePartnerId: null },
+        data: { microFranchisePartnerId },
+      });
     }
 
     const res = NextResponse.json({
