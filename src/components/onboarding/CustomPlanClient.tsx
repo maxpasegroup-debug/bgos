@@ -48,24 +48,24 @@ export function CustomPlanClient() {
     }
     setPending(true);
     try {
-      const res = await apiFetch("/api/company/create", {
+      const res = await apiFetch("/api/onboarding/launch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          name: name.trim(),
+          companyName: name.trim(),
           industry: "CUSTOM",
-          businessType: "CUSTOM",
-          plan,
+          customWorkspacePlan: plan,
         }),
       });
       const j = (await res.json()) as {
         ok?: boolean;
+        success?: boolean;
         error?: string;
         message?: string;
         requiresCustomPayment?: boolean;
       };
-      if (!res.ok || !j.ok) {
+      if (!res.ok || !j.ok || j.success === false) {
         setErr(typeof j.error === "string" ? j.error : j.message ?? "Could not create workspace.");
         return;
       }

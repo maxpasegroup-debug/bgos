@@ -2,25 +2,25 @@ import {
   CompanyBusinessType,
   CompanyIndustry,
   CompanyPlan,
-  CompanySubscriptionStatus,
   UserRole,
 } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { parseJsonBody, zodValidationErrorResponse } from "@/lib/api-response";
-import { getAuthUserFromToken, getAuthUser, getTokenFromRequest, requireAuth } from "@/lib/auth";
+import {
+  getAuthUserFromToken,
+  getTokenFromRequest,
+  requireAuth,
+  requireOnboardingLaunchSession,
+} from "@/lib/auth";
 import { handleApiError } from "@/lib/route-error";
-import { applyIndustryTemplate } from "@/lib/industry-templates";
-import { createLogger } from "@/lib/logger";
 import { loadMembershipsForJwt } from "@/lib/memberships-for-jwt";
 import { prisma } from "@/lib/prisma";
 import { setActiveCompanyCookie, setSessionCookie } from "@/lib/session-cookie";
 import { signAccessToken } from "@/lib/jwt";
-import { normalizeLogoUrl } from "@/lib/company-profile";
-import { companyMembershipClass } from "@/lib/user-company";
-import { trialEndDateFromStart } from "@/lib/trial";
 import { isSuperBossEmail } from "@/lib/super-boss";
+import { runOnboardingLaunch } from "@/lib/onboarding-launch-engine";
 
 const bodySchema = z
   .object({
@@ -31,7 +31,6 @@ const bodySchema = z
       .max(200, "Company name is too long"),
     industry: z.nativeEnum(CompanyIndustry),
     businessType: z.nativeEnum(CompanyBusinessType).optional().default(CompanyBusinessType.SOLAR),
-    /** Required when {@link businessType} is CUSTOM (Basic / Pro / Enterprise paid build). */
     plan: z.nativeEnum(CompanyPlan).optional(),
     logoUrl: z.string().max(2048).optional(),
     primaryColor: z.string().max(32).optional(),
@@ -41,6 +40,7 @@ const bodySchema = z
     billingAddress: z.string().max(4000).optional(),
     gstNumber: z.string().max(32).optional(),
     bankDetails: z.string().max(4000).optional(),
+    referralPhone: z.string().trim().max(32).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.businessType === CompanyBusinessType.CUSTOM) {
@@ -76,43 +76,24 @@ const bodySchema = z
     }
   });
 
-function jwtHasCompanyContext(
-  u: NonNullable<ReturnType<typeof getAuthUserFromToken>>,
-): boolean {
+function jwtHasCompanyContext(u: NonNullable<ReturnType<typeof getAuthUserFromToken>>): boolean {
   return Boolean(u.companyId) || (u.memberships?.length ?? 0) > 0;
 }
 
-async function getCurrentUser(request: NextRequest) {
-  const session = requireAuth(request);
-  if (session instanceof NextResponse) return null;
-  return session;
-}
-
+/**
+ * @deprecated Use {@link POST /api/onboarding/launch}. This handler delegates to the shared launch engine.
+ */
 export async function POST(request: NextRequest) {
   try {
     const raw = await parseJsonBody(request);
     if (!raw.ok) return raw.response;
-    const body = raw.data;
-    console.log("ONBOARD INPUT:", body);
 
-    const user = await getCurrentUser(request);
-    if (!user) {
-      return NextResponse.json(
-        { success: false as const, message: "Unauthorized" },
-        { status: 401 },
-      );
-    }
-    console.log("USER:", user.sub);
+    const user = requireAuth(request);
+    if (user instanceof NextResponse) return user;
 
-    const parsed = bodySchema.safeParse(body);
+    const parsed = bodySchema.safeParse(raw.data);
     if (!parsed.success) {
       return zodValidationErrorResponse(parsed.error);
-    }
-    if (!parsed.data.name.trim()) {
-      return NextResponse.json(
-        { success: false as const, message: "companyName must not be empty" },
-        { status: 400 },
-      );
     }
 
     const token = getTokenFromRequest(request);
@@ -159,6 +140,8 @@ export async function POST(request: NextRequest) {
           ok: true as const,
           companyId: stale.companyId,
           recovered: true as const,
+          deprecated: true as const,
+          migrateTo: "/api/onboarding/launch" as const,
         });
         await setSessionCookie(res, newToken);
         await setActiveCompanyCookie(res, primary.companyId);
@@ -171,7 +154,7 @@ export async function POST(request: NextRequest) {
       industry: industryRaw,
       businessType,
       plan: customPlan,
-      logoUrl: logoIn,
+      logoUrl,
       primaryColor,
       secondaryColor,
       companyEmail,
@@ -179,6 +162,7 @@ export async function POST(request: NextRequest) {
       billingAddress,
       gstNumber,
       bankDetails,
+      referralPhone,
     } = parsed.data;
 
     const industry =
@@ -197,215 +181,66 @@ export async function POST(request: NextRequest) {
       );
     }
 
-  let logoUrl: string | null = null;
-  if (logoIn != null && logoIn.trim() !== "") {
-    try {
-      logoUrl = normalizeLogoUrl(logoIn);
-    } catch {
-      return NextResponse.json(
-        {
-          ok: false as const,
-          error: "Logo must be an https URL or a path starting with /",
-          code: "VALIDATION_ERROR" as const,
-        },
-        { status: 400 },
-      );
-    }
-  }
+    const actor = await requireOnboardingLaunchSession(request, [UserRole.ADMIN, UserRole.MANAGER]);
+    if (actor instanceof NextResponse) return actor;
 
-    if (addingAnotherBusiness) {
-      if (!user.workspaceReady) {
-        return NextResponse.json(
-          {
-            ok: false as const,
-            error: "Complete workspace activation before creating another company",
-            code: "WORKSPACE_NOT_ACTIVATED" as const,
-          },
-          { status: 403 },
-        );
-      }
-      if (user.role !== UserRole.ADMIN && user.role !== UserRole.MANAGER) {
-        return NextResponse.json(
-          {
-            ok: false as const,
-            error: "Only workspace admins can create a company",
-            code: "FORBIDDEN" as const,
-          },
-          { status: 403 },
-        );
-      }
-      const owner = await prisma.user.findUnique({
-        where: { id: user.sub },
-        select: { workspaceActivatedAt: true },
-      });
-      if (!owner?.workspaceActivatedAt) {
-        return NextResponse.json(
-          {
-            ok: false as const,
-            error: "Complete workspace activation first",
-            code: "WORKSPACE_NOT_ACTIVATED" as const,
-          },
-          { status: 403 },
-        );
-      }
-    }
+    const launchIndustry = industry === CompanyIndustry.CUSTOM ? "CUSTOM" : "SOLAR";
 
-    const existingByOwnerAndName = await prisma.company.findFirst({
-      where: { ownerId: user.sub, name: { equals: name, mode: "insensitive" } },
-      select: { id: true },
+    const launch = await runOnboardingLaunch({
+      ownerUserId: user.sub,
+      ownerEmail: user.email,
+      companyName: name,
+      industry: launchIndustry,
+      team: [],
+      referralPhone: referralPhone?.trim() || null,
+      sessionId: null,
+      addingAnotherBusiness: actor.addingAnotherBusiness,
+      customWorkspacePlan:
+        launchIndustry === "CUSTOM" ? (customPlan ?? CompanyPlan.PRO) : null,
+      profile: {
+        logoUrl: logoUrl ?? null,
+        primaryColor,
+        secondaryColor,
+        companyEmail,
+        companyPhone,
+        billingAddress,
+        gstNumber,
+        bankDetails,
+      },
     });
-    if (existingByOwnerAndName) {
-      const mems = await loadMembershipsForJwt(user.sub);
-      const primary = mems[0]!;
-      const jwtCompany = mems.find((m) => m.companyId === existingByOwnerAndName.id) ?? primary;
-      const newToken = signAccessToken({
-        sub: user.sub,
-        email: user.email,
-        role: jwtCompany.jobRole,
-        companyId: jwtCompany.companyId,
-        companyPlan: jwtCompany.plan,
-        workspaceReady: addingAnotherBusiness,
-        memberships: mems,
-        ...(isSuperBossEmail(user.email) ? { superBoss: true as const } : {}),
-      });
-      const res = NextResponse.json({
-        ok: true as const,
-        companyId: existingByOwnerAndName.id,
-        existing: true as const,
-      });
-      await setSessionCookie(res, newToken);
-      await setActiveCompanyCookie(res, existingByOwnerAndName.id);
-      return res;
-    }
 
-    let companyId: string;
-    const row = await prisma.$transaction(async (tx) => {
-      if (businessType === CompanyBusinessType.CUSTOM) {
-        const pl = customPlan!;
-        const co = await tx.company.create({
-          data: {
-            name,
-            industry,
-            businessType: CompanyBusinessType.CUSTOM,
-            plan: pl,
-            ownerId: user.sub,
-            trialStartDate: null,
-            trialEndDate: null,
-            isTrialActive: false,
-            subscriptionStatus: CompanySubscriptionStatus.PAYMENT_PENDING,
-            ...(logoUrl != null ? { logoUrl } : {}),
-            ...(primaryColor?.trim() ? { primaryColor: primaryColor.trim() } : {}),
-            ...(secondaryColor?.trim() ? { secondaryColor: secondaryColor.trim() } : {}),
-            ...(companyEmail?.trim() ? { companyEmail: companyEmail.trim() } : {}),
-            ...(companyPhone?.trim() ? { companyPhone: companyPhone.trim() } : {}),
-            ...(billingAddress?.trim() ? { billingAddress: billingAddress.trim() } : {}),
-            ...(gstNumber?.trim() ? { gstNumber: gstNumber.trim().toUpperCase() } : {}),
-            ...(bankDetails?.trim() ? { bankDetails: bankDetails.trim() } : {}),
-          },
-        });
-        await tx.userCompany.create({
-          data: {
-            userId: user.sub,
-            companyId: co.id,
-            role: companyMembershipClass(UserRole.ADMIN),
-            jobRole: UserRole.ADMIN,
-          },
-        });
-        return co;
-      }
-
-      const trialStartDate = new Date();
-      const co = await tx.company.create({
-        data: {
-          name,
-          industry,
-          businessType: CompanyBusinessType.SOLAR,
-          plan: CompanyPlan.BASIC,
-          ownerId: user.sub,
-          trialStartDate,
-          trialEndDate: trialEndDateFromStart(trialStartDate),
-          isTrialActive: true,
-          subscriptionStatus: CompanySubscriptionStatus.TRIAL,
-          ...(logoUrl != null ? { logoUrl } : {}),
-          ...(primaryColor?.trim() ? { primaryColor: primaryColor.trim() } : {}),
-          ...(secondaryColor?.trim() ? { secondaryColor: secondaryColor.trim() } : {}),
-          ...(companyEmail?.trim() ? { companyEmail: companyEmail.trim() } : {}),
-          ...(companyPhone?.trim() ? { companyPhone: companyPhone.trim() } : {}),
-          ...(billingAddress?.trim() ? { billingAddress: billingAddress.trim() } : {}),
-          ...(gstNumber?.trim() ? { gstNumber: gstNumber.trim().toUpperCase() } : {}),
-          ...(bankDetails?.trim() ? { bankDetails: bankDetails.trim() } : {}),
-        },
-      });
-      await tx.userCompany.create({
-        data: {
-          userId: user.sub,
-          companyId: co.id,
-          role: companyMembershipClass(UserRole.ADMIN),
-          jobRole: UserRole.ADMIN,
-        },
-      });
-      return co;
-    });
-    companyId = row.id;
-
-    try {
-      await applyIndustryTemplate(companyId, industry === CompanyIndustry.SOLAR ? "SOLAR" : "CUSTOM");
-    } catch (e) {
-      createLogger("company/create").error("applyIndustryTemplate failed", e, { companyId });
-    }
-
-    const mems = await loadMembershipsForJwt(user.sub);
-    const primary = mems[0]!;
-    const jwtCompany = mems.find((m) => m.companyId === companyId) ?? primary;
-    const workspaceReady = addingAnotherBusiness;
-
-    let newToken: string;
-    try {
-      newToken = signAccessToken({
-        sub: user.sub,
-        email: user.email,
-        role: jwtCompany.jobRole,
-        companyId: jwtCompany.companyId,
-        companyPlan: jwtCompany.plan,
-        workspaceReady,
-        memberships: mems,
-        ...(isSuperBossEmail(user.email) ? { superBoss: true as const } : {}),
-      });
-    } catch {
+    if (!launch.ok) {
       return NextResponse.json(
-        { ok: false as const, error: "Authentication is not configured", code: "SERVER_ERROR" },
-        { status: 500 },
+        { ok: false as const, error: launch.error, code: launch.code },
+        { status: launch.status ?? 400 },
       );
     }
 
     const res = NextResponse.json({
       ok: true as const,
-      companyId,
-      businessType,
-      ...(businessType === CompanyBusinessType.CUSTOM
-        ? { requiresCustomPayment: true as const, nextStep: "/onboarding/custom/pay" as const }
+      companyId: launch.companyId,
+      employeesCreated: launch.employeesCreated,
+      dashboardsAssigned: launch.dashboardsAssigned,
+      businessType: launch.businessType,
+      deprecated: true as const,
+      migrateTo: "/api/onboarding/launch" as const,
+      ...(launch.requiresCustomPayment
+        ? { requiresCustomPayment: true as const, nextStep: launch.nextStep }
         : {}),
       user: {
         id: user.sub,
         email: user.email,
         role: UserRole.ADMIN,
-        companyId,
-        companyPlan: row.plan,
+        companyId: launch.companyId,
+        companyPlan: launchIndustry === "CUSTOM" ? (customPlan ?? CompanyPlan.PRO) : CompanyPlan.BASIC,
       },
     });
 
-    await setSessionCookie(res, newToken);
-    await setActiveCompanyCookie(res, companyId);
+    await setSessionCookie(res, launch.sessionJwt);
+    await setActiveCompanyCookie(res, launch.activeCompanyId);
 
     return res;
   } catch (error) {
-    const e = error as Error;
-    return NextResponse.json(
-      {
-        success: false as const,
-        message: e?.message || "Onboarding failed",
-      },
-      { status: 500 },
-    );
+    return handleApiError("POST /api/company/create", error);
   }
 }

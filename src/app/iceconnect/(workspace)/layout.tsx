@@ -59,6 +59,7 @@ const SEGMENT_LABEL: Record<string, string> = {
   "internal-onboarding": "Internal Onboarding",
   "tech-onboarding": "Tech · Onboarding",
   "micro-franchise": "Micro Franchise",
+  manager: "Manager",
 };
 
 export default async function IceconnectWorkspaceLayout({
@@ -89,13 +90,7 @@ export default async function IceconnectWorkspaceLayout({
       where: { id: user.companyId },
       select: { internalSalesOrg: true },
     });
-    const hubRoles = new Set([
-      "SALES_EXECUTIVE",
-      "TELECALLER",
-      "MANAGER",
-      "TECH_HEAD",
-      "TECH_EXECUTIVE",
-    ]);
+    const hubRoles = new Set(["SALES_EXECUTIVE", "TELECALLER", "TECH_HEAD", "TECH_EXECUTIVE"]);
     if (co?.internalSalesOrg === true && hubRoles.has(user.role)) {
       if (user.role === "TECH_EXECUTIVE") {
         salesHubNav = [...TECH_HUB_NAV];

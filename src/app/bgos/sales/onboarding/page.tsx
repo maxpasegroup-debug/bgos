@@ -135,6 +135,8 @@ export default function SalesOnboardingPage() {
         success?: boolean;
         error?: string;
         companyId?: string;
+        employeesCreated?: number;
+        dashboardsAssigned?: string[];
         credentials?: { name: string; role: string; email: string; password: string; loginUrl: string }[];
         credentialsFile?: { filename: string; base64: string; mimeType: string };
       };

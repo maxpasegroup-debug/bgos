@@ -85,18 +85,18 @@ export async function POST(request: NextRequest) {
       currency: typeof order.currency === "string" ? order.currency : "INR",
     });
 
-    if (applied) {
+    const co = await prisma.company.findUnique({
+      where: { id: notes.companyId },
+      select: { businessType: true, name: true, microFranchisePartnerId: true },
+    });
+
+    if (applied && co?.microFranchisePartnerId) {
       await accrueMicroFranchiseCommission({
         companyId: notes.companyId,
         amountPaise: orderAmount,
         paymentRef: razorpay_payment_id,
       });
     }
-
-    const co = await prisma.company.findUnique({
-      where: { id: notes.companyId },
-      select: { businessType: true, name: true },
-    });
     if (applied && co?.businessType === CompanyBusinessType.CUSTOM) {
       await prisma.techRequest.create({
         data: {

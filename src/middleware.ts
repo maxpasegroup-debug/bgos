@@ -421,8 +421,11 @@ export async function middleware(request: NextRequest) {
   const needsCompany = requestHeaders.get(AUTH_HEADER_NEEDS_COMPANY) === "1";
   const normalizedPath = normalizePathname(pathname);
 
-  if (normalizedPath === "/api/company/create") {
-    if (request.method !== "POST") {
+  const isCompanyCreatePost = normalizedPath === "/api/company/create" && method === "POST";
+  const isOnboardingLaunchPost = normalizedPath === "/api/onboarding/launch" && method === "POST";
+
+  if (normalizedPath === "/api/company/create" || normalizedPath === "/api/onboarding/launch") {
+    if (!isCompanyCreatePost && !isOnboardingLaunchPost) {
       return NextResponse.json(
         { ok: false, error: "Method not allowed", code: "METHOD_NOT_ALLOWED" },
         { status: 405 },
@@ -436,7 +439,8 @@ export async function middleware(request: NextRequest) {
       normalizedPath.startsWith("/onboarding/") ||
       normalizedPath === "/api/auth/me" ||
       normalizedPath === "/api/auth/logout" ||
-      normalizedPath === "/api/company/create" ||
+      isCompanyCreatePost ||
+      isOnboardingLaunchPost ||
       (normalizedPath === "/api/company/list" && request.method === "GET") ||
       (edgeSuperBoss &&
         (normalizedPath === "/bgos/control" ||

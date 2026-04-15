@@ -1,6 +1,6 @@
 import "server-only";
 
-import { CompanyPlan, type UserRole } from "@prisma/client";
+import { CompanyPlan, UserRole } from "@prisma/client";
 import { cookies, headers } from "next/headers";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
@@ -322,6 +322,50 @@ export async function requireAuthWithRoles(
   if (result instanceof NextResponse) return result;
   if (!allowedRoles.includes(result.role)) return forbidden();
   return result;
+}
+
+export type OnboardingLaunchActor =
+  | { kind: "first"; user: AuthUser; addingAnotherBusiness: false }
+  | { kind: "additional"; user: AuthUserWithCompany; addingAnotherBusiness: true };
+
+/**
+ * {@link POST /api/onboarding/launch}: first workspace (no memberships yet) or add-business.
+ * First company: only {@link UserRole.ADMIN}. Additional: active company + workspace activated.
+ */
+export async function requireOnboardingLaunchSession(
+  request: NextRequest | Request,
+  allowedRoles: UserRole[],
+): Promise<OnboardingLaunchActor | NextResponse> {
+  const auth = requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+  if (!allowedRoles.includes(auth.role)) return forbidden();
+
+  const membershipCount = await prisma.userCompany.count({ where: { userId: auth.sub } });
+
+  if (membershipCount === 0) {
+    if (auth.role !== UserRole.ADMIN) {
+      return forbidden("Only an admin can create the first workspace.");
+    }
+    return { kind: "first", user: auth, addingAnotherBusiness: false };
+  }
+
+  if (!auth.companyId) {
+    return NextResponse.json(
+      {
+        ok: false as const,
+        error: "Session is out of date — refresh or sign in again.",
+        code: "STALE_SESSION" as const,
+      },
+      { status: 409 },
+    );
+  }
+
+  const active = await requireActiveCompanyMembership(request);
+  if (active instanceof NextResponse) return active;
+  if (!allowedRoles.includes(active.role)) return forbidden();
+  if (!active.workspaceReady) return workspaceNotActivatedResponse();
+
+  return { kind: "additional", user: active, addingAnotherBusiness: true };
 }
 
 export function userHasRole(user: AuthUser, allowedRoles: UserRole[]): boolean {

@@ -57,7 +57,8 @@ export function BgosInvoiceListClient({ initialQuotationId }: { initialQuotation
   }, []);
 
   useEffect(() => {
-    void load();
+    const id = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(id);
   }, [load]);
 
   async function generateFromQuotation(qid: string) {

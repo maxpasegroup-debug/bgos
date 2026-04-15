@@ -25,7 +25,8 @@ export function ViewModuleGuideButton({
   }, [category]);
 
   useEffect(() => {
-    void probe();
+    const id = window.setTimeout(() => void probe(), 0);
+    return () => window.clearTimeout(id);
   }, [probe]);
 
   if (available === false || available === null) {

@@ -10,7 +10,7 @@ export const MICRO_FRANCHISE_HOME_PATH = "/iceconnect/micro-franchise";
 
 export const ROLE_HOME: Readonly<Record<string, string>> = {
   ADMIN: "/bgos/dashboard",
-  MANAGER: "/iceconnect/leads",
+  MANAGER: "/iceconnect/manager",
   SALES_EXECUTIVE: "/iceconnect/leads",
   TELECALLER: "/iceconnect/leads",
   TECH_HEAD: TECH_EXEC_HOME_PATH,
@@ -33,7 +33,6 @@ export const ROLE_HOME: Readonly<Record<string, string>> = {
 /** Roles that may use the company document vault (BGOS + `/iceconnect/documents` + `/api/document/*`). */
 export const DOCUMENT_VAULT_ROLES_LIST = [
   "ADMIN",
-  "MANAGER",
   "SALES_HEAD",
   "SALES_EXECUTIVE",
   "TELECALLER",
@@ -51,12 +50,10 @@ export const DOCUMENT_VAULT_ROLES_LIST = [
 
 export const DOCUMENT_VAULT_ROLES = new Set<string>(DOCUMENT_VAULT_ROLES_LIST);
 
-const PRIVILEGED = new Set<string>(["ADMIN", "MANAGER"]);
-
 /** ICECONNECT sales workspace (leads/customers/wallet). */
-const ICE_SALES_HUB = new Set<string>(["SALES_EXECUTIVE", "TELECALLER", "MANAGER"]);
+const ICE_SALES_HUB = new Set<string>(["SALES_EXECUTIVE", "TELECALLER"]);
 /** ICECONNECT technical workspace. */
-const ICE_TECH_HUB = new Set<string>(["TECH_HEAD", "TECH_EXECUTIVE", "MANAGER"]);
+const ICE_TECH_HUB = new Set<string>(["TECH_HEAD", "TECH_EXECUTIVE"]);
 
 /** BGOS onboarding workflow engine (forms, tech queue, delivery). */
 const ONBOARDING_WORKFLOW_ROLES = new Set<string>([
@@ -74,18 +71,19 @@ type RouteRule = { prefix: string; roles: Set<string> };
 const PAGE_RULES: RouteRule[] = [
   { prefix: "/bgos", roles: new Set(["ADMIN", "MANAGER"]) },
   { prefix: "/sales-booster", roles: new Set(["ADMIN", "MANAGER"]) },
-  { prefix: "/iceconnect/sales", roles: new Set(["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "MANAGER"]) },
-  { prefix: "/iceconnect/sales-head", roles: new Set(["SALES_HEAD", "ADMIN", "MANAGER"]) },
-  { prefix: "/iceconnect/partner", roles: new Set(["CHANNEL_PARTNER", "ADMIN", "MANAGER"]) },
-  { prefix: "/iceconnect/operations", roles: new Set(["OPERATIONS_HEAD", "ADMIN", "MANAGER"]) },
-  { prefix: "/iceconnect/site", roles: new Set(["SITE_ENGINEER", "ADMIN", "MANAGER"]) },
-  { prefix: "/iceconnect/pro", roles: new Set(["PRO", "ADMIN", "MANAGER"]) },
-  { prefix: "/iceconnect/install", roles: new Set(["INSTALLATION_TEAM", "ADMIN", "MANAGER"]) },
-  { prefix: "/iceconnect/service", roles: new Set(["SERVICE_TEAM", "ADMIN", "MANAGER"]) },
-  { prefix: "/iceconnect/inventory", roles: new Set(["INVENTORY_MANAGER", "ADMIN", "MANAGER"]) },
-  { prefix: "/iceconnect/accounts", roles: new Set(["ACCOUNTANT", "ADMIN", "MANAGER"]) },
-  { prefix: "/iceconnect/loan", roles: new Set(["LCO", "ADMIN", "MANAGER"]) },
-  { prefix: "/iceconnect/hr", roles: new Set(["HR_MANAGER", "ADMIN", "MANAGER"]) },
+  { prefix: "/iceconnect/manager", roles: new Set(["MANAGER"]) },
+  { prefix: "/iceconnect/sales", roles: new Set(["SALES_EXECUTIVE", "TELECALLER", "ADMIN"]) },
+  { prefix: "/iceconnect/sales-head", roles: new Set(["SALES_HEAD", "ADMIN"]) },
+  { prefix: "/iceconnect/partner", roles: new Set(["CHANNEL_PARTNER", "ADMIN"]) },
+  { prefix: "/iceconnect/operations", roles: new Set(["OPERATIONS_HEAD", "ADMIN"]) },
+  { prefix: "/iceconnect/site", roles: new Set(["SITE_ENGINEER", "ADMIN"]) },
+  { prefix: "/iceconnect/pro", roles: new Set(["PRO", "ADMIN"]) },
+  { prefix: "/iceconnect/install", roles: new Set(["INSTALLATION_TEAM", "ADMIN"]) },
+  { prefix: "/iceconnect/service", roles: new Set(["SERVICE_TEAM", "ADMIN"]) },
+  { prefix: "/iceconnect/inventory", roles: new Set(["INVENTORY_MANAGER", "ADMIN"]) },
+  { prefix: "/iceconnect/accounts", roles: new Set(["ACCOUNTANT", "ADMIN"]) },
+  { prefix: "/iceconnect/loan", roles: new Set(["LCO", "ADMIN"]) },
+  { prefix: "/iceconnect/hr", roles: new Set(["HR_MANAGER", "ADMIN"]) },
   { prefix: "/iceconnect/my-journey", roles: ICE_SALES_HUB },
   { prefix: "/iceconnect/leads", roles: ICE_SALES_HUB },
   { prefix: "/iceconnect/customers", roles: ICE_SALES_HUB },
@@ -100,21 +98,15 @@ const PAGE_RULES: RouteRule[] = [
   { prefix: "/onboarding/manage", roles: ONBOARDING_WORKFLOW_ROLES },
   {
     prefix: "/iceconnect/tech/onboarding",
-    roles: new Set(["TECH_HEAD", "TECH_EXECUTIVE", "ADMIN", "MANAGER"]),
+    roles: new Set(["TECH_HEAD", "TECH_EXECUTIVE", "ADMIN"]),
   },
   {
     prefix: "/iceconnect/internal-sales",
-    roles: new Set([
-      "SALES_EXECUTIVE",
-      "TELECALLER",
-      "ADMIN",
-      "MANAGER",
-      "TECH_HEAD",
-    ]),
+    roles: new Set(["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "TECH_HEAD"]),
   },
   {
     prefix: "/iceconnect/internal-tech",
-    roles: new Set(["TECH_HEAD", "TECH_EXECUTIVE", "ADMIN", "MANAGER"]),
+    roles: new Set(["TECH_HEAD", "TECH_EXECUTIVE", "ADMIN"]),
   },
   {
     prefix: "/bgos/internal-tech",
@@ -122,13 +114,7 @@ const PAGE_RULES: RouteRule[] = [
   },
   {
     prefix: "/iceconnect/internal-onboarding",
-    roles: new Set([
-      "MANAGER",
-      "OPERATIONS_HEAD",
-      "SITE_ENGINEER",
-      "PRO",
-      "INSTALLATION_TEAM",
-    ]),
+    roles: new Set(["OPERATIONS_HEAD", "SITE_ENGINEER", "PRO", "INSTALLATION_TEAM"]),
   },
   {
     prefix: "/bgos/internal-onboarding",
@@ -145,6 +131,35 @@ const PAGE_RULES: RouteRule[] = [
 ];
 
 const API_RULES: RouteRule[] = [
+  { prefix: "/api/manager", roles: new Set(["MANAGER"]) },
+  {
+    prefix: "/api/onboarding/launch",
+    roles: new Set(["ADMIN", "MANAGER", "SALES_EXECUTIVE", "TELECALLER"]),
+  },
+  {
+    prefix: "/api/onboarding/activate",
+    roles: new Set(["ADMIN", "MANAGER"]),
+  },
+  {
+    prefix: "/api/company/create",
+    roles: new Set(["ADMIN", "MANAGER"]),
+  },
+  {
+    prefix: "/api/company/list",
+    roles: new Set(["ADMIN", "MANAGER"]),
+  },
+  {
+    prefix: "/api/company/switch",
+    roles: new Set(["ADMIN", "MANAGER"]),
+  },
+  {
+    prefix: "/api/company/current",
+    roles: new Set(["ADMIN", "MANAGER"]),
+  },
+  {
+    prefix: "/api/company/settings",
+    roles: new Set(["ADMIN", "MANAGER"]),
+  },
   { prefix: "/api/bgos/sales-booster", roles: new Set(["ADMIN", "MANAGER"]) },
   { prefix: "/api/dashboard", roles: new Set(["ADMIN", "MANAGER"]) },
   { prefix: "/api/activity", roles: new Set(["ADMIN", "MANAGER"]) },
@@ -238,7 +253,6 @@ const API_RULES: RouteRule[] = [
       "SALES_EXECUTIVE",
       "TELECALLER",
       "ADMIN",
-      "MANAGER",
       "OPERATIONS_HEAD",
       "SITE_ENGINEER",
       "PRO",
@@ -247,11 +261,11 @@ const API_RULES: RouteRule[] = [
   },
   {
     prefix: "/api/leads",
-    roles: new Set(["SALES_EXECUTIVE", "TELECALLER", "SALES_HEAD", "ADMIN", "MANAGER"]),
+    roles: new Set(["SALES_EXECUTIVE", "TELECALLER", "SALES_HEAD", "ADMIN"]),
   },
   {
     prefix: "/api/tasks",
-    roles: new Set(["SALES_EXECUTIVE", "TELECALLER", "SALES_HEAD", "ADMIN", "MANAGER"]),
+    roles: new Set(["SALES_EXECUTIVE", "TELECALLER", "SALES_HEAD", "ADMIN"]),
   },
   {
     prefix: "/api/iceconnect/executive",
@@ -294,7 +308,6 @@ const API_RULES: RouteRule[] = [
       "LCO",
       "HR_MANAGER",
       "ADMIN",
-      "MANAGER",
       "TECH_HEAD",
       "TECH_EXECUTIVE",
     ]),
@@ -383,16 +396,19 @@ export function roleCanAccessPath(
   }
 
   if (pathname === "/iceconnect" || pathname === "/iceconnect/") {
-    return PRIVILEGED.has(role);
+    return false;
   }
-
-  if (PRIVILEGED.has(role)) return true;
 
   const page = allowedByRules(pathname, role, PAGE_RULES);
   if (page !== null) return page;
 
   const api = allowedByRules(pathname, role, API_RULES);
   if (api !== null) return api;
+
+  /** MANAGER: unmatched ICECONNECT paths are denied (allowed routes matched above). */
+  if (role === "MANAGER" && (p === "/iceconnect" || p.startsWith("/iceconnect/"))) {
+    return false;
+  }
 
   return true;
 }
@@ -421,36 +437,31 @@ export function postLoginDestination(
 
 /** Path segment after `/iceconnect/` → roles allowed on that dashboard. */
 export const ICECONNECT_DASHBOARD_ROLES: Record<string, readonly string[]> = {
-  "my-journey": ["SALES_EXECUTIVE", "TELECALLER", "MANAGER"],
-  leads: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER"],
-  customers: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER"],
-  wallet: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER"],
-  notifications: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER"],
-  profile: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER", "MICRO_FRANCHISE"],
+  manager: ["MANAGER"],
+  "my-journey": ["SALES_EXECUTIVE", "TELECALLER"],
+  leads: ["SALES_EXECUTIVE", "TELECALLER"],
+  customers: ["SALES_EXECUTIVE", "TELECALLER"],
+  wallet: ["SALES_EXECUTIVE", "TELECALLER"],
+  notifications: ["SALES_EXECUTIVE", "TELECALLER"],
+  profile: ["SALES_EXECUTIVE", "TELECALLER", "MICRO_FRANCHISE"],
   "micro-franchise": ["MICRO_FRANCHISE"],
-  tech: ["TECH_HEAD", "TECH_EXECUTIVE", "MANAGER"],
-  "tech-onboarding": ["TECH_HEAD", "TECH_EXECUTIVE", "MANAGER"],
-  sales: ["SALES_EXECUTIVE", "TELECALLER", "MANAGER"],
-  "sales-head": ["SALES_HEAD", "MANAGER"],
-  partner: ["CHANNEL_PARTNER", "MANAGER"],
-  operations: ["OPERATIONS_HEAD", "MANAGER"],
-  site: ["SITE_ENGINEER", "MANAGER"],
-  pro: ["PRO", "MANAGER"],
-  install: ["INSTALLATION_TEAM", "MANAGER"],
-  service: ["SERVICE_TEAM", "MANAGER"],
-  inventory: ["INVENTORY_MANAGER", "MANAGER"],
-  accounts: ["ACCOUNTANT", "MANAGER"],
-  loan: ["LCO", "MANAGER"],
-  hr: ["HR_MANAGER", "MANAGER"],
-  "internal-sales": ["SALES_EXECUTIVE", "TELECALLER", "MANAGER", "TECH_HEAD"],
-  "internal-tech": ["TECH_HEAD", "TECH_EXECUTIVE", "MANAGER"],
-  "internal-onboarding": [
-    "MANAGER",
-    "OPERATIONS_HEAD",
-    "SITE_ENGINEER",
-    "PRO",
-    "INSTALLATION_TEAM",
-  ],
+  tech: ["TECH_HEAD", "TECH_EXECUTIVE"],
+  "tech-onboarding": ["TECH_HEAD", "TECH_EXECUTIVE"],
+  sales: ["SALES_EXECUTIVE", "TELECALLER"],
+  "sales-head": ["SALES_HEAD"],
+  partner: ["CHANNEL_PARTNER"],
+  operations: ["OPERATIONS_HEAD"],
+  site: ["SITE_ENGINEER"],
+  pro: ["PRO"],
+  install: ["INSTALLATION_TEAM"],
+  service: ["SERVICE_TEAM"],
+  inventory: ["INVENTORY_MANAGER"],
+  accounts: ["ACCOUNTANT"],
+  loan: ["LCO"],
+  hr: ["HR_MANAGER"],
+  "internal-sales": ["SALES_EXECUTIVE", "TELECALLER", "TECH_HEAD"],
+  "internal-tech": ["TECH_HEAD", "TECH_EXECUTIVE"],
+  "internal-onboarding": ["OPERATIONS_HEAD", "SITE_ENGINEER", "PRO", "INSTALLATION_TEAM"],
   documents: [...DOCUMENT_VAULT_ROLES_LIST],
 };
 

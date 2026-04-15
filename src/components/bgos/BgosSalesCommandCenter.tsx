@@ -144,7 +144,8 @@ export function BgosSalesCommandCenter() {
   }, [range]);
 
   useEffect(() => {
-    void load();
+    const id = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(id);
   }, [load]);
 
   const openLead = useCallback(async (leadId: string) => {

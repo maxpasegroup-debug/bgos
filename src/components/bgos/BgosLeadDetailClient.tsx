@@ -77,7 +77,8 @@ export function BgosLeadDetailClient({ leadId }: { leadId: string }) {
   }, [leadId]);
 
   useEffect(() => {
-    void load();
+    const id = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(id);
   }, [load]);
 
   const activeQuotation = quotations.find((q) => q.status !== "REJECTED") ?? null;

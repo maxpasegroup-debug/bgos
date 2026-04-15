@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
 
     const company = await prisma.company.findUnique({
       where: { id: notes.companyId },
-      select: { id: true, ownerId: true },
+      select: { id: true, ownerId: true, microFranchisePartnerId: true },
     });
     if (!company) {
       return NextResponse.json({ received: true, skipped: "company" });
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
       currency: normalized.currency,
     });
 
-    if (applied) {
+    if (applied && company.microFranchisePartnerId) {
       await accrueMicroFranchiseCommission({
         companyId: notes.companyId,
         amountPaise: normalized.amountPaise,

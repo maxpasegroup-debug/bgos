@@ -31,9 +31,12 @@ export function InternalNotificationsBell({ theme }: { theme: "bgos" | "ice" }) 
   }, []);
 
   useEffect(() => {
-    void load();
+    const boot = window.setTimeout(() => void load(), 0);
     const t = setInterval(() => void load(), 60000);
-    return () => clearInterval(t);
+    return () => {
+      clearTimeout(boot);
+      clearInterval(t);
+    };
   }, [load]);
 
   async function markOne(id: string) {

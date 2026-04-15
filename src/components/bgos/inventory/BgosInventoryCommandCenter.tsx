@@ -108,7 +108,8 @@ export function BgosInventoryCommandCenter() {
   }, [filter]);
 
   useEffect(() => {
-    void load();
+    const id = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(id);
   }, [load]);
 
   const selected = useMemo(() => data?.products.find((p) => p.id === detailId) ?? null, [data?.products, detailId]);
@@ -148,7 +149,7 @@ export function BgosInventoryCommandCenter() {
     await load();
   }
 
-  async function useStock() {
+  async function submitStockUsage() {
     if (!selected) return;
     await apiFetch("/api/bgos/inventory/stock?mode=use", {
       method: "POST",
@@ -453,7 +454,7 @@ export function BgosInventoryCommandCenter() {
                   <option value="installation">installation</option>
                   <option value="service">service</option>
                 </select>
-                <button type="button" onClick={() => void useStock()} className="rounded-lg border border-[#FFC300]/35 bg-[#FFC300]/10 px-3 py-2 text-sm font-semibold text-[#FFE08A]">
+                <button type="button" onClick={() => void submitStockUsage()} className="rounded-lg border border-[#FFC300]/35 bg-[#FFC300]/10 px-3 py-2 text-sm font-semibold text-[#FFE08A]">
                   Use
                 </button>
               </div>

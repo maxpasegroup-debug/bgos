@@ -39,8 +39,11 @@ export function BgosThemeProvider({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setThemeState(readStoredTheme());
-    setMounted(true);
+    const id = window.setTimeout(() => {
+      setThemeState(readStoredTheme());
+      setMounted(true);
+    }, 0);
+    return () => window.clearTimeout(id);
   }, []);
 
   const setTheme = useCallback((t: BgosTheme) => {

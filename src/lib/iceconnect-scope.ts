@@ -3,7 +3,8 @@ import "server-only";
 import type { UserRole } from "@prisma/client";
 import type { AuthUser } from "./auth";
 
-const PRIVILEGED = new Set<UserRole>(["ADMIN", "MANAGER"]);
+/** ADMIN-only bypass for assignee filters — managers use role-scoped routes, not global data. */
+const PRIVILEGED = new Set<UserRole>(["ADMIN"]);
 
 export function isIceconnectPrivileged(role: UserRole): boolean {
   return PRIVILEGED.has(role);

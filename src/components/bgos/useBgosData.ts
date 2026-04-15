@@ -182,9 +182,12 @@ export function useBgosData(
   const okOnce = useRef(false);
 
   useEffect(() => {
-    sbLandingMeChecked.current = false;
-    superBossNoCompanyRef.current = false;
-    setSuperBossNoCompany(false);
+    const id = window.setTimeout(() => {
+      sbLandingMeChecked.current = false;
+      superBossNoCompanyRef.current = false;
+      setSuperBossNoCompany(false);
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [pathname]);
 
   const refetch = useCallback(() => {
@@ -404,15 +407,17 @@ export function useBgosData(
       }
     };
 
-    void load();
+    const boot = window.setTimeout(() => void load(), 0);
     if (controlShell || superBossNoCompanyRef.current) {
       return () => {
         cancelled = true;
+        window.clearTimeout(boot);
       };
     }
     const id = window.setInterval(() => void load(), pollMs);
     return () => {
       cancelled = true;
+      window.clearTimeout(boot);
       window.clearInterval(id);
     };
   }, [

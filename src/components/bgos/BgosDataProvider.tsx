@@ -101,9 +101,9 @@ export function BgosDataProvider({
 
   useEffect(() => {
     if (hasProPlan) return;
-    if (dashboardRangeRequiresPro(analyticsRangePreset)) {
-      setAnalyticsRangePresetState("this_month");
-    }
+    if (!dashboardRangeRequiresPro(analyticsRangePreset)) return;
+    const id = window.setTimeout(() => setAnalyticsRangePresetState("this_month"), 0);
+    return () => window.clearTimeout(id);
   }, [hasProPlan, analyticsRangePreset]);
 
   const value = useMemo(

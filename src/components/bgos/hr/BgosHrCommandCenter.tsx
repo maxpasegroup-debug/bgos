@@ -162,7 +162,8 @@ export function BgosHrCommandCenter() {
   }, [filter]);
 
   useEffect(() => {
-    void load();
+    const id = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(id);
   }, [load]);
 
   const openDetail = useCallback(async (id: string) => {

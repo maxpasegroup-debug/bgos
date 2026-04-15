@@ -44,7 +44,8 @@ export function UserManualsAdminClient({ categories }: { categories: Cat[] }) {
   }, []);
 
   useEffect(() => {
-    void load();
+    const id = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(id);
   }, [load]);
 
   async function upload(category: UserManualCategory, file: File | null, title: string) {

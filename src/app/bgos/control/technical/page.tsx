@@ -34,7 +34,7 @@ export default function ControlTechnicalPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const res = await apiFetch("/api/bgos/control/tech-queue", { credentials: "include" });
+      const res = await apiFetch("/api/bgos/control/technical", { credentials: "include" });
       const j = ((await readApiJson(res, "control/technical")) ?? {}) as {
         ok?: boolean;
         items?: Item[];
@@ -68,7 +68,8 @@ export default function ControlTechnicalPage() {
   }, []);
 
   useEffect(() => {
-    void load();
+    const id = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(id);
   }, [load]);
 
   const cardShell = light

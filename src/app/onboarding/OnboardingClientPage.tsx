@@ -38,6 +38,7 @@ export function OnboardingClientPage() {
   const [companyPhone, setCompanyPhone] = useState("");
   const [billingAddress, setBillingAddress] = useState("");
   const [gstNumber, setGstNumber] = useState("");
+  const [referralPhone, setReferralPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [probing, setProbing] = useState(true);
@@ -156,14 +157,14 @@ export function OnboardingClientPage() {
 
     setPending(true);
     try {
-      const res = await apiFetch("/api/company/create", {
+      const res = await apiFetch("/api/onboarding/launch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          name: fields.data.name,
-          industry: fields.data.industry,
-          businessType: "SOLAR",
+          companyName: fields.data.name,
+          industry: "SOLAR",
+          ...(referralPhone.trim() ? { referralPhone: referralPhone.trim() } : {}),
           ...(fields.data.logoUrl?.trim() ? { logoUrl: fields.data.logoUrl.trim() } : {}),
           ...(fields.data.companyEmail?.trim()
             ? { companyEmail: fields.data.companyEmail.trim() }
@@ -181,12 +182,13 @@ export function OnboardingClientPage() {
       });
       const data = (await res.json()) as {
         ok?: boolean;
+        success?: boolean;
         error?: string;
         message?: string;
         companyId?: string;
       };
 
-      if (!res.ok || !data.ok) {
+      if (!res.ok || !data.ok || data.success === false) {
         setError(
           typeof data.error === "string"
             ? data.error
@@ -493,6 +495,22 @@ export function OnboardingClientPage() {
               name="gstNumber"
               value={gstNumber}
               onChange={(e) => setGstNumber(e.target.value)}
+              disabled={pending}
+              className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none ring-cyan-500/40 focus:ring-2"
+            />
+          </div>
+          <div>
+            <label htmlFor="referral-phone" className="block text-xs font-medium text-white/70">
+              Referral phone <span className="text-white/40">(optional)</span>
+            </label>
+            <input
+              id="referral-phone"
+              name="referralPhone"
+              type="tel"
+              autoComplete="tel"
+              placeholder="Micro-franchise partner phone"
+              value={referralPhone}
+              onChange={(e) => setReferralPhone(e.target.value)}
               disabled={pending}
               className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none ring-cyan-500/40 focus:ring-2"
             />
