@@ -39,7 +39,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
   await prisma.user.update({
     where: { id: existing.id },
-    data: { password },
+    data: { password, firstLogin: true, forcePasswordReset: true },
   });
 
   await logActivity(prisma, {

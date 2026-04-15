@@ -2,40 +2,40 @@ import { IceconnectMetroStage, type OnboardingSubmissionStatus, type OnboardingT
 
 export type LeadFlowV3Stage =
   | "NEW"
-  | "INTRODUCTION"
-  | "LIVE_DEMO"
-  | "CREATE_ACCOUNT"
-  | "ONBOARDING"
-  | "LIVE";
+  | "INTRODUCED"
+  | "DEMO"
+  | "FOLLOW_UP"
+  | "ONBOARD"
+  | "SUBSCRIPTION";
 
 export type LeadFlowV3Selection = LeadFlowV3Stage | "LOST";
 
 export const LEAD_FLOW_V3_LABEL: Record<LeadFlowV3Stage, string> = {
   NEW: "New",
-  INTRODUCTION: "Introduction",
-  LIVE_DEMO: "Live Demo",
-  CREATE_ACCOUNT: "Create Account",
-  ONBOARDING: "Onboarding",
-  LIVE: "Live",
+  INTRODUCED: "Introduced",
+  DEMO: "Demo",
+  FOLLOW_UP: "Follow Up",
+  ONBOARD: "Onboard",
+  SUBSCRIPTION: "Subscription",
 };
 
 export function flowV3StageFromDb(stage: IceconnectMetroStage | null | undefined): LeadFlowV3Stage {
-  if (stage === IceconnectMetroStage.INTRO_CALL) return "INTRODUCTION";
-  if (stage === IceconnectMetroStage.DEMO_DONE) return "LIVE_DEMO";
-  if (stage === IceconnectMetroStage.FOLLOW_UP) return "CREATE_ACCOUNT";
+  if (stage === IceconnectMetroStage.INTRO_CALL) return "INTRODUCED";
+  if (stage === IceconnectMetroStage.DEMO_DONE) return "DEMO";
+  if (stage === IceconnectMetroStage.FOLLOW_UP) return "FOLLOW_UP";
   if (stage === IceconnectMetroStage.ONBOARDING || stage === IceconnectMetroStage.PAYMENT_DONE) {
-    return "ONBOARDING";
+    return "ONBOARD";
   }
-  if (stage === IceconnectMetroStage.SUBSCRIPTION) return "LIVE";
+  if (stage === IceconnectMetroStage.SUBSCRIPTION) return "SUBSCRIPTION";
   return "NEW";
 }
 
 export function flowV3StageToDb(stage: LeadFlowV3Stage): IceconnectMetroStage {
-  if (stage === "INTRODUCTION") return IceconnectMetroStage.INTRO_CALL;
-  if (stage === "LIVE_DEMO") return IceconnectMetroStage.DEMO_DONE;
-  if (stage === "CREATE_ACCOUNT") return IceconnectMetroStage.FOLLOW_UP;
-  if (stage === "ONBOARDING") return IceconnectMetroStage.ONBOARDING;
-  if (stage === "LIVE") return IceconnectMetroStage.SUBSCRIPTION;
+  if (stage === "INTRODUCED") return IceconnectMetroStage.INTRO_CALL;
+  if (stage === "DEMO") return IceconnectMetroStage.DEMO_DONE;
+  if (stage === "FOLLOW_UP") return IceconnectMetroStage.FOLLOW_UP;
+  if (stage === "ONBOARD") return IceconnectMetroStage.ONBOARDING;
+  if (stage === "SUBSCRIPTION") return IceconnectMetroStage.SUBSCRIPTION;
   return IceconnectMetroStage.LEAD_CREATED;
 }
 

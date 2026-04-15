@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
       password: passwordHash,
       isActive: true,
       firstLogin: true,
+      forcePasswordReset: true,
     },
   });
 

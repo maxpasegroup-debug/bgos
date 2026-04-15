@@ -10,7 +10,6 @@ import {
 import {
   credentialsWorkbookBase64,
   generateEmail,
-  generatePassword,
   industryToBusinessType,
   industryToPlan,
   type LaunchCredential,
@@ -30,6 +29,8 @@ import { hashPassword } from "@/lib/password";
 import { trialEndDateFromStart } from "@/lib/trial";
 import { companyMembershipClass } from "@/lib/user-company";
 import { publicBgosOrigin, publicIceconnectOrigin } from "@/lib/host-routing";
+import { mapTeamEntries } from "@/lib/nexa-onboarding-engine";
+import { sendAccountReadyEmail } from "@/lib/account-ready-email";
 
 export type OnboardingLaunchIndustry = LaunchIndustry;
 
@@ -88,6 +89,12 @@ export type OnboardingLaunchFail = {
 };
 
 export type OnboardingLaunchResult = OnboardingLaunchOk | OnboardingLaunchFail;
+
+function buildTempPassword(companyName: string, personName: string): string {
+  const c = companyName.trim().replace(/\s+/g, "-").slice(0, 24) || "Company";
+  const p = personName.trim().replace(/\s+/g, "-").slice(0, 24) || "User";
+  return `${c}-${p}-2026`;
+}
 
 async function uniqueEmail(baseEmail: string): Promise<string> {
   let candidate = baseEmail.toLowerCase();
@@ -265,6 +272,12 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
       industry: input.industry,
       team: teamForPlan,
     });
+    const roleStatusByName = new Map(
+      mapTeamEntries(onboardingPlan.employees.map((e) => ({ name: e.name, role: e.roleRaw }))).map((e) => [
+        e.name.trim().toLowerCase(),
+        e,
+      ]),
+    );
 
     const ownerEmailLower = owner.email.trim().toLowerCase();
     const preparedUsersByProvidedEmail = new Map<
@@ -278,7 +291,7 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
     const preparedGeneratedUsers = await Promise.all(
       generatedCandidates.map(async (member) => {
         const email = await uniqueEmail(generateEmail(name, member.name));
-        const plain = generatePassword(name, member.name);
+        const plain = buildTempPassword(name, member.name);
         return {
           name: member.name.trim(),
           role: member.userRole,
@@ -293,7 +306,7 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
       if (!provided || provided === ownerEmailLower || preparedUsersByProvidedEmail.has(provided)) {
         continue;
       }
-      const plain = generatePassword(name, member.name);
+      const plain = buildTempPassword(name, member.name);
       preparedUsersByProvidedEmail.set(provided, {
         plain,
         passwordHash: await hashPassword(plain),
@@ -359,6 +372,8 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
           companyId: co.id,
           role: companyMembershipClass(UserRole.ADMIN),
           jobRole: UserRole.ADMIN,
+          dashboardAssigned: "Manager",
+          status: "READY",
         },
       });
 
@@ -392,14 +407,27 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
               },
             });
             if (already) {
+              const mapped = roleStatusByName.get(member.name.trim().toLowerCase());
+              await tx.userCompany.update({
+                where: { id: already.id },
+                data: {
+                  role: companyMembershipClass(role),
+                  jobRole: role,
+                  dashboardAssigned: mapped?.mappedDashboard ?? null,
+                  status: mapped?.status ?? "READY",
+                },
+              });
               continue;
             }
+            const mapped = roleStatusByName.get(member.name.trim().toLowerCase());
             await tx.userCompany.create({
               data: {
                 userId: existing.id,
                 companyId: co.id,
                 role: companyMembershipClass(role),
                 jobRole: role,
+                dashboardAssigned: mapped?.mappedDashboard ?? null,
+                status: mapped?.status ?? "READY",
               },
             });
             employeesProvisioned += 1;
@@ -426,15 +454,19 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
               isActive: true,
               workspaceActivatedAt: new Date(),
               firstLogin: true,
+              forcePasswordReset: true,
             },
             select: { id: true, name: true, email: true },
           });
+          const mapped = roleStatusByName.get(member.name.trim().toLowerCase());
           await tx.userCompany.create({
             data: {
               userId: user.id,
               companyId: co.id,
               role: companyMembershipClass(role),
               jobRole: role,
+              dashboardAssigned: mapped?.mappedDashboard ?? null,
+              status: mapped?.status ?? "READY",
             },
           });
           employeesProvisioned += 1;
@@ -461,15 +493,19 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
             isActive: true,
             workspaceActivatedAt: new Date(),
             firstLogin: true,
+            forcePasswordReset: true,
           },
           select: { id: true, name: true, email: true },
         });
+        const mapped = roleStatusByName.get(member.name.trim().toLowerCase());
         await tx.userCompany.create({
           data: {
             userId: user.id,
             companyId: co.id,
             role: companyMembershipClass(role),
             jobRole: role,
+            dashboardAssigned: mapped?.mappedDashboard ?? null,
+            status: mapped?.status ?? "READY",
           },
         });
         employeesProvisioned += 1;
@@ -540,6 +576,19 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
 
     const employeesCreated = employeesProvisioned;
     const dashboardsAssigned = dashboardsAssignedFor(rolesForDashboards);
+
+    await Promise.all(
+      credentials
+        .filter((c) => c.password && !c.password.startsWith("—"))
+        .map((c) =>
+          sendAccountReadyEmail({
+            to: c.email,
+            companyName: name,
+            loginUrl: c.loginUrl,
+            tempPassword: c.password,
+          }),
+        ),
+    );
 
     const mems = await loadMembershipsForJwt(input.ownerUserId);
     const primary = mems[0]!;

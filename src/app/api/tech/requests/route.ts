@@ -19,6 +19,8 @@ const bodySchema = z.object({
   roleName: z.string().trim().min(1),
   description: z.string().trim().optional(),
   companyId: z.string().trim().optional(),
+  requestedBy: z.string().trim().optional(),
+  priority: z.enum(["HIGH", "MEDIUM", "LOW"]).optional(),
 });
 
 const patchSchema = z.object({
@@ -39,6 +41,8 @@ export async function GET(request: NextRequest) {
         description: true,
         companyId: true,
         status: true,
+        priority: true,
+        requestedBy: true,
         createdAt: true,
         company: { select: { name: true } },
       },
@@ -71,6 +75,8 @@ export async function POST(request: NextRequest) {
         roleName: parsed.data.roleName,
         description: parsed.data.description?.trim() || null,
         companyId: parsed.data.companyId?.trim() || null,
+        requestedBy: parsed.data.requestedBy?.trim() || null,
+        priority: parsed.data.priority ?? "HIGH",
         status: "pending",
       },
       select: { id: true, roleName: true, status: true, createdAt: true },
@@ -99,8 +105,21 @@ export async function PATCH(request: NextRequest) {
     const row = await prisma.techRequest.update({
       where: { id: parsed.data.id },
       data: { status: parsed.data.status },
-      select: { id: true, status: true },
+      select: { id: true, status: true, roleName: true, companyId: true },
     });
+    if (parsed.data.status === "done" && row.companyId) {
+      await prisma.userCompany.updateMany({
+        where: {
+          companyId: row.companyId,
+          status: "PENDING_BUILD",
+          dashboardAssigned: null,
+        },
+        data: {
+          status: "READY",
+          dashboardAssigned: row.roleName,
+        },
+      });
+    }
     return NextResponse.json({ ok: true as const, request: row });
   } catch (error) {
     console.error("API ERROR:", error);

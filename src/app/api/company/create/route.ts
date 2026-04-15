@@ -42,6 +42,8 @@ const bodySchema = z
     gstNumber: z.string().max(32).optional(),
     bankDetails: z.string().max(4000).optional(),
     referralPhone: z.string().trim().max(32).optional(),
+    microFranchisePartnerId: z.string().trim().max(64).optional(),
+    source: z.string().trim().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.businessType === CompanyBusinessType.CUSTOM) {
@@ -164,7 +166,20 @@ export async function POST(request: NextRequest) {
       gstNumber,
       bankDetails,
       referralPhone,
+      microFranchisePartnerId: mfPartnerIdFromBody,
+      source,
     } = parsed.data;
+
+    if (source !== "NEXA_ENGINE") {
+      return NextResponse.json(
+        {
+          ok: false as const,
+          error: "Company creation is only allowed via Nexa onboarding.",
+          code: "NEXA_REQUIRED" as const,
+        },
+        { status: 403 },
+      );
+    }
 
     const industry =
       businessType === CompanyBusinessType.CUSTOM ? CompanyIndustry.CUSTOM : industryRaw;
@@ -173,7 +188,10 @@ export async function POST(request: NextRequest) {
     const referralPhoneRaw = referralPhone?.trim() || null;
     let microFranchisePartnerId: string | null = null;
     let referralPhoneForLaunch: string | null = referralPhoneRaw;
-    if (referralPhoneRaw) {
+    if (mfPartnerIdFromBody?.trim()) {
+      microFranchisePartnerId = mfPartnerIdFromBody.trim();
+    }
+    if (referralPhoneRaw && !microFranchisePartnerId) {
       const normalized = normalizeMicroFranchisePhone(referralPhoneRaw);
       if (normalized) {
         referralPhoneForLaunch = normalized;

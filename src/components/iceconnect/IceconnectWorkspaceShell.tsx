@@ -183,7 +183,7 @@ function IceconnectSalesHubChrome({
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
             className="relative flex-1 px-4 py-8 sm:px-8"
           >
-            <div className="mx-auto max-w-3xl">{children}</div>
+            <div className="mx-auto max-w-5xl">{children}</div>
           </motion.main>
         </div>
       </div>
@@ -203,6 +203,7 @@ function IceconnectClassicChrome({
   const displayCompany = company?.name?.trim() || "Your company";
   const roleDisplay = ROLE_LABEL[role] ?? role;
   const [nextAction, setNextAction] = useState("Review your assigned queue.");
+  const [nextActionCta, setNextActionCta] = useState<{ label: string; href: string } | null>(null);
   const [badgeCount, setBadgeCount] = useState(0);
   const [showToast, setShowToast] = useState(false);
   const [toastShownOnce, setToastShownOnce] = useState(false);
@@ -213,9 +214,20 @@ function IceconnectClassicChrome({
       try {
         const res = await apiFetch("/api/nexa/next-action", { credentials: "include" });
         if (!res.ok) return;
-        const j = (await res.json()) as { ok?: boolean; nextAction?: string; badgeCount?: number };
+        const j = (await res.json()) as {
+          ok?: boolean;
+          nextAction?: string;
+          badgeCount?: number;
+          actions?: Array<{ ctaLabel?: string; ctaHref?: string }>;
+        };
         if (cancelled || j.ok !== true) return;
         if (typeof j.nextAction === "string" && j.nextAction.trim()) setNextAction(j.nextAction.trim());
+        const top = Array.isArray(j.actions) ? j.actions[0] : null;
+        if (top?.ctaLabel && top?.ctaHref) {
+          setNextActionCta({ label: top.ctaLabel, href: top.ctaHref });
+        } else {
+          setNextActionCta(null);
+        }
         setBadgeCount(typeof j.badgeCount === "number" ? Math.max(0, j.badgeCount) : 0);
         if ((j.badgeCount ?? 0) > 0 && !toastShownOnce) {
           setShowToast(true);
@@ -307,7 +319,14 @@ function IceconnectClassicChrome({
       {showToast ? (
         <div className="fixed right-4 top-4 z-50 max-w-xs rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 shadow">
           <div className="flex items-start justify-between gap-3">
-            <p>NEXA alert: {nextAction}</p>
+            <div>
+              <p>NEXA alert: {nextAction}</p>
+              {nextActionCta ? (
+                <Link href={nextActionCta.href} className="mt-1 inline-block font-semibold underline">
+                  {nextActionCta.label}
+                </Link>
+              ) : null}
+            </div>
             <button type="button" className="font-semibold" onClick={() => setShowToast(false)}>
               x
             </button>

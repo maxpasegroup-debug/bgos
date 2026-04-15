@@ -12,6 +12,7 @@ import { isAutomationCenterEnabled } from "@/lib/automation-center";
 import { handleLeadCreated } from "@/lib/automation-engine";
 import { prisma } from "@/lib/prisma";
 import { handleNewLead } from "@/lib/nexa-engine";
+import { runNexaAutonomousEvent } from "@/lib/nexa-autonomous-engine";
 import { runAutomationExecution } from "@/lib/automation-execution";
 import { createLeadTask, dueDateCallLead, taskTitleCallLead } from "@/lib/task-engine";
 import { findUserInCompany } from "@/lib/user-company";
@@ -159,6 +160,12 @@ export async function POST(request: NextRequest) {
   if (leadForAutomation && automationCenterOn) {
     await runAutomationExecution(companyId, "LEAD_CREATED", {
       lead: leadForAutomation,
+    });
+    await runNexaAutonomousEvent({
+      companyId,
+      actorUserId: actorId,
+      event: "lead_created",
+      payload: { leadId: leadForAutomation.id },
     });
   }
 

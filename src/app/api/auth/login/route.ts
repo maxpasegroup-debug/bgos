@@ -312,7 +312,15 @@ export async function POST(request: Request) {
 
     const hostHeader = request.headers.get("host");
     const needsCrossDomainHandoff = crossDomainLoginRequired(hostHeader, effectiveRole);
-    const forcePasswordReset = user.firstLogin === true;
+    const forcePasswordReset = user.firstLogin === true || user.forcePasswordReset === true;
+    const inProgressSession = await prisma.onboardingSession.findFirst({
+      where: {
+        createdByUserId: user.id,
+        status: { in: ["draft", "in_progress", "ready"] },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
     const nextPath = boss
       ? SUPER_BOSS_HOME_PATH
       : effectiveRole === UserRole.TECH_EXECUTIVE
@@ -328,7 +336,18 @@ export async function POST(request: Request) {
                 Boolean(user.workspaceActivatedAt),
                 user.email,
               );
-    const forcedNextPath = forcePasswordReset ? "/iceconnect/profile?forcePasswordReset=1" : nextPath;
+    const forcedNextPath = forcePasswordReset
+      ? "/reset-password"
+      : inProgressSession
+        ? effectiveRole === UserRole.ADMIN
+          ? "/onboarding?resume=1"
+          : "/iceconnect/onboarding?resume=1"
+        : nextPath;
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLogin: new Date() },
+    });
 
     // Cookie setting — structured body: { success, user } plus fields used by existing clients.
     const res = NextResponse.json(

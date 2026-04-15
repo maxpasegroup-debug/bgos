@@ -1,16 +1,14 @@
 "use client";
 
-
+import type { IceconnectMetroStage } from "@prisma/client";
 import { apiFetch, formatFetchFailure, readApiJson } from "@/lib/api-fetch";
-import { publicBgosOrigin } from "@/lib/host-routing";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { IceconnectMetroStage } from "@prisma/client";
 import { useCompanyBranding } from "@/contexts/company-branding-context";
 import type { LeadFlowV3Selection, LeadFlowV3Stage } from "@/lib/iceconnect-lead-flow-v3";
-import { MetroLine } from "./MetroLine";
+import { LEAD_FLOW_V3_LABEL } from "@/lib/iceconnect-lead-flow-v3";
 
 type LeadItem = {
   id: string;
@@ -28,6 +26,7 @@ type LeadItem = {
   nextFollowUpAt: string | null;
   assigneeName: string;
   assigneeId: string | null;
+  iceconnectMetroStage?: IceconnectMetroStage;
   canEdit: boolean;
   won: boolean;
   lost: boolean;
@@ -48,6 +47,17 @@ type Stats = {
 type RangePreset = "all" | "today" | "week" | "month" | "custom";
 type StatusFilter = "active" | "onboarding" | "live" | "lost";
 
+type AssigneeOption = { id: string; name: string | null; email: string };
+
+const CRM_STAGES: LeadFlowV3Stage[] = [
+  "NEW",
+  "INTRODUCED",
+  "DEMO",
+  "FOLLOW_UP",
+  "ONBOARD",
+  "SUBSCRIPTION",
+];
+
 function buildQuery(range: RangePreset, customFrom: string, customTo: string, statusFilter: StatusFilter) {
   const p = new URLSearchParams();
   p.set("statusFilter", statusFilter);
@@ -62,21 +72,13 @@ function buildQuery(range: RangePreset, customFrom: string, customTo: string, st
   return p.toString();
 }
 
-function metroStageFor(stage: LeadFlowV3Stage): IceconnectMetroStage {
-  if (stage === "INTRODUCTION") return IceconnectMetroStage.INTRO_CALL;
-  if (stage === "LIVE_DEMO") return IceconnectMetroStage.DEMO_DONE;
-  if (stage === "CREATE_ACCOUNT") return IceconnectMetroStage.FOLLOW_UP;
-  if (stage === "ONBOARDING") return IceconnectMetroStage.ONBOARDING;
-  if (stage === "LIVE") return IceconnectMetroStage.SUBSCRIPTION;
-  return IceconnectMetroStage.LEAD_CREATED;
-}
-
 export function IceconnectSalesLeadsClient() {
   const router = useRouter();
   const { ready } = useCompanyBranding();
   const [leads, setLeads] = useState<LeadItem[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [managerView, setManagerView] = useState(false);
+  const [assignees, setAssignees] = useState<AssigneeOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -84,6 +86,7 @@ export function IceconnectSalesLeadsClient() {
   const [modalOpen, setModalOpen] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [industry, setIndustry] = useState("");
   const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -92,10 +95,16 @@ export function IceconnectSalesLeadsClient() {
   const [customTo, setCustomTo] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [search, setSearch] = useState("");
-  const [accountOpenLeadId, setAccountOpenLeadId] = useState<string | null>(null);
-  const [accountIndustry, setAccountIndustry] = useState<"solar" | "custom">("solar");
-  const [accountMode, setAccountMode] = useState<"send_form" | "fill_for_client">("send_form");
-  const [shareExecId, setShareExecId] = useState<string | null>(null);
+  const [stageFilter, setStageFilter] = useState<"" | LeadFlowV3Stage>("");
+  const [industryFilter, setIndustryFilter] = useState("");
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editLead, setEditLead] = useState<LeadItem | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editIndustry, setEditIndustry] = useState("");
+  const [editLocation, setEditLocation] = useState("");
+  const [editNotes, setEditNotes] = useState("");
 
   const load = useCallback(async () => {
     setErr(null);
@@ -107,7 +116,7 @@ export function IceconnectSalesLeadsClient() {
         ok?: boolean;
         leads?: LeadItem[];
         stats?: Stats;
-        view?: { manager?: boolean };
+        view?: { manager?: boolean; assignees?: AssigneeOption[] };
         code?: string;
         error?: string;
       };
@@ -122,6 +131,7 @@ export function IceconnectSalesLeadsClient() {
       setLeads(j.leads ?? []);
       if (j.stats) setStats(j.stats);
       setManagerView(j.view?.manager === true);
+      setAssignees(Array.isArray(j.view?.assignees) ? j.view!.assignees! : []);
     } catch (e) {
       console.error("API ERROR:", e);
       setErr(formatFetchFailure(e, "Request failed"));
@@ -135,37 +145,31 @@ export function IceconnectSalesLeadsClient() {
     return () => window.clearTimeout(id);
   }, [load]);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await apiFetch("/api/auth/me", { credentials: "include" });
-        const j = ((await readApiJson(res, "auth/me-leads")) ?? {}) as {
-          ok?: boolean;
-          user?: { id?: string };
-        };
-        if (cancelled || !res.ok || j.ok !== true || !j.user?.id) return;
-        setShareExecId(j.user.id);
-      } catch {
-        /* ignore */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const filteredLeads = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return leads;
-    return leads.filter(
-      (l) =>
+    return leads.filter((l) => {
+      if (stageFilter && l.stage !== stageFilter) return false;
+      if (industryFilter.trim() && l.industry.trim() !== industryFilter.trim()) return false;
+      if (!q) return true;
+      return (
         l.name.toLowerCase().includes(q) ||
         l.companyName.toLowerCase().includes(q) ||
         l.phone.replace(/\D/g, "").includes(q.replace(/\D/g, "")) ||
-        l.phone.toLowerCase().includes(q),
-    );
-  }, [leads, search]);
+        l.phone.toLowerCase().includes(q)
+      );
+    });
+  }, [leads, search, stageFilter, industryFilter]);
+
+  const leadsByStage = useMemo(() => {
+    const map = new Map<LeadFlowV3Stage, LeadItem[]>();
+    for (const s of CRM_STAGES) map.set(s, []);
+    for (const l of filteredLeads) {
+      if (l.lost) continue;
+      const list = map.get(l.stage);
+      list?.push(l);
+    }
+    return map;
+  }, [filteredLeads]);
 
   async function createLead(e: React.FormEvent) {
     e.preventDefault();
@@ -176,7 +180,7 @@ export function IceconnectSalesLeadsClient() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, phone, location, notes }),
+        body: JSON.stringify({ name, phone, location, industry, notes }),
       });
       const j = (await res.json()) as { ok?: boolean; error?: string; code?: string };
       if (!res.ok || !j.ok) {
@@ -185,6 +189,7 @@ export function IceconnectSalesLeadsClient() {
       }
       setName("");
       setPhone("");
+      setIndustry("");
       setLocation("");
       setNotes("");
       setModalOpen(false);
@@ -221,34 +226,58 @@ export function IceconnectSalesLeadsClient() {
     }
   }
 
-  async function launchCreateAccount(leadId: string) {
+  async function updateAssignee(leadId: string, assigneeId: string) {
     setBusy(leadId);
     setErr(null);
     try {
-      const res = await apiFetch("/api/iceconnect/executive/leads/account", {
-        method: "POST",
+      const res = await apiFetch("/api/iceconnect/executive/leads/stage", {
+        method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          leadId,
-          industry: accountIndustry,
-          mode: accountMode,
-        }),
+        body: JSON.stringify({ action: "set_assignee", leadId, assigneeId }),
       });
-      const j = (await res.json()) as { ok?: boolean; error?: string; onboardingRoute?: string };
+      const j = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !j.ok) {
-        setErr(j.error ?? "Could not prepare onboarding");
+        setErr(j.error ?? "Could not reassign lead");
         return;
       }
-      setAccountOpenLeadId(null);
-      if (j.onboardingRoute) {
-        router.push(j.onboardingRoute);
-      } else {
-        await load();
-      }
+      await load();
     } catch (e) {
       console.error("API ERROR:", e);
       setErr(formatFetchFailure(e, "Request failed"));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function saveLeadEdits(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editLead) return;
+    setBusy(`edit-${editLead.id}`);
+    setErr(null);
+    try {
+      const res = await apiFetch(`/api/iceconnect/executive/leads/${editLead.id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editName,
+          phone: editPhone,
+          industry: editIndustry,
+          location: editLocation,
+          notes: editNotes,
+        }),
+      });
+      const j = ((await readApiJson(res, "leads/patch")) ?? {}) as { ok?: boolean; error?: string };
+      if (!res.ok || j.ok !== true) {
+        setErr(j.error ?? "Could not save lead");
+        return;
+      }
+      setEditOpen(false);
+      setEditLead(null);
+      await load();
+    } catch (e) {
+      setErr(formatFetchFailure(e, "Could not save lead"));
     } finally {
       setBusy(null);
     }
@@ -262,7 +291,7 @@ export function IceconnectSalesLeadsClient() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Leads</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Internal sales pipeline — Sales → Form → Tech → Live
+            Pure CRM pipeline — track stages only. Onboarding runs in the Onboarding module.
             {managerView ? (
               <span className="ml-2 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-800">
                 Manager view · all reps
@@ -270,54 +299,23 @@ export function IceconnectSalesLeadsClient() {
             ) : null}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setModalOpen(true)}
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
-        >
-          <span className="text-lg leading-none">+</span>
-          Create Lead
-        </button>
-      </div>
-
-      {shareExecId ? (
-        <div className="rounded-2xl border border-indigo-200 bg-gradient-to-r from-indigo-50 to-violet-50 p-4 shadow-sm">
-          <p className="text-sm font-semibold text-indigo-950">Share Online Micro Franchise</p>
-          <p className="mt-1 text-xs text-indigo-900/80">
-            Applicants use Nexa on BGOS — your ref is tracked automatically.
-          </p>
-          <p className="mt-2 break-all font-mono text-[11px] text-indigo-800">
-            {`${publicBgosOrigin()}/micro-franchise/apply?ref=${encodeURIComponent(shareExecId)}`}
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white"
-              onClick={async () => {
-                const url = `${publicBgosOrigin()}/micro-franchise/apply?ref=${encodeURIComponent(shareExecId)}`;
-                try {
-                  await navigator.clipboard.writeText(url);
-                  setErr(null);
-                } catch {
-                  setErr("Could not copy link — copy manually from the text above.");
-                }
-              }}
-            >
-              Copy link
-            </button>
-            <a
-              className="rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-800"
-              href={`https://wa.me/?text=${encodeURIComponent(
-                `Apply for BGOS Micro Franchise (takes 2 min): ${publicBgosOrigin()}/micro-franchise/apply?ref=${encodeURIComponent(shareExecId)}`,
-              )}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              WhatsApp share
-            </a>
-          </div>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/iceconnect/onboarding"
+            className="inline-flex shrink-0 items-center justify-center rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-sm font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-50"
+          >
+            Open Onboarding
+          </Link>
+          <button
+            type="button"
+            onClick={() => setModalOpen(true)}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
+          >
+            <span className="text-lg leading-none">+</span>
+            Create Lead
+          </button>
         </div>
-      ) : null}
+      </div>
 
       {stats ? (
         <motion.div
@@ -326,9 +324,7 @@ export function IceconnectSalesLeadsClient() {
           className="grid gap-3 rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-indigo-50/40 p-4 shadow-sm sm:grid-cols-3"
         >
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-              Open pipeline
-            </p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Open pipeline</p>
             <p className="mt-1 text-2xl font-bold text-gray-900">{stats.openPipelineCount}</p>
           </div>
           <div>
@@ -360,9 +356,7 @@ export function IceconnectSalesLeadsClient() {
       ) : null}
 
       {err ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          {err}
-        </div>
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{err}</div>
       ) : null}
 
       <div className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
@@ -382,9 +376,7 @@ export function IceconnectSalesLeadsClient() {
               type="button"
               onClick={() => setRange(key)}
               className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                range === key
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                range === key ? "bg-indigo-600 text-white shadow-sm" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
               }`}
             >
               {label}
@@ -420,9 +412,7 @@ export function IceconnectSalesLeadsClient() {
             type="button"
             onClick={() => setStatusFilter("active")}
             className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-              statusFilter === "active"
-                ? "bg-emerald-600 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              statusFilter === "active" ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
           >
             Active
@@ -436,53 +426,69 @@ export function IceconnectSalesLeadsClient() {
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
           >
-            Onboarding
+            Onboard stage
           </button>
           <button
             type="button"
             onClick={() => setStatusFilter("live")}
             className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-              statusFilter === "live"
-                ? "bg-indigo-600 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              statusFilter === "live" ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
           >
-            Live
+            Subscription
           </button>
           <button
             type="button"
             onClick={() => setStatusFilter("lost")}
             className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-              statusFilter === "lost"
-                ? "bg-gray-800 text-white"
-                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              statusFilter === "lost" ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
           >
             Lost
           </button>
         </div>
 
-        <div className="border-t border-gray-100 pt-4">
-          <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Search</label>
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Name, phone, or company…"
-            className="mt-2 w-full max-w-md rounded-xl border border-gray-200 px-4 py-2.5 text-sm shadow-inner outline-none ring-indigo-500/30 focus:border-indigo-400 focus:ring-2"
-          />
+        <div className="grid gap-3 border-t border-gray-100 pt-4 md:grid-cols-3">
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Search</label>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Name, phone, or company…"
+              className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm shadow-inner outline-none ring-indigo-500/30 focus:border-indigo-400 focus:ring-2"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Stage</label>
+            <select
+              value={stageFilter}
+              onChange={(e) => setStageFilter((e.target.value || "") as "" | LeadFlowV3Stage)}
+              className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm"
+            >
+              <option value="">All stages</option>
+              {CRM_STAGES.map((s) => (
+                <option key={s} value={s}>
+                  {LEAD_FLOW_V3_LABEL[s]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Industry</label>
+            <input
+              value={industryFilter}
+              onChange={(e) => setIndustryFilter(e.target.value)}
+              placeholder="Exact match"
+              className="mt-2 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm"
+            />
+          </div>
         </div>
       </div>
 
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-900">
-          Lead pipeline
-        </h2>
-        <button
-          type="button"
-          onClick={() => void load()}
-          className="text-xs font-medium text-indigo-600 hover:underline"
-        >
+        <h2 className="text-sm font-semibold text-gray-900">Kanban</h2>
+        <button type="button" onClick={() => void load()} className="text-xs font-medium text-indigo-600 hover:underline">
           Refresh
         </button>
       </div>
@@ -510,96 +516,101 @@ export function IceconnectSalesLeadsClient() {
             </button>
           ) : null}
         </motion.div>
-      ) : (
-        <ul className="space-y-4">
-          <AnimatePresence initial={false}>
+      ) : statusFilter === "lost" ? (
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+          <p className="text-sm font-semibold text-gray-900">Lost leads</p>
+          <ul className="mt-3 divide-y divide-gray-100">
             {filteredLeads.map((l) => (
-              <motion.li
-                key={l.id}
-                layout
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.2 }}
-                className="group rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-indigo-200 hover:shadow-md"
+              <li key={l.id} className="py-3 text-sm">
+                <p className="font-semibold text-gray-900">{l.name}</p>
+                <p className="text-xs text-gray-600">{l.phone}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <div className="overflow-x-auto pb-2">
+          <div className="flex min-w-[1100px] gap-3">
+            {CRM_STAGES.map((stage) => (
+              <section
+                key={stage}
+                className="w-64 shrink-0 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm"
               >
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="truncate text-lg font-semibold text-gray-900">{l.name}</p>
-                      {l.won ? (
-                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">
-                          ✅ WON
-                        </span>
-                      ) : null}
-                      {l.lost ? (
-                        <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-bold text-gray-700">
-                          Lost
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="mt-1 font-mono text-sm text-gray-700 tabular-nums">{l.phone}</p>
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-                      <span>
-                        Created {new Date(l.createdAt).toLocaleDateString(undefined, { dateStyle: "medium" })}
-                      </span>
-                      <span>Assigned to {l.assigneeName}</span>
-                      <span className="font-medium text-indigo-700">Current stage: {l.stageLabel}</span>
-                      {l.companyName ? <span>Company: {l.companyName}</span> : null}
-                      {l.industry ? <span>Industry: {l.industry}</span> : null}
-                    </div>
-                    {l.location ? <p className="mt-1 text-xs text-gray-500">{l.location}</p> : null}
-                    <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-600">
-                      <span>Form: {l.formStatus}</span>
-                      {l.techStatus ? <span>Tech Status: {l.techStatus}</span> : null}
-                      {l.livePlanLabel ? <span>Live - Plan: {l.livePlanLabel}</span> : null}
-                    </div>
-                  </div>
-                  {l.canEdit ? (
-                    <div className="flex flex-wrap gap-2">
-                      <select
-                        value={l.lost ? "LOST" : l.stage}
-                        onChange={(e) =>
-                          void updateStage(l.id, e.target.value as LeadFlowV3Selection)
-                        }
-                        disabled={busy === l.id}
-                        className="rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-xs font-semibold text-gray-800"
-                      >
-                        <option value="NEW">New</option>
-                        <option value="INTRODUCTION">Introduction</option>
-                        <option value="LIVE_DEMO">Live Demo</option>
-                        <option value="CREATE_ACCOUNT">Create Account</option>
-                        <option value="ONBOARDING">Onboarding</option>
-                        <option value="LIVE">Live</option>
-                        <option value="LOST">Lost</option>
-                      </select>
-                    </div>
-                  ) : null}
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-bold uppercase tracking-wide text-gray-500">{LEAD_FLOW_V3_LABEL[stage]}</p>
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-700">
+                    {(leadsByStage.get(stage) ?? []).length}
+                  </span>
                 </div>
-
-                {!l.lost ? (
-                  <div className="mt-5 border-t border-gray-100 pt-5">
-                    <MetroLine
-                      current={metroStageFor(l.stage)}
-                    />
-                    {l.stage === "CREATE_ACCOUNT" && l.canEdit ? (
+                <div className="mt-3 space-y-2">
+                  {(leadsByStage.get(stage) ?? []).map((l) => (
+                    <motion.div
+                      key={l.id}
+                      layout
+                      className="rounded-xl border border-gray-200 bg-gradient-to-b from-white to-gray-50 p-3 shadow-sm"
+                    >
                       <button
                         type="button"
-                        disabled={busy === l.id}
-                        onClick={() => setAccountOpenLeadId(l.id)}
-                        className="mt-3 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
+                        className="w-full text-left"
+                        onClick={() => {
+                          setEditLead(l);
+                          setEditName(l.name);
+                          setEditPhone(l.phone);
+                          setEditIndustry(l.industry);
+                          setEditLocation(l.location);
+                          setEditNotes(l.notes);
+                          setEditOpen(true);
+                        }}
                       >
-                        Create Account
+                        <p className="text-sm font-semibold text-gray-900">{l.name}</p>
+                        <p className="mt-0.5 font-mono text-xs text-gray-700 tabular-nums">{l.phone}</p>
+                        {l.companyName ? <p className="mt-1 text-xs text-gray-600">Co: {l.companyName}</p> : null}
+                        {l.industry ? <p className="text-xs text-indigo-700">Industry: {l.industry}</p> : null}
+                        {l.location ? <p className="text-xs text-gray-500">{l.location}</p> : null}
                       </button>
-                    ) : null}
-                  </div>
-                ) : (
-                  <p className="mt-3 text-xs text-gray-500">Final stage was: {l.stageLabel}</p>
-                )}
-              </motion.li>
+
+                      {l.canEdit ? (
+                        <div className="mt-2 space-y-2 border-t border-gray-100 pt-2">
+                          <select
+                            value={l.lost ? "LOST" : l.stage}
+                            onChange={(e) => void updateStage(l.id, e.target.value as LeadFlowV3Selection)}
+                            disabled={busy === l.id}
+                            className="w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-[11px] font-semibold text-gray-800"
+                          >
+                            {CRM_STAGES.map((s) => (
+                              <option key={s} value={s}>
+                                {LEAD_FLOW_V3_LABEL[s]}
+                              </option>
+                            ))}
+                            <option value="LOST">Lost</option>
+                          </select>
+
+                          {managerView && assignees.length > 0 ? (
+                            <select
+                              value={l.assigneeId ?? ""}
+                              onChange={(e) => void updateAssignee(l.id, e.target.value)}
+                              disabled={busy === l.id}
+                              className="w-full rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-[11px] font-semibold text-gray-800"
+                            >
+                              {assignees.map((a) => (
+                                <option key={a.id} value={a.id}>
+                                  {(a.name?.trim() || a.email) ?? a.id}
+                                </option>
+                              ))}
+                            </select>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </motion.div>
+                  ))}
+                  {(leadsByStage.get(stage) ?? []).length === 0 ? (
+                    <p className="text-[11px] text-gray-400">Drop cards here (use stage dropdown)</p>
+                  ) : null}
+                </div>
+              </section>
             ))}
-          </AnimatePresence>
-        </ul>
+          </div>
+        </div>
       )}
 
       <AnimatePresence>
@@ -643,6 +654,15 @@ export function IceconnectSalesLeadsClient() {
                   <p className="mt-1 text-[11px] text-gray-500">Must be unique for your workspace.</p>
                 </div>
                 <div>
+                  <label className="text-xs font-medium text-gray-600">Industry</label>
+                  <input
+                    value={industry}
+                    onChange={(e) => setIndustry(e.target.value)}
+                    placeholder="Solar, Education, Healthcare, Custom…"
+                    className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm"
+                  />
+                </div>
+                <div>
                   <label className="text-xs font-medium text-gray-600">Location</label>
                   <input
                     value={location}
@@ -682,70 +702,91 @@ export function IceconnectSalesLeadsClient() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {accountOpenLeadId ? (
+        {editOpen && editLead ? (
           <motion.div
             className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setAccountOpenLeadId(null)}
+            onClick={() => {
+              setEditOpen(false);
+              setEditLead(null);
+            }}
             role="presentation"
           >
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 16 }}
-              transition={{ type: "spring", damping: 26, stiffness: 320 }}
-              className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+              className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
-              <h2 className="text-lg font-bold text-gray-900">Create Account</h2>
-              <p className="mt-1 text-sm text-gray-500">
-                Choose industry and how you want to start onboarding.
-              </p>
-              <div className="mt-5 space-y-4">
+              <h2 className="text-lg font-bold text-gray-900">Edit lead</h2>
+              <p className="mt-1 text-sm text-gray-500">CRM fields only — onboarding is separate.</p>
+              <form onSubmit={(e) => void saveLeadEdits(e)} className="mt-6 space-y-4">
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Name *</label>
+                  <input
+                    required
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Phone *</label>
+                  <input
+                    required
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm"
+                  />
+                </div>
                 <div>
                   <label className="text-xs font-medium text-gray-600">Industry</label>
-                  <select
-                    value={accountIndustry}
-                    onChange={(e) => setAccountIndustry(e.target.value as "solar" | "custom")}
+                  <input
+                    value={editIndustry}
+                    onChange={(e) => setEditIndustry(e.target.value)}
                     className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm"
-                  >
-                    <option value="solar">Solar</option>
-                    <option value="custom">Custom</option>
-                  </select>
+                  />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-gray-600">Action</label>
-                  <select
-                    value={accountMode}
-                    onChange={(e) =>
-                      setAccountMode(e.target.value as "send_form" | "fill_for_client")
-                    }
+                  <label className="text-xs font-medium text-gray-600">Location</label>
+                  <input
+                    value={editLocation}
+                    onChange={(e) => setEditLocation(e.target.value)}
                     className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm"
-                  >
-                    <option value="send_form">Send form to client</option>
-                    <option value="fill_for_client">Fill on behalf of client</option>
-                  </select>
+                  />
                 </div>
-              </div>
-              <div className="mt-6 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setAccountOpenLeadId(null)}
-                  className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={busy === accountOpenLeadId}
-                  onClick={() => void launchCreateAccount(accountOpenLeadId)}
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                >
-                  Continue
-                </button>
-              </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Notes</label>
+                  <textarea
+                    value={editNotes}
+                    onChange={(e) => setEditNotes(e.target.value)}
+                    rows={4}
+                    className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm"
+                  />
+                </div>
+                <div className="flex flex-wrap justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditOpen(false);
+                      setEditLead(null);
+                    }}
+                    className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={busy === `edit-${editLead.id}`}
+                    className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    Save
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </motion.div>
         ) : null}

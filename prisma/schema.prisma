@@ -125,6 +125,11 @@ enum IceconnectMetroStage {
   SUBSCRIPTION
 }
 
+enum OnboardingStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
 /** Plan tier for executive targets and converted ICECONNECT customers. */
 enum IceconnectCustomerPlan {
   FREE
@@ -302,6 +307,7 @@ model Company {
   activityLogs    ActivityLog[]
   serviceTickets ServiceTicket[]
   automations   Automation[]
+  nexaActions   NexaAction[]
   documents     Document[]
   leaveRequests LeaveRequest[]
   attendances   Attendance[]
@@ -328,6 +334,8 @@ model Company {
   salesExecutiveMonthlyTargets SalesExecutiveMonthlyTarget[]
   onboardingFormTemplates      OnboardingFormTemplate[]
   onboardingSubmissions        OnboardingSubmission[]
+  onboardingSessions           OnboardingSession[]
+  onboardingRecords            Onboarding[]
   launchChannelPartner         LaunchChannelPartner? @relation("LaunchPartnerCompany", fields: [launchChannelPartnerId], references: [id], onDelete: SetNull)
   microFranchisePartner        MicroFranchisePartner? @relation(fields: [microFranchisePartnerId], references: [id], onDelete: SetNull)
   microFranchiseCommissionTxs    CommissionTransaction[]
@@ -461,6 +469,9 @@ model UserCompany {
   companyId String
   role      String
   jobRole   UserRole
+  dashboardAssigned String?
+  /// READY | PENDING_BUILD | IN_PROGRESS | LIVE
+  status    String   @default("READY")
   createdAt DateTime @default(now())
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -484,6 +495,10 @@ model User {
   workspaceActivatedAt DateTime?
   /** Force one-time password reset on first successful login. */
   firstLogin Boolean @default(false)
+  /** Hard gate for credentials minted during onboarding/import. */
+  forcePasswordReset Boolean @default(false)
+  /** Updated on every successful authentication. */
+  lastLogin DateTime?
 
   companiesOwned       Company[]        @relation("OwnedCompany")
   memberships          UserCompany[]
@@ -510,6 +525,8 @@ model User {
   onboardingSubmissionsTech    OnboardingSubmission[] @relation("OnboardingTechAssignee")
   onboardingWorkflowMessages   OnboardingMessage[]
   onboardingSessionsCreated    OnboardingSession[] @relation("OnboardingSessionCreator")
+  onboardingRecordsCreated     Onboarding[] @relation("OnboardingCreator")
+  nexaActions                  NexaAction[] @relation("NexaActionActor")
   microFranchiseReferrals        MicroFranchiseApplication[] @relation("MicroFranchiseReferrer")
   microFranchiseAssignments      MicroFranchiseApplication[] @relation("MicroFranchiseAssignee")
   microFranchisePartner          MicroFranchisePartner?
@@ -531,19 +548,29 @@ model LaunchChannelPartner {
 /** Sales launch session used by Nexa chat onboarding flow. */
 model OnboardingSession {
   id              String   @id @default(cuid())
-  companyName     String
-  industry        String
-  rawTeamInput    String
-  parsedTeam      Json
-  unknownRoles    Json
+  source          String?
+  leadId          String?
+  partnerId       String?
+  companyId       String?
+  companyName     String?
+  industry        String?
+  rawTeamInput    String?
+  parsedTeam      Json?
+  unknownRoles    Json?
+  data            Json?
+  currentStep     String?
   status          String   @default("draft")
   createdByUserId String
   createdAt       DateTime @default(now())
 
   creator User @relation("OnboardingSessionCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  lead    Lead? @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
 
   @@index([createdByUserId, createdAt])
   @@index([status])
+  @@index([leadId])
+  @@index([companyId])
 }
 
 /** Tech exception queue created from launch unknown roles. */
@@ -553,6 +580,8 @@ model TechRequest {
   description String?
   companyId   String?
   status      String   @default("pending")
+  priority    String   @default("HIGH")
+  requestedBy String?
   createdAt   DateTime @default(now())
 
   company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
@@ -758,6 +787,8 @@ model Lead {
 
   onboardingTasks                 OnboardingTask[]
   onboardingWorkflowSubmission    OnboardingSubmission?
+  onboardingSessions              OnboardingSession[]
+  onboardingRecords              Onboarding[]
   internalLeadActivities InternalLeadActivity[]
   nexaSupportTickets     InternalNexaSupportTicket[]
 
@@ -769,6 +800,25 @@ model Lead {
   @@index([phone])
   @@index([companyId, email])
   @@index([companyId, assignedTo, iceconnectMetroStage])
+}
+
+model Onboarding {
+  id         String           @id @default(cuid())
+  leadId     String
+  companyId  String?
+  status     OnboardingStatus @default(IN_PROGRESS)
+  createdBy  String
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  meta       Json?
+
+  lead     Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  company  Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  creator  User     @relation("OnboardingCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([leadId, status])
+  @@index([createdBy, createdAt])
+  @@index([companyId])
 }
 
 model Deal {
@@ -823,6 +873,26 @@ model Automation {
 
   @@index([companyId])
   @@index([companyId, trigger])
+}
+
+model NexaAction {
+  id         String   @id @default(cuid())
+  type       String
+  event      String
+  target     String
+  status     String
+  message    String
+  metadata   Json?
+  executedAt DateTime @default(now())
+  companyId  String
+  actorUserId String?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  actor   User?   @relation("NexaActionActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, executedAt])
+  @@index([companyId, event])
+  @@index([status])
 }
 
 model Installation {

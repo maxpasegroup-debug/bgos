@@ -26,7 +26,12 @@ const bodySchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("set_stage"),
     leadId: z.string().trim().min(1),
-    stage: z.enum(["NEW", "INTRODUCTION", "LIVE_DEMO", "CREATE_ACCOUNT", "ONBOARDING", "LIVE", "LOST"]),
+    stage: z.enum(["NEW", "INTRODUCED", "DEMO", "FOLLOW_UP", "ONBOARD", "SUBSCRIPTION", "LOST"]),
+  }),
+  z.object({
+    action: z.literal("set_assignee"),
+    leadId: z.string().trim().min(1),
+    assigneeId: z.string().trim().min(1),
   }),
 ]);
 
@@ -66,6 +71,28 @@ export async function PATCH(request: NextRequest) {
       return jsonError(403, "FORBIDDEN", "Only the assigned executive (or a manager) can update this lead.");
     }
 
+    if (parsed.data.action === "set_assignee") {
+      if (!isIceconnectPrivileged(session.role)) {
+        return jsonError(403, "FORBIDDEN", "Only manager/admin can reassign leads.");
+      }
+      const membership = await prisma.userCompany.findFirst({
+        where: {
+          companyId: session.companyId,
+          userId: parsed.data.assigneeId,
+          jobRole: { in: [UserRole.SALES_EXECUTIVE, UserRole.TELECALLER] },
+        },
+        select: { userId: true },
+      });
+      if (!membership) {
+        return jsonError(404, "NOT_FOUND", "Assignee not found in sales team.");
+      }
+      await prisma.lead.update({
+        where: { id: leadId },
+        data: { assignedTo: parsed.data.assigneeId, internalStageUpdatedAt: new Date() },
+      });
+      return NextResponse.json({ ok: true as const });
+    }
+
     const selected = parsed.data.stage;
     const now = new Date();
     const updateData =
@@ -74,7 +101,7 @@ export async function PATCH(request: NextRequest) {
             status: LeadStatus.LOST,
             internalStageUpdatedAt: now,
           }
-        : selected === "LIVE"
+        : selected === "SUBSCRIPTION"
           ? {
               iceconnectMetroStage: IceconnectMetroStage.SUBSCRIPTION,
               iceconnectSubscribedAt: now,

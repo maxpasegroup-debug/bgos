@@ -38,6 +38,7 @@ function withDashboardDefaults(m: z.infer<typeof parsedMemberSchema>): NexaMappe
 }
 
 const bodySchema = z.object({
+  source: z.literal("NEXA_ENGINE"),
   sessionId: z.string().trim().optional(),
   companyName: z.string().trim().min(1).max(200),
   industry: z.enum(["SOLAR", "CUSTOM"]),

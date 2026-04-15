@@ -53,6 +53,7 @@ export function CustomPlanClient() {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
+          source: "NEXA_ENGINE",
           companyName: name.trim(),
           industry: "CUSTOM",
           customWorkspacePlan: plan,

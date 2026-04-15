@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { parseJsonBodyZod } from "@/lib/api-response";
 import { requireAuthWithRoles } from "@/lib/auth";
+import { startNexaOnboarding } from "@/lib/nexa-onboarding-engine";
 import { prisma } from "@/lib/prisma";
 
 const bodySchema = z.object({
@@ -25,16 +26,18 @@ export async function POST(request: NextRequest) {
     const parsed = await parseJsonBodyZod(request, bodySchema);
     if (!parsed.ok) return parsed.response;
 
-    const row = await prisma.onboardingSession.create({
+    const started = await startNexaOnboarding({
+      userId: session.sub,
+      source: "DIRECT",
+    });
+    const row = await prisma.onboardingSession.update({
+      where: { id: started.sessionId },
       data: {
         companyName: parsed.data.companyName,
         industry: parsed.data.industry,
-        rawTeamInput: "",
-        parsedTeam: [],
-        unknownRoles: [],
+        currentStep: "industry",
         status: "draft",
-        createdByUserId: session.sub,
-      },
+      } as any,
     });
     return NextResponse.json({
       ok: true as const,

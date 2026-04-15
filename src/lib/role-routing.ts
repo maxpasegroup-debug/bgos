@@ -86,6 +86,7 @@ const PAGE_RULES: RouteRule[] = [
   { prefix: "/iceconnect/hr", roles: new Set(["HR_MANAGER", "ADMIN"]) },
   { prefix: "/iceconnect/my-journey", roles: ICE_SALES_HUB },
   { prefix: "/iceconnect/leads", roles: ICE_SALES_HUB },
+  { prefix: "/iceconnect/onboarding", roles: ICE_SALES_HUB },
   { prefix: "/iceconnect/customers", roles: ICE_SALES_HUB },
   { prefix: "/iceconnect/wallet", roles: ICE_SALES_HUB },
   { prefix: "/iceconnect/micro-franchise", roles: new Set(["MICRO_FRANCHISE"]) },
@@ -272,6 +273,10 @@ const API_RULES: RouteRule[] = [
     roles: ICE_SALES_HUB,
   },
   {
+    prefix: "/api/iceconnect/onboarding",
+    roles: ICE_SALES_HUB,
+  },
+  {
     prefix: "/api/onboarding/workflow/create",
     roles: ONBOARDING_WORKFLOW_ROLES,
   },
@@ -440,6 +445,7 @@ export const ICECONNECT_DASHBOARD_ROLES: Record<string, readonly string[]> = {
   manager: ["MANAGER"],
   "my-journey": ["SALES_EXECUTIVE", "TELECALLER"],
   leads: ["SALES_EXECUTIVE", "TELECALLER"],
+  onboarding: ["SALES_EXECUTIVE", "TELECALLER"],
   customers: ["SALES_EXECUTIVE", "TELECALLER"],
   wallet: ["SALES_EXECUTIVE", "TELECALLER"],
   notifications: ["SALES_EXECUTIVE", "TELECALLER"],

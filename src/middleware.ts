@@ -457,7 +457,7 @@ export async function middleware(request: NextRequest) {
           { status: 403 },
         );
       }
-      return NextResponse.redirect(new URL("/onboarding", request.url));
+      return NextResponse.redirect(new URL("/onboarding?source=DIRECT", request.url));
     }
   }
 
@@ -498,7 +498,7 @@ export async function middleware(request: NextRequest) {
             { status: 403 },
           );
         }
-        return NextResponse.redirect(new URL("/onboarding", request.url));
+        return NextResponse.redirect(new URL("/onboarding?resume=1", request.url));
       }
     }
   }

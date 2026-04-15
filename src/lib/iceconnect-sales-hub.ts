@@ -15,13 +15,13 @@ export const METRO_STAGES: readonly IceconnectMetroStage[] = [
 ] as const;
 
 export const METRO_STAGE_LABEL: Record<IceconnectMetroStage, string> = {
-  [IceconnectMetroStage.LEAD_CREATED]: "Lead Created",
-  [IceconnectMetroStage.INTRO_CALL]: "Intro Call",
-  [IceconnectMetroStage.DEMO_DONE]: "Demo Done",
-  [IceconnectMetroStage.FOLLOW_UP]: "Follow-up",
-  [IceconnectMetroStage.ONBOARDING]: "Form Filled",
-  [IceconnectMetroStage.PAYMENT_DONE]: "Payment Done",
-  [IceconnectMetroStage.SUBSCRIPTION]: "Converted",
+  [IceconnectMetroStage.LEAD_CREATED]: "New",
+  [IceconnectMetroStage.INTRO_CALL]: "Introduced",
+  [IceconnectMetroStage.DEMO_DONE]: "Demo",
+  [IceconnectMetroStage.FOLLOW_UP]: "Follow Up",
+  [IceconnectMetroStage.ONBOARDING]: "Onboard",
+  [IceconnectMetroStage.PAYMENT_DONE]: "Payment",
+  [IceconnectMetroStage.SUBSCRIPTION]: "Subscription",
 };
 
 export const CUSTOMER_PLAN_LABEL: Record<IceconnectCustomerPlan, string> = {

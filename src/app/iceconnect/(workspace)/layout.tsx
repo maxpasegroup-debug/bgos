@@ -16,6 +16,7 @@ export const metadata: Metadata = {
 const SALES_HUB_ORDER = [
   "my-journey",
   "leads",
+  "onboarding",
   "customers",
   "wallet",
   "notifications",
@@ -34,6 +35,7 @@ const TECH_HUB_NAV = [
 const SALES_HUB_LABEL: Record<string, string> = {
   "my-journey": "My Journey",
   leads: "Leads",
+  onboarding: "Onboarding",
   customers: "Customers",
   wallet: "Wallet",
   notifications: "Notifications",

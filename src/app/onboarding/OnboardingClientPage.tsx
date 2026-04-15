@@ -39,6 +39,7 @@ export function OnboardingClientPage() {
   const [billingAddress, setBillingAddress] = useState("");
   const [gstNumber, setGstNumber] = useState("");
   const [referralPhone, setReferralPhone] = useState("");
+  const [nexaSessionId, setNexaSessionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [probing, setProbing] = useState(true);
@@ -157,11 +158,29 @@ export function OnboardingClientPage() {
 
     setPending(true);
     try {
+      let sid = nexaSessionId;
+      if (!sid) {
+        const startRes = await apiFetch("/api/nexa/onboarding/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ source: "DIRECT" }),
+        });
+        const startData = (await startRes.json()) as { ok?: boolean; sessionId?: string; error?: string };
+        if (!startRes.ok || startData.ok !== true || !startData.sessionId) {
+          setError(startData.error || "Could not start Nexa onboarding");
+          return;
+        }
+        sid = startData.sessionId;
+        setNexaSessionId(sid);
+      }
       const res = await apiFetch("/api/onboarding/launch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
+          source: "NEXA_ENGINE",
+          sessionId: sid ?? undefined,
           companyName: fields.data.name,
           industry: "SOLAR",
           ...(referralPhone.trim() ? { referralPhone: referralPhone.trim() } : {}),

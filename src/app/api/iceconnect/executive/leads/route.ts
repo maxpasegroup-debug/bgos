@@ -5,12 +5,7 @@ import { z } from "zod";
 import { jsonError, parseJsonBodyZod, prismaKnownErrorResponse } from "@/lib/api-response";
 import { handleApiError } from "@/lib/route-error";
 import { requireIceconnectRole } from "@/lib/iceconnect-route-guard";
-import {
-  flowV3StageFromDb,
-  LEAD_FLOW_V3_LABEL,
-  onboardingFormStatusLabel,
-  techStatusLabel,
-} from "@/lib/iceconnect-lead-flow-v3";
+import { flowV3StageFromDb, LEAD_FLOW_V3_LABEL } from "@/lib/iceconnect-lead-flow-v3";
 import { leadPhonesDuplicate } from "@/lib/iceconnect-executive-leads";
 import { currentPeriod, monthBoundsUTC } from "@/lib/iceconnect-sales-hub";
 import { isIceconnectPrivileged } from "@/lib/iceconnect-scope";
@@ -29,6 +24,7 @@ const createSchema = z.object({
   name: z.string().trim().min(1).max(200),
   phone: z.string().trim().min(5).max(32),
   location: z.string().trim().max(500).optional(),
+  industry: z.string().trim().max(120).optional(),
   notes: z.string().trim().max(5000).optional(),
 });
 
@@ -154,14 +150,10 @@ export async function GET(request: NextRequest) {
           updatedAt: true,
           assignedTo: true,
           assignee: { select: { id: true, name: true } },
-          onboardingWorkflowSubmission: {
-            select: {
-              id: true,
-              category: true,
-              status: true,
-              filledByUserId: true,
-              techTask: { select: { status: true } },
-            },
+          onboardingRecords: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { id: true, status: true },
           },
         },
       }),
@@ -200,40 +192,18 @@ export async function GET(request: NextRequest) {
     const conversionPct =
       targetCount > 0 ? Math.min(100, Math.round((conversionsThisMonth / targetCount) * 100)) : 0;
 
-    const deliveredToLive = leads
-      .filter(
-        (l) =>
-          l.onboardingWorkflowSubmission?.status === "DELIVERED" &&
-          l.status !== LeadStatus.LOST &&
-          (l.iceconnectMetroStage ?? IceconnectMetroStage.LEAD_CREATED) !==
-            IceconnectMetroStage.SUBSCRIPTION,
-      )
-      .map((l) => l.id);
-    if (deliveredToLive.length > 0) {
-      await prisma.lead.updateMany({
-        where: { id: { in: deliveredToLive } },
-        data: {
-          iceconnectMetroStage: IceconnectMetroStage.SUBSCRIPTION,
-          iceconnectSubscribedAt: new Date(),
-          status: LeadStatus.WON,
-        },
-      });
-    }
-
     const mapped = leads.map((l) => {
-      const effectiveDbStage =
-        deliveredToLive.includes(l.id)
-          ? IceconnectMetroStage.SUBSCRIPTION
-          : (l.iceconnectMetroStage ?? IceconnectMetroStage.LEAD_CREATED);
+      const effectiveDbStage = l.iceconnectMetroStage ?? IceconnectMetroStage.LEAD_CREATED;
       const stageKey = flowV3StageFromDb(effectiveDbStage);
       const canEdit =
         l.assignedTo === session.sub || isIceconnectPrivileged(session.role);
+      const ob = l.onboardingRecords[0];
       return {
         id: l.id,
         name: l.name,
         phone: l.phone,
         companyName: l.leadCompanyName ?? "",
-        industry: l.onboardingWorkflowSubmission?.category ?? l.businessType ?? "",
+        industry: l.businessType ?? "",
         location: l.iceconnectLocation ?? "",
         notes: l.internalSalesNotes ?? "",
         stage: stageKey,
@@ -244,23 +214,41 @@ export async function GET(request: NextRequest) {
         updatedAt: l.updatedAt.toISOString(),
         assigneeName: l.assignee?.name?.trim() || "—",
         assigneeId: l.assignedTo,
+        iceconnectMetroStage: effectiveDbStage,
         canEdit,
-        won: stageKey === "LIVE",
+        won: stageKey === "SUBSCRIPTION",
         lost: l.status === LeadStatus.LOST,
-        livePlanLabel: stageKey === "LIVE" ? currentPlanLabel : null,
-        onboardingFormId: l.onboardingWorkflowSubmission?.id ?? null,
-        onboardingIndustry: l.onboardingWorkflowSubmission?.category ?? null,
-        formStatus: onboardingFormStatusLabel(l.onboardingWorkflowSubmission?.status ?? null),
-        techStatus: techStatusLabel(l.onboardingWorkflowSubmission?.techTask?.status ?? null),
+        livePlanLabel: stageKey === "SUBSCRIPTION" ? currentPlanLabel : null,
+        onboardingFormId: ob?.id ?? null,
+        onboardingIndustry: l.businessType ?? null,
+        formStatus: ob?.status === "COMPLETED" ? "Completed" : ob ? "In progress" : "Not started",
+        techStatus: null,
       };
     });
 
     const filtered = mapped.filter((l) => {
       if (statusFilter === "lost") return l.lost;
-      if (statusFilter === "live") return l.stage === "LIVE" && !l.lost;
-      if (statusFilter === "onboarding") return l.stage === "ONBOARDING" && !l.lost;
-      return l.stage !== "LIVE" && l.stage !== "ONBOARDING" && !l.lost;
+      if (statusFilter === "live") return l.stage === "SUBSCRIPTION" && !l.lost;
+      if (statusFilter === "onboarding") return l.stage === "ONBOARD" && !l.lost;
+      return l.stage !== "SUBSCRIPTION" && !l.lost;
     });
+
+    let assignees: { id: string; name: string | null; email: string }[] | undefined;
+    if (isIceconnectPrivileged(session.role)) {
+      const memberships = await prisma.userCompany.findMany({
+        where: {
+          companyId: session.companyId,
+          jobRole: { in: [UserRole.SALES_EXECUTIVE, UserRole.TELECALLER] },
+        },
+        include: { user: { select: { id: true, name: true, email: true } } },
+        orderBy: { user: { name: "asc" } },
+      });
+      assignees = memberships.map((m) => ({
+        id: m.userId,
+        name: m.user.name,
+        email: m.user.email,
+      }));
+    }
 
     return NextResponse.json({
       ok: true as const,
@@ -273,6 +261,7 @@ export async function GET(request: NextRequest) {
       },
       view: {
         manager: isIceconnectPrivileged(session.role),
+        assignees,
       },
     });
   } catch (e) {
@@ -292,7 +281,7 @@ export async function POST(request: NextRequest) {
   const parsed = await parseJsonBodyZod(request, createSchema);
   if (!parsed.ok) return parsed.response;
 
-  const { name, phone, location, notes } = parsed.data;
+  const { name, phone, location, industry, notes } = parsed.data;
 
   try {
     const peers = await prisma.lead.findMany({
@@ -312,6 +301,7 @@ export async function POST(request: NextRequest) {
         createdByUserId: session.sub,
         status: LeadStatus.NEW,
         iceconnectMetroStage: IceconnectMetroStage.LEAD_CREATED,
+        businessType: industry?.trim() ? industry.trim() : null,
         iceconnectLocation: location?.trim() ? location.trim() : null,
         internalSalesNotes: notes?.trim() ? notes.trim() : null,
       },
@@ -319,6 +309,7 @@ export async function POST(request: NextRequest) {
         id: true,
         name: true,
         phone: true,
+        businessType: true,
         iceconnectLocation: true,
         internalSalesNotes: true,
         iceconnectMetroStage: true,
@@ -338,7 +329,7 @@ export async function POST(request: NextRequest) {
           name: lead.name,
           phone: lead.phone,
           companyName: "",
-          industry: "",
+          industry: lead.businessType ?? "",
           location: lead.iceconnectLocation ?? "",
           notes: lead.internalSalesNotes ?? "",
           stage,
@@ -349,6 +340,7 @@ export async function POST(request: NextRequest) {
           nextFollowUpAt: null,
           assigneeName: lead.assignee?.name?.trim() || "—",
           assigneeId: lead.assignedTo,
+          iceconnectMetroStage: lead.iceconnectMetroStage ?? IceconnectMetroStage.LEAD_CREATED,
           canEdit: true,
           won: false,
           lost: false,

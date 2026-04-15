@@ -1,0 +1,4 @@
+ALTER TABLE "OnboardingSession"
+ADD COLUMN IF NOT EXISTS "source" TEXT,
+ADD COLUMN IF NOT EXISTS "partnerId" TEXT,
+ADD COLUMN IF NOT EXISTS "currentStep" TEXT;
