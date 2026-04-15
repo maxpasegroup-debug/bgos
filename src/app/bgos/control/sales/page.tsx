@@ -142,15 +142,15 @@ export default function ControlSalesPage() {
           </div>
 
           <div className={cardShell}>
-            <p className={light ? "font-bold text-slate-900" : "font-bold text-white"}>Channel Partners</p>
+            <p className={light ? "font-bold text-slate-900" : "font-bold text-white"}>Micro Franchise</p>
             <div className="mt-2">
-              <Link href="/bgos/control/sales/channel-partners" className="text-xs text-cyan-300 hover:text-cyan-200">
-                Open detailed channel partner module →
+              <Link href="/bgos/control/micro-franchise" className="text-xs text-cyan-300 hover:text-cyan-200">
+                Open micro franchise ecosystem →
               </Link>
             </div>
             <ul className="mt-3 space-y-2 text-sm">
               {partners.length === 0 ? (
-                <li className={muted}>No channel partner conversions yet.</li>
+                <li className={muted}>No micro franchise conversions yet.</li>
               ) : (
                 partners.map((p) => (
                   <li key={p.id} className={muted}>
@@ -162,7 +162,14 @@ export default function ControlSalesPage() {
           </div>
         </div>
       ) : !error ? (
-        <p className={muted + " mt-6"}>Loading…</p>
+        <div className={cardShell + " mt-6"}>
+          <p className={light ? "font-semibold text-slate-900" : "font-semibold text-white"}>
+            No sales data yet
+          </p>
+          <p className={muted + " mt-1"}>
+            Start onboarding your first company and adding leads to populate this dashboard.
+          </p>
+        </div>
       ) : null}
     </div>
   );

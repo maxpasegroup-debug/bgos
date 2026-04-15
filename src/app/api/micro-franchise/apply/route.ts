@@ -10,11 +10,15 @@ import { getOrCreateInternalSalesCompanyId } from "@/lib/internal-sales-org";
 export const runtime = "nodejs";
 
 const bodySchema = z.object({
+  businessName: z.string().trim().min(1).max(160),
   name: z.string().trim().min(1).max(120),
   phone: z.string().trim().min(5).max(32),
   email: z
     .preprocess((v) => (typeof v === "string" && v.trim() === "" ? undefined : v), z.string().trim().email().max(254).optional()),
   location: z.string().trim().max(200).optional(),
+  country: z.string().trim().min(2).max(80),
+  state: z.string().trim().min(2).max(120),
+  category: z.enum(["SOLAR", "MULTI_BUSINESS", "CUSTOM"]),
   experience: z.string().trim().max(2000).optional(),
   ref: z.string().trim().min(1).max(64).optional(),
 });
@@ -37,7 +41,8 @@ export async function POST(request: NextRequest) {
   const parsed = await parseJsonBodyZod(request, bodySchema);
   if (!parsed.ok) return parsed.response;
 
-  const { name, phone, location, experience } = parsed.data;
+  const { name, phone, experience, country, state, category, businessName } = parsed.data;
+  const location = `${state}, ${country}`;
   const email =
     typeof parsed.data.email === "string" && parsed.data.email.trim().length > 0
       ? parsed.data.email.trim().toLowerCase()
@@ -70,6 +75,16 @@ export async function POST(request: NextRequest) {
         experience: experience?.trim() || null,
         referredById,
         status: "APPLICATION",
+        notes: [
+          {
+            type: "meta",
+            at: new Date().toISOString(),
+            businessName,
+            country,
+            state,
+            category,
+          },
+        ],
       },
       select: { id: true },
     });

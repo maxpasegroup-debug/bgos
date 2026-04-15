@@ -11,9 +11,12 @@ export function MicroFranchiseApplyClient() {
 
   const [step, setStep] = useState<"name" | "phone" | "details" | "submit">("name");
   const [name, setName] = useState("");
+  const [businessName, setBusinessName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [location, setLocation] = useState("");
+  const [country, setCountry] = useState("India");
+  const [state, setState] = useState("");
+  const [category, setCategory] = useState<"SOLAR" | "MULTI_BUSINESS" | "CUSTOM">("SOLAR");
   const [experience, setExperience] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -27,10 +30,13 @@ export function MicroFranchiseApplyClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          businessName: businessName.trim(),
           name: name.trim(),
           phone: phone.trim(),
           email: email.trim() || undefined,
-          location: location.trim() || undefined,
+          country: country.trim(),
+          state: state.trim(),
+          category,
           experience: experience.trim() || undefined,
           ref: ref || undefined,
         }),
@@ -79,7 +85,13 @@ export function MicroFranchiseApplyClient() {
         <div className="mt-6 space-y-4">
           {step === "name" ? (
             <>
-              <label className="block text-xs text-white/60">Your name</label>
+              <label className="block text-xs text-white/60">Franchise Business Name</label>
+              <input
+                value={businessName}
+                onChange={(e) => setBusinessName(e.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none ring-cyan-500/30 focus:ring-2"
+              />
+              <label className="block text-xs text-white/60">Owner name</label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -87,7 +99,7 @@ export function MicroFranchiseApplyClient() {
               />
               <button
                 type="button"
-                disabled={!name.trim()}
+                disabled={!name.trim() || !businessName.trim()}
                 onClick={() => setStep("phone")}
                 className="w-full rounded-xl bg-cyan-500 py-2.5 text-sm font-semibold text-black disabled:opacity-40"
               >
@@ -129,12 +141,33 @@ export function MicroFranchiseApplyClient() {
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none ring-cyan-500/30 focus:ring-2"
               />
-              <label className="block text-xs text-white/60">City / region</label>
+              <label className="block text-xs text-white/60">Country</label>
+              <select
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none ring-cyan-500/30 focus:ring-2"
+              >
+                <option>India</option>
+                <option>UAE</option>
+                <option>USA</option>
+                <option>Singapore</option>
+              </select>
+              <label className="block text-xs text-white/60">State</label>
               <input
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
+                value={state}
+                onChange={(e) => setState(e.target.value)}
                 className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none ring-cyan-500/30 focus:ring-2"
               />
+              <label className="block text-xs text-white/60">Category</label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value as "SOLAR" | "MULTI_BUSINESS" | "CUSTOM")}
+                className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none ring-cyan-500/30 focus:ring-2"
+              >
+                <option value="SOLAR">Solar</option>
+                <option value="MULTI_BUSINESS">Multi Business</option>
+                <option value="CUSTOM">Custom</option>
+              </select>
               <label className="block text-xs text-white/60">Experience (optional)</label>
               <textarea
                 value={experience}
@@ -157,6 +190,9 @@ export function MicroFranchiseApplyClient() {
             <>
               <div className="rounded-xl border border-white/10 bg-black/20 p-4 text-xs text-white/75">
                 <p>
+                  <span className="text-white/50">Business:</span> {businessName}
+                </p>
+                <p className="mt-1">
                   <span className="text-white/50">Name:</span> {name}
                 </p>
                 <p className="mt-1">
@@ -167,11 +203,14 @@ export function MicroFranchiseApplyClient() {
                     <span className="text-white/50">Email:</span> {email}
                   </p>
                 ) : null}
-                {location ? (
+                {state ? (
                   <p className="mt-1">
-                    <span className="text-white/50">Location:</span> {location}
+                    <span className="text-white/50">Location:</span> {state}, {country}
                   </p>
                 ) : null}
+                <p className="mt-1">
+                  <span className="text-white/50">Category:</span> {category}
+                </p>
               </div>
               <div className="flex gap-2">
                 <button type="button" onClick={() => setStep("details")} className="flex-1 rounded-xl border border-white/15 py-2.5 text-sm">

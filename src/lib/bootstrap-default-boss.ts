@@ -13,6 +13,9 @@ const DEFAULT_BOSS_PASSWORD_PLAIN = "123456";
  * Fresh database: create default boss + company + membership so first login succeeds on BGOS and ICECONNECT.
  */
 export async function ensureDefaultBossUser(): Promise<void> {
+  // Never auto-seed outside explicit local dev.
+  if (process.env.NODE_ENV !== "development") return;
+
   await withDbRetry("ensureDefaultBossUser", async () => {
     const anyUser = await prisma.user.findFirst({ select: { id: true } });
     if (anyUser) return;

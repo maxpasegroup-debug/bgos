@@ -168,7 +168,14 @@ export default function ControlClientsPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {filtered.length === 0 ? (
-          <p className={mutedCls}>No companies in this category.</p>
+          <div className={cardShell + " sm:col-span-2 lg:col-span-3"}>
+            <p className={light ? "font-semibold text-slate-900" : "font-semibold text-white"}>
+              No clients yet
+            </p>
+            <p className={mutedCls + " mt-1"}>
+              Start onboarding your first company to see client insights here.
+            </p>
+          </div>
         ) : (
           filtered.map((c) => (
             <Link

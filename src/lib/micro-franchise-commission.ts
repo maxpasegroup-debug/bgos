@@ -46,15 +46,17 @@ export async function accrueMicroFranchiseCommission(
         amountPaise: input.amountPaise,
       });
 
-      const partner = await tx.microFranchisePartner.findUnique({
+      const partner = (await tx.microFranchisePartner.findUnique({
         where: { id: company.microFranchisePartnerId },
         select: {
           id: true,
+          tier: true,
+          performanceScore: true,
           commissionPlan: {
             select: { type: true, value: true, recurring: true, instantBonus: true },
           },
-        },
-      });
+        } as any,
+      })) as any;
       if (!partner) return false;
 
       const plan = partner.commissionPlan;
@@ -70,6 +72,14 @@ export async function accrueMicroFranchiseCommission(
       } else {
         commission = 0;
       }
+
+      // Auto commission boost rules based on partner tier/performance.
+      let boostFactor = 1;
+      if (partner.tier === "GOLD") boostFactor += 0.05;
+      if (partner.tier === "PLATINUM") boostFactor += 0.1;
+      if (partner.performanceScore >= 90) boostFactor += 0.03;
+      commission = Math.round(commission * boostFactor * 100) / 100;
+
       if (!Number.isFinite(commission) || commission <= 0) return false;
 
       const priorForCompany = await tx.commissionTransaction.count({

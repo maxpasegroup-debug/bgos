@@ -610,6 +610,9 @@ model MicroFranchisePartner {
   email            String?
   userId           String   @unique
   commissionPlanId String?
+  performanceScore Float    @default(0)
+  tier             String   @default("BRONZE")
+  lastScoredAt     DateTime?
   createdAt        DateTime @default(now())
 
   application      MicroFranchiseApplication? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
@@ -618,8 +621,28 @@ model MicroFranchisePartner {
   wallet           Wallet?
   companies        Company[]
   commissionTransactions CommissionTransaction[]
+  alerts           MicroFranchiseAlert[]
 
   @@index([commissionPlanId])
+}
+
+model MicroFranchiseAlert {
+  id        String   @id @default(cuid())
+  partnerId String
+  /// INACTIVE | GROWTH | RISK
+  type      String
+  /// LOW | MEDIUM | HIGH
+  severity  String   @default("LOW")
+  title     String
+  message   String
+  status    String   @default("OPEN")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  partner MicroFranchisePartner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId, createdAt])
+  @@index([status, createdAt])
 }
 
 model Wallet {
