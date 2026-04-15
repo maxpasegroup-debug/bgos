@@ -5,6 +5,25 @@
  * Run: E2E_BASE_URL=http://localhost:3000 node scripts/e2e-multibusiness-onboarding.mjs
  * Requires: dev server, DATABASE_URL, JWT_SECRET (≥32 chars).
  */
+import fs from "node:fs";
+import path from "node:path";
+import process from "node:process";
+import { e2eFetch, waitForDevServer } from "./e2e-fetch.mjs";
+
+const envPath = path.join(process.cwd(), ".env");
+if (fs.existsSync(envPath)) {
+  const raw = fs.readFileSync(envPath, "utf8");
+  for (const line of raw.split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t || t.startsWith("#")) continue;
+    const idx = t.indexOf("=");
+    if (idx < 1) continue;
+    const key = t.slice(0, idx).trim();
+    const val = t.slice(idx + 1).trim().replace(/^"(.*)"$/, "$1");
+    if (!(key in process.env)) process.env[key] = val;
+  }
+}
+
 const BASE = (process.env.E2E_BASE_URL || "http://localhost:3000").replace(/\/+$/, "");
 
 function mergeCookieJar(prev, res) {
@@ -38,7 +57,7 @@ function mergeCookieJar(prev, res) {
 async function req(path, { method = "GET", jar = "", body } = {}) {
   const headers = { ...(body ? { "Content-Type": "application/json" } : {}) };
   if (jar) headers.cookie = jar;
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await e2eFetch(`${BASE}${path}`, {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -59,6 +78,7 @@ function fail(step, msg, extra) {
 }
 
 async function main() {
+  await waitForDevServer(BASE);
   const t = Date.now();
   const bossEmail = `e2e-mb-boss-${t}@example.com`;
   const empEmail = `e2e-mb-tel-${t}@example.com`;

@@ -8,6 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { execFileSync } from "node:child_process";
+import { e2eFetch, waitForDevServer } from "./e2e-fetch.mjs";
 
 const envPath = path.join(process.cwd(), ".env");
 if (fs.existsSync(envPath)) {
@@ -59,7 +60,7 @@ async function req(path, { method = "GET", jar = "", body, headers = {} } = {}) 
   const h = { ...headers };
   if (body !== undefined) h["Content-Type"] = "application/json";
   if (jar) h.cookie = jar;
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await e2eFetch(`${BASE}${path}`, {
     method,
     headers: h,
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -81,6 +82,7 @@ function fail(step, msg, extra) {
 }
 
 async function main() {
+  await waitForDevServer(BASE);
   if (!bossEmail) fail("config", "Set BGOS_BOSS_EMAIL in .env");
   if (!bossPassword) fail("config", "Set E2E_BOSS_PASSWORD to the platform boss account password");
 

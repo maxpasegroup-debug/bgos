@@ -262,7 +262,14 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
       team: teamForPlan,
     });
 
-    const txResult = await prisma.$transaction(async (tx) => {
+    /** Default Prisma interactive tx is 5s; bcrypt + several employees exceeds that on dev / high-latency DB. */
+    const interactiveTxTimeoutMs = (() => {
+      const n = Number(process.env.ONBOARDING_LAUNCH_TX_TIMEOUT_MS);
+      return Number.isFinite(n) ? Math.min(600_000, Math.max(15_000, n)) : 180_000;
+    })();
+
+    const txResult = await prisma.$transaction(
+      async (tx) => {
       const employeeCredentials: LaunchCredential[] = [];
       let employeesProvisioned = 0;
       const rolesForDashboards: UserRole[] = [];
@@ -466,7 +473,9 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
         rolesForDashboards,
         employeeCredentials,
       };
-    });
+      },
+      { maxWait: 20_000, timeout: interactiveTxTimeoutMs },
+    );
 
     const { companyId, employeesProvisioned, rolesForDashboards, employeeCredentials } = txResult;
 

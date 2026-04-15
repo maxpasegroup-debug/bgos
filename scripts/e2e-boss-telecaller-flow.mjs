@@ -3,6 +3,8 @@
  * Run: E2E_BASE_URL=http://localhost:3000 node scripts/e2e-boss-telecaller-flow.mjs
  * Requires: dev server + DATABASE_URL + JWT_SECRET (same as app).
  */
+import { e2eFetch, waitForDevServer } from "./e2e-fetch.mjs";
+
 const BASE = (process.env.E2E_BASE_URL || "http://localhost:3000").replace(/\/+$/, "");
 
 /** Merge Set-Cookie lines into a single Cookie header value (session + activeCompanyId). */
@@ -37,7 +39,7 @@ function mergeCookieJar(prev, res) {
 async function req(path, { method = "GET", jar = "", body } = {}) {
   const headers = { ...(body ? { "Content-Type": "application/json" } : {}) };
   if (jar) headers.cookie = jar;
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await e2eFetch(`${BASE}${path}`, {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -58,6 +60,7 @@ function fail(step, msg, extra) {
 }
 
 async function main() {
+  await waitForDevServer(BASE);
   const t = Date.now();
   const bossEmail = `e2e-boss-${t}@example.com`;
   const empEmail = `e2e-tel-${t}@example.com`;

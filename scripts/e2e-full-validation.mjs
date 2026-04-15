@@ -6,10 +6,12 @@
  *      npm run e2e:validate
  *
  * Env: E2E_BASE_URL (default http://localhost:3000), DATABASE_URL, JWT_SECRET via .env
+ * Optional: E2E_SERVER_WAIT_MS, E2E_FETCH_HEADERS_MS (see scripts/e2e-fetch.mjs)
  */
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { e2eFetch, waitForDevServer } from "./e2e-fetch.mjs";
 
 const envPath = path.join(process.cwd(), ".env");
 if (fs.existsSync(envPath)) {
@@ -59,7 +61,7 @@ async function req(path, { method = "GET", jar = "", body, formData } = {}) {
   const headers = {};
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (jar) headers.cookie = jar;
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await e2eFetch(`${BASE}${path}`, {
     method,
     headers,
     body: formData !== undefined ? formData : body !== undefined ? JSON.stringify(body) : undefined,
@@ -87,6 +89,7 @@ const MIN_PNG_B64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
 async function main() {
+  await waitForDevServer(BASE);
   const t = Date.now();
   const bossEmail = `e2e-boss-${t}@example.com`;
   const empEmail = `e2e-tel-${t}@example.com`;
@@ -245,5 +248,8 @@ async function main() {
 
 main().catch((e) => {
   console.error(e);
+  if (String(e?.message ?? "").includes("not reachable")) {
+    console.error("Hint: run `npm run dev` in another terminal, then retry.");
+  }
   process.exit(1);
 });

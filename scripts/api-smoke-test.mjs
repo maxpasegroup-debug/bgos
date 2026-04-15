@@ -5,6 +5,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { e2eFetch, waitForDevServer } from "./e2e-fetch.mjs";
 
 const envPath = path.join(process.cwd(), ".env");
 if (fs.existsSync(envPath)) {
@@ -52,9 +53,10 @@ const cases = [
 ];
 
 async function run() {
+  await waitForDevServer(BASE);
   let failed = 0;
   for (const c of cases) {
-    const res = await fetch(`${BASE}${c.path}`, {
+    const res = await e2eFetch(`${BASE}${c.path}`, {
       method: c.method,
       headers: c.body !== undefined ? { "Content-Type": "application/json" } : {},
       body: c.body !== undefined ? JSON.stringify(c.body) : undefined,
@@ -77,7 +79,7 @@ async function run() {
   }
 
   {
-    const res = await fetch(`${BASE}/api/onboarding/launch`, {
+    const res = await e2eFetch(`${BASE}/api/onboarding/launch`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ companyName: "x", industry: "SOLAR" }),

@@ -14,6 +14,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { e2eFetch, waitForDevServer } from "./e2e-fetch.mjs";
 
 const envPath = path.join(process.cwd(), ".env");
 if (fs.existsSync(envPath)) {
@@ -70,7 +71,7 @@ async function req(path, { method = "GET", jar = "", body } = {}) {
   const headers = {};
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (jar) headers.cookie = jar;
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await e2eFetch(`${BASE}${path}`, {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -94,6 +95,7 @@ function fail(step, msg, extra) {
 }
 
 async function main() {
+  await waitForDevServer(BASE);
   const t = Date.now();
   const bossEmail = `e2e-auto-${t}@example.com`;
   const mobileDigits = `8${String(t).slice(-9)}`.padEnd(10, "0").slice(0, 10);
