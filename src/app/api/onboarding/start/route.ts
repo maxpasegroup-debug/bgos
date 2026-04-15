@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { parseJsonBodyZod } from "@/lib/api-response";
 import { requireAuthWithRoles } from "@/lib/auth";
-import { startNexaOnboarding } from "@/lib/nexa-onboarding-engine";
+import { startNexaOnboarding } from "@/lib/nexa-onboarding-start";
 import { prisma } from "@/lib/prisma";
 
 const bodySchema = z.object({
