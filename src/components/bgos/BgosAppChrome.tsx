@@ -16,25 +16,28 @@ export function BgosAppChrome({ children }: { children: ReactNode }) {
     useBgosDashboardContext();
   const { theme } = useBgosTheme();
   const light = theme === "light";
+  const sidebarPad = controlShell
+    ? "pl-16 transition-all duration-300 ease-in-out peer-hover/bgos-sidebar:pl-[240px]"
+    : BGOS_SIDEBAR_PAD;
 
   return (
     <div
       data-bgos-theme={theme}
       className={
         light
-          ? "relative min-h-screen text-slate-900 antialiased"
-          : "relative min-h-screen text-white antialiased"
+          ? "relative h-screen overflow-hidden text-slate-900 antialiased"
+          : "relative h-screen overflow-hidden text-white antialiased"
       }
     >
       {trialReadOnly ? <BgosTrialExpiredOverlay /> : null}
       <BgosAmbientBackground />
       <BgosSidebar />
-      <div className={`relative flex min-h-screen flex-col ${BGOS_SIDEBAR_PAD}`}>
+      <div className={`relative flex h-screen min-w-0 flex-col overflow-hidden ${sidebarPad}`}>
         <BgosHeader />
         {!controlShell && !planLockedToBasic && !trialReadOnly ? (
           <PlanUpgradeBanner plan={companyPlan} />
         ) : null}
-        <div className="relative z-10 flex-1">{children}</div>
+        <main className="relative z-10 flex-1 overflow-y-auto">{children}</main>
         <BgosCheckoutSuccess />
       </div>
     </div>

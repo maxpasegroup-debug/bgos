@@ -38,6 +38,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false as const, error: "User not found in company", code: "NOT_FOUND" }, { status: 404 });
   }
 
+  // HR payout lock: only allow creating salary payout records if employee KYC is verified.
+  // We use raw SQL for KYC columns in case Prisma client regeneration is pending.
+  const kycRows = await prisma.$queryRawUnsafe<Array<{ kycStatus: string | null }>>(
+    `SELECT "kycStatus" FROM "UserCompany" WHERE "companyId" = ? AND "userId" = ?`,
+    session.companyId,
+    parsed.data.userId,
+  );
+  const kycStatus = kycRows?.[0]?.kycStatus ?? "PENDING";
+  if (kycStatus !== "VERIFIED") {
+    return NextResponse.json(
+      { ok: false as const, error: "Complete KYC to receive payouts", code: "KYC_REQUIRED" },
+      { status: 403 },
+    );
+  }
+
   const row = await (prisma as any).salary.upsert({
     where: {
       companyId_userId_month: {

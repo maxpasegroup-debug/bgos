@@ -1,6 +1,14 @@
 import { z } from "zod";
 
-export const DOCUMENT_TYPES = ["AGREEMENT", "SITE", "INVOICE", "KSEB", "OTHER"] as const;
+export const DOCUMENT_TYPES = [
+  "AGREEMENT",
+  "SITE",
+  "INVOICE",
+  "KSEB",
+  "KYC_PAN",
+  "KYC_ID",
+  "OTHER",
+] as const;
 
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 
@@ -11,6 +19,8 @@ export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   SITE: "Site",
   INVOICE: "Invoice",
   KSEB: "KSEB",
+  KYC_PAN: "PAN",
+  KYC_ID: "ID",
   OTHER: "Other",
 };
 

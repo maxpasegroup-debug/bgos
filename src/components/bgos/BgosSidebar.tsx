@@ -83,7 +83,7 @@ export function BgosSidebar() {
   if (controlShell) {
     return (
       <aside
-        className={`group fixed bottom-0 left-0 top-0 z-40 flex w-16 flex-col border-r backdrop-blur-xl transition-[width] duration-300 hover:w-[240px] ${shell}`}
+        className={`peer/bgos-sidebar group fixed bottom-0 left-0 top-0 z-40 flex w-16 flex-col border-r border-white/10 bg-white/5 backdrop-blur-xl transition-all duration-300 ease-in-out hover:w-[240px] ${shell}`}
       >
         <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-1.5 py-3">
           {superBossControlNav.map((item) => (
@@ -104,7 +104,7 @@ export function BgosSidebar() {
 
   return (
     <aside
-      className={`fixed bottom-0 left-0 top-0 z-40 flex w-16 flex-col border-r backdrop-blur-xl md:w-[240px] ${shell}`}
+      className={`fixed bottom-0 left-0 top-0 z-40 flex w-16 flex-col border-r border-white/10 bg-white/5 backdrop-blur-xl md:w-[240px] ${shell}`}
     >
       <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-1.5 py-3 md:px-2">
         {primaryNav.map((item) => (

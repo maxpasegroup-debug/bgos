@@ -39,6 +39,7 @@ export default async function RootLayout({
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <body className="flex min-h-screen flex-col overflow-x-hidden">
         <DomainShell>{children}</DomainShell>
+        <div id="modal-root" />
       </body>
     </html>
   );

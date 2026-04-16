@@ -155,8 +155,8 @@ export function BgosHeader() {
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
       className={
         light
-          ? "sticky top-0 z-30 shrink-0 border-b border-slate-200/90 bg-white/75 backdrop-blur-xl"
-          : "sticky top-0 z-30 shrink-0 border-b border-[var(--bgos-border)]/80 bg-[#121821]/75 backdrop-blur-xl"
+          ? "sticky top-0 z-50 shrink-0 border-b border-slate-200/90 bg-white/75 backdrop-blur-xl"
+          : "sticky top-0 z-50 shrink-0 border-b border-[var(--bgos-border)]/80 bg-[#121821]/75 backdrop-blur-xl"
       }
     >
       <div

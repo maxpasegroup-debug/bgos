@@ -68,9 +68,14 @@ export async function POST(request: NextRequest) {
       paidAmount: 0,
       dueDate,
       items,
-      pricingVersion: PRICING_VERSION,
-    } as any,
+    },
   });
+  // Persist pricing version via raw SQL to avoid Prisma client mismatch.
+  await prisma.$executeRawUnsafe(
+    `UPDATE "Invoice" SET "pricingVersion" = ? WHERE "id" = ?`,
+    PRICING_VERSION,
+    inv.id,
+  );
 
   const displayStatus = resolveInvoiceStatus({
     status: inv.status,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { z } from "zod";
 import { useBgosDashboardContext } from "./BgosDataProvider";
 import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
@@ -65,6 +66,7 @@ export function BgosAddLeadModal({
   const [success, setSuccess] = useState<string | null>(null);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [portalReady, setPortalReady] = useState(false);
 
   const assignDefaultLabel =
     currentUser?.role === "ADMIN" ? "My Leads (Boss)" : "My leads";
@@ -120,6 +122,10 @@ export function BgosAddLeadModal({
     } finally {
       setLoadingUsers(false);
     }
+  }, []);
+
+  useEffect(() => {
+    setPortalReady(true);
   }, []);
 
   useEffect(() => {
@@ -262,25 +268,31 @@ export function BgosAddLeadModal({
   }
 
   if (!open) {
-    return success ? (
+    if (!success || !portalReady || typeof document === "undefined") return null;
+    const target = document.getElementById("modal-root") ?? document.body;
+    return createPortal(
       <div
-        className="pointer-events-none fixed bottom-6 left-1/2 z-[60] max-w-md -translate-x-1/2 px-4"
+        className="pointer-events-none fixed bottom-6 left-1/2 z-[10001] max-w-md -translate-x-1/2 px-4"
         role="status"
       >
         <div className="pointer-events-auto rounded-xl border border-emerald-500/40 bg-emerald-950/95 px-4 py-3 text-center text-sm text-emerald-100 shadow-lg backdrop-blur">
           {success}
         </div>
-      </div>
-    ) : null;
+      </div>,
+      target,
+    );
   }
 
-  return (
+  if (!portalReady || typeof document === "undefined") return null;
+  const target = document.getElementById("modal-root") ?? document.body;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto overflow-x-hidden p-5 sm:p-6"
+      className="fixed inset-0 z-[9999] flex items-center justify-center overflow-y-auto overflow-x-hidden p-5 sm:p-6"
       role="presentation"
     >
       <div
-        className="fixed inset-0 bg-black/65 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         aria-hidden
         onClick={onClose}
       />
@@ -288,7 +300,7 @@ export function BgosAddLeadModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative z-10 my-auto w-full max-w-[500px] max-h-[min(90dvh,calc(100vh-1.5rem))] overflow-y-auto overscroll-contain rounded-2xl border border-white/10 bg-[#0f141d] p-6 shadow-2xl sm:p-8"
+        className="relative z-[10000] my-auto w-full max-w-[500px] max-h-[min(90dvh,calc(100vh-1.5rem))] overflow-y-auto overscroll-contain rounded-2xl border border-white/10 bg-[#0f172a] p-6 shadow-2xl sm:p-8"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 id={titleId} className="text-lg font-semibold text-white">
@@ -470,6 +482,7 @@ export function BgosAddLeadModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    target,
   );
 }

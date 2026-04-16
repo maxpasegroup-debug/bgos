@@ -142,9 +142,15 @@ export async function applySuccessfulRazorpayPayment(input: {
         amount: input.amountPaise,
         currency: input.currency.toUpperCase() || "INR",
         status: "completed",
-        pricingVersion: PRICING_VERSION,
-      } as any,
+      },
     });
+    // Persist pricing version via raw SQL to avoid Prisma client mismatch if migrations
+    // are deployed before Prisma regeneration.
+    await tx.$executeRawUnsafe(
+      `UPDATE "RazorpayPayment" SET "pricingVersion" = ? WHERE "razorpayPaymentId" = ?`,
+      PRICING_VERSION,
+      input.razorpayPaymentId,
+    );
 
     await tx.company.update({
       where: { id: input.companyId },
@@ -234,13 +240,17 @@ export async function recordRazorpayPaymentFailed(normalized: NormalizedRazorpay
         amount: normalized.amountPaise,
         currency: normalized.currency.toUpperCase() || "INR",
         status: "failed",
-        pricingVersion: PRICING_VERSION,
       } as any,
       update: {
         ...(normalized.paymentId ? { razorpayPaymentId: normalized.paymentId } : {}),
         status: "failed",
       },
     });
+    await prisma.$executeRawUnsafe(
+      `UPDATE "RazorpayPayment" SET "pricingVersion" = ? WHERE "razorpayOrderId" = ?`,
+      PRICING_VERSION,
+      normalized.orderId,
+    );
     return true;
   } catch (e) {
     console.error("ERROR:razorpay.recordRazorpayPaymentFailed", e);
