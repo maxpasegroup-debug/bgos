@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { SectionReveal } from "./SectionReveal";
 import { Container } from "./Container";
 import { blockGap, sectionDivider, sectionY } from "./spacing";
+import { PRICING } from "@/config/pricing";
 
 const WA_LINK =
   "https://wa.me/918089239823?text=Hi%20I%20want%20BGOS%20Enterprise%20plan";
@@ -23,14 +24,14 @@ export function PricingSection() {
         <div className={`grid gap-6 lg:grid-cols-3 ${blockGap}`}>
           <PlanCard
             title="Basic"
-            price="₹6000/month"
+            price={`₹${PRICING.BASIC.price}/month`}
             points={["Manage your business"]}
             ctaLabel="Start Free Trial"
             ctaHref="/signup"
           />
           <PlanCard
             title="Pro"
-            price="₹12000/month"
+            price={`₹${PRICING.PRO.price}/month`}
             points={["Everything in Basic", "Sales Booster included"]}
             ctaLabel="Upgrade to Pro"
             ctaHref="/signup"

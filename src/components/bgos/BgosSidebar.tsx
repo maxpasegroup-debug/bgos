@@ -513,7 +513,6 @@ const superBossControlNav: NavDef[] = [
   { id: "sb-tech", label: "Technical Dept", href: "/bgos/control/technical", icon: OpsIcon },
   { id: "sb-accounts", label: "Accounts", href: "/bgos/control/accounts", icon: BillingIcon },
   { id: "sb-mf", label: "Micro Franchise", href: "/bgos/control/micro-franchise", icon: NexaIcon },
-  { id: "sb-offers", label: "Offers & Incentives", href: "/bgos/control/offers-incentives", icon: GiftIcon },
-  { id: "sb-vision", label: "Vision & Targets", href: "/bgos/control/vision", icon: PricingIcon },
+  { id: "sb-performance", label: "Performance Engine", href: "/bgos/control/performance-engine", icon: GiftIcon },
   { id: "sb-booster", label: "Sales Booster", href: "/bgos/control/sales-booster", icon: LightningIcon },
 ];

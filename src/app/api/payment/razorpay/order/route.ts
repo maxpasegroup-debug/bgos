@@ -4,6 +4,7 @@ import { CompanyBusinessType, CompanyPlan, CompanySubscriptionStatus } from "@pr
 import Razorpay from "razorpay";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
+import { PRICING_VERSION, RAZORPAY_PLAN_IDS, applyDiscountToPlanInr, inrToPaise } from "@/config/pricing";
 import { jsonError, jsonSuccess, parseJsonBodyZod } from "@/lib/api-response";
 import { requireAuthWithRoles } from "@/lib/auth";
 import { handleApiError } from "@/lib/route-error";
@@ -16,6 +17,7 @@ export const runtime = "nodejs";
 
 const bodySchema = z.object({
   plan: z.enum(["basic", "pro", "enterprise"]),
+  discountCode: z.string().trim().max(50).optional(),
 });
 
 /**
@@ -76,8 +78,14 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const amount = razorpayAmountForPlan(targetPlan);
+  const pricing = applyDiscountToPlanInr(targetPlan, parsed.data.discountCode);
+  const amount = inrToPaise(pricing.finalPriceInr);
+  const expectedBaseAmount = razorpayAmountForPlan(targetPlan);
+  if (pricing.appliedDiscountCode === null && amount !== expectedBaseAmount) {
+    return jsonError(400, "PRICING_LOCK_FAILED", "Pricing lock failed.");
+  }
   const receipt = `bgos_${randomBytes(10).toString("hex")}`.slice(0, 40);
+  const razorpayPlanId = RAZORPAY_PLAN_IDS[targetPlan];
 
   try {
     const rz = new Razorpay({ key_id: billing.keyId, key_secret: billing.keySecret });
@@ -89,6 +97,9 @@ export async function POST(request: NextRequest) {
         userId: session.sub,
         companyId: session.companyId,
         plan: String(targetPlan),
+        pricingVersion: PRICING_VERSION,
+        razorpayPlanId: razorpayPlanId || "",
+        discountCode: pricing.appliedDiscountCode || "",
       },
     });
     return jsonSuccess({

@@ -3,14 +3,15 @@ import "server-only";
 import crypto from "node:crypto";
 import { CompanySubscriptionStatus, type CompanyPlan, Prisma } from "@prisma/client";
 import Razorpay from "razorpay";
+import { PRICING_VERSION, priceForPlanPaise, validatePaymentAmountOrThrow } from "@/config/pricing";
 import { prisma } from "@/lib/prisma";
 
-/** ₹6,000 / month in paise */
-export const RAZORPAY_BASIC_MONTHLY_PAISE = 600_000;
-/** ₹12,000 / month in paise */
-export const RAZORPAY_PRO_MONTHLY_PAISE = 1_200_000;
-/** ₹24,000 / month in paise — custom enterprise tier checkout */
-export const RAZORPAY_ENTERPRISE_MONTHLY_PAISE = 2_400_000;
+/** Basic monthly in paise */
+export const RAZORPAY_BASIC_MONTHLY_PAISE = priceForPlanPaise("BASIC");
+/** Pro monthly in paise */
+export const RAZORPAY_PRO_MONTHLY_PAISE = priceForPlanPaise("PRO");
+/** Enterprise monthly in paise — custom enterprise tier checkout */
+export const RAZORPAY_ENTERPRISE_MONTHLY_PAISE = priceForPlanPaise("ENTERPRISE");
 
 const SUBSCRIPTION_PERIOD_DAYS = 30;
 
@@ -65,15 +66,14 @@ export function verifyRazorpayWebhookSignature(rawBody: string, signature: strin
 }
 
 export function razorpayAmountForPlan(plan: CompanyPlan): number {
-  if (plan === "ENTERPRISE") return RAZORPAY_ENTERPRISE_MONTHLY_PAISE;
-  if (plan === "PRO") return RAZORPAY_PRO_MONTHLY_PAISE;
-  return RAZORPAY_BASIC_MONTHLY_PAISE;
+  return priceForPlanPaise(plan);
 }
 
 type OrderNotes = {
   userId: string;
   companyId: string;
   plan: CompanyPlan;
+  pricingVersion?: string;
 };
 
 function parseOrderNotes(notes: unknown): OrderNotes | null {
@@ -91,7 +91,8 @@ function parseOrderNotes(notes: unknown): OrderNotes | null {
           ? ("ENTERPRISE" as CompanyPlan)
           : null;
   if (!userId || !companyId || !plan) return null;
-  return { userId, companyId, plan };
+  const pricingVersion = typeof o.pricingVersion === "string" ? o.pricingVersion.trim() : "";
+  return { userId, companyId, plan, pricingVersion: pricingVersion || undefined };
 }
 
 /**
@@ -123,6 +124,7 @@ export async function applySuccessfulRazorpayPayment(input: {
     }
 
     const now = new Date();
+    validatePaymentAmountOrThrow(input.targetPlan, input.amountPaise);
     const base =
       company.subscriptionPeriodEnd && company.subscriptionPeriodEnd.getTime() > now.getTime()
         ? company.subscriptionPeriodEnd
@@ -140,7 +142,8 @@ export async function applySuccessfulRazorpayPayment(input: {
         amount: input.amountPaise,
         currency: input.currency.toUpperCase() || "INR",
         status: "completed",
-      },
+        pricingVersion: PRICING_VERSION,
+      } as any,
     });
 
     await tx.company.update({
@@ -231,7 +234,8 @@ export async function recordRazorpayPaymentFailed(normalized: NormalizedRazorpay
         amount: normalized.amountPaise,
         currency: normalized.currency.toUpperCase() || "INR",
         status: "failed",
-      },
+        pricingVersion: PRICING_VERSION,
+      } as any,
       update: {
         ...(normalized.paymentId ? { razorpayPaymentId: normalized.paymentId } : {}),
         status: "failed",

@@ -1,9 +1,10 @@
 import "server-only";
 
 import { CompanyPlan, CompanySubscriptionStatus } from "@prisma/client";
+import { PRICING, inrMonthlyLabel } from "@/config/pricing";
 
-const BASIC_MONTHLY = "₹6,000/month";
-const PRO_MONTHLY = "₹12,000/month";
+const BASIC_MONTHLY = inrMonthlyLabel(PRICING.BASIC.price);
+const PRO_MONTHLY = inrMonthlyLabel(PRICING.PRO.price);
 
 export function planAmountLabel(
   plan: CompanyPlan,

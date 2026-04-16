@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { CompanyPlan, CompanySubscriptionStatus } from "@prisma/client";
 import { useCallback, useEffect, useState } from "react";
+import { PRICING } from "@/config/pricing";
 import { planRank } from "@/lib/company-plan-values";
 import { fetchStripeCheckoutUrl } from "@/lib/stripe-plan-checkout";
 import { BGOS_MAIN_PAD } from "./layoutTokens";
@@ -332,7 +333,9 @@ export function BgosSubscriptionPageClient() {
             <div className="border-b border-white/10 pb-4">
               <p className={planTitle}>Basic plan</p>
               <p className="mt-3 text-lg font-semibold text-white">15-day free trial</p>
-              <p className="mt-1 text-sm text-white/60">Then ₹6,000 / month</p>
+              <p className="mt-1 text-sm text-white/60">
+                Then ₹{PRICING.BASIC.price.toLocaleString("en-IN")} / month
+              </p>
             </div>
             <ul className={featureList}>
               <li className={featureLi}>
@@ -390,7 +393,9 @@ export function BgosSubscriptionPageClient() {
             </div>
             <div className="border-b border-white/10 pb-4 pt-6 sm:pt-4">
               <p className={planTitle}>Pro plan</p>
-              <p className="mt-3 text-lg font-semibold text-white">₹12,000 / month</p>
+              <p className="mt-3 text-lg font-semibold text-white">
+                ₹{PRICING.PRO.price.toLocaleString("en-IN")} / month
+              </p>
               <p className="mt-1 text-sm text-white/55">Full growth stack · unlimited team</p>
             </div>
             <ul className={featureList}>

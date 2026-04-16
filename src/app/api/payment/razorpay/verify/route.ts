@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { CompanyBusinessType } from "@prisma/client";
 import Razorpay from "razorpay";
 import { z } from "zod";
+import { PRICING_VERSION, RAZORPAY_PLAN_IDS } from "@/config/pricing";
 import { jsonError, jsonSuccess, parseJsonBodyZod } from "@/lib/api-response";
 import { requireAuthWithRoles } from "@/lib/auth";
 import { handleApiError } from "@/lib/route-error";
@@ -64,6 +65,15 @@ export async function POST(request: NextRequest) {
     const notes = decodeRazorpayOrderNotes(order.notes);
     if (!notes) {
       return jsonError(400, "INVALID_ORDER", "Order metadata missing.");
+    }
+    if (notes.pricingVersion && notes.pricingVersion !== PRICING_VERSION) {
+      return jsonError(400, "PRICING_VERSION_MISMATCH", "Pricing version mismatch.");
+    }
+    const orderNotes = (order.notes && typeof order.notes === "object" ? order.notes : {}) as Record<string, unknown>;
+    const orderPlanId = typeof orderNotes.razorpayPlanId === "string" ? orderNotes.razorpayPlanId.trim() : "";
+    const expectedPlanId = RAZORPAY_PLAN_IDS[notes.plan] ?? "";
+    if (expectedPlanId && orderPlanId && expectedPlanId !== orderPlanId) {
+      return jsonError(400, "PLAN_ID_MISMATCH", "Razorpay plan mapping mismatch.");
     }
     if (notes.companyId !== session.companyId || notes.userId !== session.sub) {
       return jsonError(403, "ORDER_MISMATCH", "Order does not belong to this session.");

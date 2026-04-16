@@ -459,6 +459,7 @@ model RazorpayPayment {
   amount            Int
   currency          String      @default("INR")
   status            String
+  pricingVersion    String      @default("v1.0")
   createdAt         DateTime    @default(now())
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -983,6 +984,7 @@ model Invoice {
   paidAmount    Float     @default(0)
   dueDate       DateTime?
   items         Json
+  pricingVersion String   @default("v1.0")
   createdAt     DateTime  @default(now())
 
   company     Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)

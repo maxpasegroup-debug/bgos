@@ -2,6 +2,7 @@
 
 
 import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
+import { PRICING } from "@/config/pricing";
 import { LeadStatus, TaskStatus } from "@prisma/client";
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -422,8 +423,8 @@ export function IceconnectSalesDashboard() {
   const leadsSortedByPriority = useMemo(() => {
     const rows = [...leads];
     rows.sort((a, b) => {
-      const pa = (a.conversionProbability ?? 0) * ((a.value ?? 7000) / 1000);
-      const pb = (b.conversionProbability ?? 0) * ((b.value ?? 7000) / 1000);
+      const pa = (a.conversionProbability ?? 0) * ((a.value ?? PRICING.BASIC.price) / 1000);
+      const pb = (b.conversionProbability ?? 0) * ((b.value ?? PRICING.BASIC.price) / 1000);
       return pb - pa;
     });
     return rows;

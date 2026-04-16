@@ -5,6 +5,7 @@ import { jsonError, jsonSuccess, parseJsonBodyZod } from "@/lib/api-response";
 import { requireAuthWithRoles } from "@/lib/auth";
 import { parseItemsJson, resolveInvoiceStatus, roundMoney } from "@/lib/money-items";
 import { nextInvoiceNumber } from "@/lib/money-numbers";
+import { PRICING_VERSION } from "@/config/pricing";
 import { prisma } from "@/lib/prisma";
 import { USER_ADMIN_ROLES } from "@/lib/user-company";
 
@@ -67,7 +68,8 @@ export async function POST(request: NextRequest) {
       paidAmount: 0,
       dueDate,
       items,
-    },
+      pricingVersion: PRICING_VERSION,
+    } as any,
   });
 
   const displayStatus = resolveInvoiceStatus({

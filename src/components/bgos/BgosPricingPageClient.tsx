@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { CompanyPlan } from "@prisma/client";
 import { useCallback, useState } from "react";
+import { PRICING } from "@/config/pricing";
 import { PLAN, planRank, type PaidPlan } from "@/lib/company-plan-values";
 import { fetchStripeCheckoutUrl } from "@/lib/stripe-plan-checkout";
 import { postSalesBoosterUpgradeRequest } from "@/lib/sales-booster-client";
@@ -14,7 +15,9 @@ const LABEL_PRO =
 const LABEL_ENTERPRISE =
   process.env.NEXT_PUBLIC_BILLING_ENTERPRISE_LABEL?.trim() || "For larger teams · premium support";
 
-const PRICE_BASIC = process.env.NEXT_PUBLIC_BILLING_BASIC_PRICE?.trim() || "Free trial";
+const PRICE_BASIC =
+  process.env.NEXT_PUBLIC_BILLING_BASIC_PRICE?.trim() ||
+  `₹${PRICING.BASIC.price.toLocaleString("en-IN")}/month`;
 const PRICE_PRO = process.env.NEXT_PUBLIC_BILLING_PRO_PRICE?.trim() || "From subscription";
 const PRICE_ENTERPRISE = process.env.NEXT_PUBLIC_BILLING_ENTERPRISE_PRICE?.trim() || "From subscription";
 

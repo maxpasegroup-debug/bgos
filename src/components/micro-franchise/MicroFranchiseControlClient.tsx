@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
 import { useBgosTheme } from "@/components/bgos/BgosThemeContext";
+import { PRICING } from "@/config/pricing";
 import { apiFetch, formatFetchFailure, readApiJson } from "@/lib/api-fetch";
 
 type Tab = "pipeline" | "live" | "offers" | "wallet" | "leaderboard" | "map" | "insights";
@@ -180,7 +181,7 @@ export function MicroFranchiseControlClient() {
   const [search, setSearch] = useState("");
 
   const [offerName, setOfferName] = useState("");
-  const [offerProduct, setOfferProduct] = useState<"6000" | "12000" | "ENTERPRISE">("6000");
+  const [offerProduct, setOfferProduct] = useState<"7000" | "12000" | "ENTERPRISE">("7000");
   const [offerType, setOfferType] = useState<"PERCENTAGE" | "FIXED">("PERCENTAGE");
   const [offerValue, setOfferValue] = useState(10);
   const [offerRecurring, setOfferRecurring] = useState(true);
@@ -505,8 +506,8 @@ export function MicroFranchiseControlClient() {
           <form className={card + " space-y-3"} onSubmit={(e) => void createOffer(e)}>
             <p className="text-lg font-semibold">Create commission plan</p>
             <input value={offerName} onChange={(e) => setOfferName(e.target.value)} placeholder="Plan name" className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm" />
-            <select value={offerProduct} onChange={(e) => setOfferProduct(e.target.value as "6000" | "12000" | "ENTERPRISE")} className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm">
-              <option value="6000">6000</option><option value="12000">12000</option><option value="ENTERPRISE">Enterprise</option>
+            <select value={offerProduct} onChange={(e) => setOfferProduct(e.target.value as "7000" | "12000" | "ENTERPRISE")} className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm">
+              <option value="7000">{PRICING.BASIC.price}</option><option value="12000">{PRICING.PRO.price}</option><option value="ENTERPRISE">Enterprise</option>
             </select>
             <select value={offerType} onChange={(e) => setOfferType(e.target.value as "PERCENTAGE" | "FIXED")} className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm">
               <option value="PERCENTAGE">Percentage</option><option value="FIXED">Fixed</option>

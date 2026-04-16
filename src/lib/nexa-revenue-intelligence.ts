@@ -1,4 +1,5 @@
 import { IceconnectCustomerPlan, LeadResponseStatus, LeadStatus } from "@prisma/client";
+import { PRICING } from "@/config/pricing";
 
 type StageName = "New" | "Introduced" | "Demo" | "Follow-up" | "Onboard" | "Subscription" | "Lost";
 
@@ -55,10 +56,10 @@ function stageWeight(stage: StageName): number {
 
 function planValue(plan: IceconnectCustomerPlan | null, fallback: number | null): number {
   if (typeof fallback === "number" && Number.isFinite(fallback) && fallback > 0) return fallback;
-  if (plan === IceconnectCustomerPlan.BASIC) return 6000;
-  if (plan === IceconnectCustomerPlan.PRO) return 12000;
-  if (plan === IceconnectCustomerPlan.ENTERPRISE) return 25000;
-  return 7000;
+  if (plan === IceconnectCustomerPlan.BASIC) return PRICING.BASIC.price;
+  if (plan === IceconnectCustomerPlan.PRO) return PRICING.PRO.price;
+  if (plan === IceconnectCustomerPlan.ENTERPRISE) return PRICING.PRO.price;
+  return PRICING.BASIC.price;
 }
 
 function hoursSince(ts: Date | null, now: Date): number {

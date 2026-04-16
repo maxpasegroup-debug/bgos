@@ -1,5 +1,5 @@
-import { OffersIncentivesControlClient } from "@/components/bgos/control/OffersIncentivesControlClient";
+import { redirect } from "next/navigation";
 
 export default function OffersIncentivesControlPage() {
-  return <OffersIncentivesControlClient />;
+  redirect("/bgos/control/performance-engine");
 }
