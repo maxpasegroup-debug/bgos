@@ -34,7 +34,6 @@ function IceconnectLoginForm() {
   const [formError, setFormError] = useState<string | null>(null);
   const [credentialsMismatch, setCredentialsMismatch] = useState(false);
   const [pending, setPending] = useState(false);
-  const [logoSrc, setLogoSrc] = useState("/logo.jpg");
 
   const emailInvalid = Boolean(fieldErrors.email) || credentialsMismatch;
   const passwordInvalid = Boolean(fieldErrors.password) || credentialsMismatch;
@@ -184,204 +183,188 @@ function IceconnectLoginForm() {
   }
 
   const inputBase =
-    "w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none transition-[box-shadow,border-color] duration-200 focus:border-indigo-400/50 focus:ring-2 focus:ring-indigo-500/35 focus:ring-offset-0";
+    "w-full rounded-xl border border-white/[0.12] bg-black/25 px-4 py-3 text-sm text-white placeholder:text-white/38 outline-none transition-[box-shadow,border-color] duration-200 focus:border-sky-400/45 focus:ring-2 focus:ring-sky-500/30 focus:ring-offset-0";
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-5 py-12 sm:px-8">
-      {/* OS-style deep gradient + very light motion (CSS) */}
+    <motion.div
+      className="relative h-dvh max-h-dvh overflow-hidden text-white"
+      initial={{ opacity: reduceMotion ? 1 : 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+    >
+      {/* Immersive background */}
       <div
-        className="pointer-events-none absolute inset-0 bg-[linear-gradient(165deg,#0B0F1A_0%,#111827_48%,#020617_100%)]"
+        className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,#020617_0%,#0f172a_42%,#111827_100%)]"
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute inset-0 opacity-70 motion-reduce:opacity-40"
+        className="pointer-events-none absolute inset-0 opacity-80 motion-reduce:opacity-50"
         style={{
           background:
-            "radial-gradient(ellipse 80% 50% at 20% -10%, rgba(99,102,241,0.14), transparent 50%), radial-gradient(ellipse 60% 40% at 100% 0%, rgba(59,130,246,0.12), transparent 45%)",
+            "radial-gradient(ellipse 70% 55% at 0% 50%, rgba(56,189,248,0.08), transparent 55%), radial-gradient(ellipse 50% 45% at 100% 20%, rgba(129,140,248,0.09), transparent 50%)",
         }}
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute left-1/2 top-1/3 h-[min(42rem,85vw)] w-[min(42rem,85vw)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-indigo-500/[0.07] blur-3xl motion-reduce:animate-none animate-pulse"
-        style={{ animationDuration: "7s" }}
+        className="pointer-events-none absolute -left-24 top-1/2 h-[28rem] w-[28rem] -translate-y-1/2 rounded-full bg-sky-500/[0.06] blur-3xl motion-reduce:animate-none animate-pulse"
+        style={{ animationDuration: "8s" }}
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute bottom-0 right-0 h-72 w-72 translate-x-1/4 translate-y-1/4 rounded-full bg-violet-600/[0.06] blur-3xl motion-reduce:animate-none animate-pulse"
-        style={{ animationDuration: "9s", animationDelay: "1s" }}
+        className="pointer-events-none absolute -right-16 bottom-0 h-80 w-80 rounded-full bg-violet-600/[0.05] blur-3xl motion-reduce:animate-none animate-pulse"
+        style={{ animationDuration: "10s", animationDelay: "0.5s" }}
         aria-hidden
       />
 
-      <motion.div
-        className="relative z-10 w-full max-w-[420px] group"
-        initial={{ opacity: 0, y: 18 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-      >
-        <div className="relative overflow-hidden rounded-[20px] border border-white/[0.08] bg-[rgba(255,255,255,0.04)] p-8 shadow-[0_24px_80px_-16px_rgba(0,0,0,0.65)] backdrop-blur-[16px] transition-transform duration-300 ease-out will-change-transform group-hover:-translate-y-0.5 motion-reduce:group-hover:translate-y-0">
-          {/* Nexa orb — top-right, subtle */}
-          <div className="pointer-events-none absolute right-5 top-5 flex flex-col items-center gap-1.5 text-center sm:right-6 sm:top-6">
-            <motion.div
-              className="relative h-11 w-11 rounded-full bg-[radial-gradient(circle_at_35%_30%,#dbeafe_0%,#60a5fa_45%,#6366f1_100%)] shadow-[0_0_20px_rgba(99,102,241,0.35)]"
-              animate={
-                reduceMotion ? { scale: 1, opacity: 0.96 } : { scale: [1, 1.06, 1], opacity: [0.92, 1, 0.92] }
-              }
-              transition={
-                reduceMotion
-                  ? { duration: 0 }
-                  : { duration: 3.2, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }
-              }
-              aria-hidden
-            />
-            <span className="max-w-[7rem] text-[9px] font-medium uppercase leading-tight tracking-wide text-white/45">
-              Powered by Nexa — Your Virtual CEO
-            </span>
-          </div>
-
-          <div className="pr-16 text-left sm:pr-20">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={logoSrc}
-              alt="ICECONNECT"
-              className="h-14 w-auto object-contain drop-shadow-[0_0_10px_rgba(255,200,0,0.3)]"
-              width={220}
-              height={56}
-              onError={() => setLogoSrc("/bgos-logo-placeholder.svg")}
-            />
-            <h1 className="mt-4 text-2xl font-bold tracking-tight text-white">ICECONNECT</h1>
-            <p className="mt-1 text-sm font-medium text-indigo-100/90">Your Company&apos;s Execution Engine</p>
-            <p className="mt-2 max-w-[280px] text-xs leading-relaxed text-white/55">
-              Operate teams. Track performance. Close faster.
-            </p>
-          </div>
-
-          <form className="mt-8 space-y-4" onSubmit={onSubmit} noValidate>
-            <div>
-              <label htmlFor="ice-email" className="sr-only">
-                Email
-              </label>
-              <input
-                id="ice-email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                placeholder="Enter your company email"
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  setFieldErrors((p) => ({ ...p, email: undefined }));
-                  setFormError(null);
-                  setCredentialsMismatch(false);
-                }}
-                aria-invalid={emailInvalid}
-                aria-busy={pending}
-                className={`${inputBase} ${
-                  emailInvalid ? "border-rose-400/50 focus:border-rose-400/60 focus:ring-rose-500/30" : ""
-                }`}
-              />
-              {fieldErrors.email?.trim() ? (
-                <p className="mt-1.5 text-xs text-rose-300" role="alert">
-                  {fieldErrors.email}
-                </p>
-              ) : null}
-            </div>
-
-            <div>
-              <label htmlFor="ice-password" className="sr-only">
-                Password
-              </label>
-              <input
-                id="ice-password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setFieldErrors((p) => ({ ...p, password: undefined }));
-                  setFormError(null);
-                  setCredentialsMismatch(false);
-                }}
-                aria-invalid={passwordInvalid}
-                className={`${inputBase} ${
-                  passwordInvalid ? "border-rose-400/50 focus:border-rose-400/60 focus:ring-rose-500/30" : ""
-                }`}
-              />
-              {fieldErrors.password?.trim() ? (
-                <p className="mt-1.5 text-xs text-rose-300" role="alert">
-                  {fieldErrors.password}
-                </p>
-              ) : null}
-            </div>
-
-            {formError ? (
-              <p className="text-center text-xs text-rose-300" role="alert">
-                {formError}
-              </p>
-            ) : null}
-
-            <motion.button
-              type="submit"
-              disabled={pending}
-              aria-busy={pending}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              transition={{ type: "spring", stiffness: 420, damping: 24 }}
-              className="relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-[#ff7a18] to-[#ffb347] py-3.5 text-center text-sm font-semibold text-[#1a0a00] shadow-[0_0_24px_rgba(255,140,60,0.25)] transition-[box-shadow,filter] duration-200 hover:shadow-[0_0_32px_rgba(255,160,80,0.35)] hover:brightness-[1.03] disabled:pointer-events-none disabled:opacity-55"
-            >
-              {pending ? "Entering…" : "Enter Workspace"}
-            </motion.button>
-          </form>
-
-          {/* Live system indicators (static display values) */}
-          <ul className="mt-5 flex flex-col gap-1.5 border-t border-white/[0.06] pt-5 text-[11px] text-white/55">
-            <li className="flex items-center gap-2">
-              <span aria-hidden>🔵</span>
-              <span>124 teams active</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <span aria-hidden>🟢</span>
-              <span>3,482 tasks completed today</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <span aria-hidden>⚡</span>
-              <span>Real-time execution enabled</span>
-            </li>
-          </ul>
-
-          <p className="mt-5 text-center text-[10px] leading-relaxed text-white/38">
-            Use credentials provided by your organization.
+      <div className="relative z-10 grid h-full min-h-0 w-full grid-cols-1 grid-rows-2 lg:grid-cols-[1.2fr_0.8fr] lg:grid-rows-1">
+        {/* LEFT — motivation */}
+        <motion.section
+          className="flex min-h-0 flex-col justify-center px-5 py-5 sm:px-8 sm:py-6 lg:px-14 lg:py-8 xl:px-20"
+          initial={{ opacity: reduceMotion ? 1 : 0, y: reduceMotion ? 0 : 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55, delay: reduceMotion ? 0 : 0.08, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <p className="text-[clamp(1.5rem,5.5vw,2.5rem)] font-bold leading-[1.08] tracking-tight text-white lg:text-[clamp(1.85rem,2.8vw,2.5rem)]">
+            Build. Close. Grow.
           </p>
+          <p className="mt-3 max-w-md text-sm font-medium leading-snug text-white/88 sm:mt-5 sm:text-base lg:text-lg">
+            This is your workspace to execute, not just manage.
+          </p>
+          <p className="mt-2 max-w-sm text-xs leading-relaxed text-white/45 sm:mt-4 sm:text-sm">
+            Every action matters. Every lead counts. Every day compounds.
+          </p>
+        </motion.section>
 
-          {/* Trust + security strip */}
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 border-t border-white/[0.06] pt-5 text-[10px] text-white/42">
-            <span className="inline-flex items-center gap-1">
-              <span aria-hidden>🔒</span>
-              Enterprise-grade security
-            </span>
-            <span className="hidden text-white/25 sm:inline">·</span>
-            <span className="inline-flex items-center gap-1">
-              <span aria-hidden>⚡</span>
-              Real-time tracking
-            </span>
-            <span className="hidden text-white/25 sm:inline">·</span>
-            <span className="inline-flex items-center gap-1">
-              <span aria-hidden>🌍</span>
-              Multi-team collaboration
-            </span>
-          </div>
+        {/* RIGHT — login + Nexa */}
+        <section className="flex min-h-0 items-center justify-center px-4 pb-5 pt-0 sm:px-6 sm:pb-6 lg:px-8 lg:pb-8 lg:pt-4">
+          <motion.div
+            className="group relative w-full max-w-[400px]"
+            initial={{ opacity: reduceMotion ? 1 : 0, y: reduceMotion ? 0 : 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: reduceMotion ? 0 : 0.12, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <div className="relative overflow-hidden rounded-[20px] border border-white/[0.08] bg-[rgba(255,255,255,0.05)] p-6 shadow-[0_24px_64px_-12px_rgba(0,0,0,0.55)] backdrop-blur-[16px] transition-transform duration-300 ease-out will-change-transform sm:p-8 group-hover:-translate-y-0.5 motion-reduce:group-hover:translate-y-0">
+              {/* Nexa — top-right */}
+              <div className="pointer-events-none absolute right-5 top-5 flex flex-col items-end gap-1.5 text-right">
+                <motion.div
+                  className="h-10 w-10 rounded-full bg-[radial-gradient(circle_at_32%_28%,#bfdbfe_0%,#60a5fa_48%,#7c3aed_100%)] shadow-[0_0_18px_rgba(99,102,241,0.4)]"
+                  animate={
+                    reduceMotion ? { scale: 1, opacity: 0.95 } : { scale: [1, 1.07, 1], opacity: [0.9, 1, 0.9] }
+                  }
+                  transition={
+                    reduceMotion
+                      ? { duration: 0 }
+                      : { duration: 3.2, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }
+                  }
+                  aria-hidden
+                />
+                <span className="text-[10px] font-medium tracking-wide text-white/50">Nexa is ready.</span>
+              </div>
 
-          <p className="mt-4 text-center text-[10px] tracking-wide text-white/30">Powered by BGOS</p>
-        </div>
-      </motion.div>
-    </div>
+              <div className="pr-14">
+                <h1 className="text-xl font-bold tracking-[0.2em] text-white sm:text-2xl">ICECONNECT</h1>
+                <p className="mt-2 text-xs font-medium leading-relaxed text-white/55 sm:text-sm">
+                  Your Business Operating System
+                </p>
+              </div>
+
+              <form className="mt-8 space-y-3.5" onSubmit={onSubmit} noValidate>
+                <div>
+                  <label htmlFor="ice-email" className="sr-only">
+                    Email
+                  </label>
+                  <input
+                    id="ice-email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="Enter your workspace email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setFieldErrors((p) => ({ ...p, email: undefined }));
+                      setFormError(null);
+                      setCredentialsMismatch(false);
+                    }}
+                    aria-invalid={emailInvalid}
+                    aria-busy={pending}
+                    className={`${inputBase} ${
+                      emailInvalid ? "border-rose-400/45 focus:border-rose-400/55 focus:ring-rose-500/25" : ""
+                    }`}
+                  />
+                  {fieldErrors.email?.trim() ? (
+                    <p className="mt-1.5 text-xs text-rose-300" role="alert">
+                      {fieldErrors.email}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div>
+                  <label htmlFor="ice-password" className="sr-only">
+                    Password
+                  </label>
+                  <input
+                    id="ice-password"
+                    name="password"
+                    type="password"
+                    autoComplete="current-password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setFieldErrors((p) => ({ ...p, password: undefined }));
+                      setFormError(null);
+                      setCredentialsMismatch(false);
+                    }}
+                    aria-invalid={passwordInvalid}
+                    className={`${inputBase} ${
+                      passwordInvalid ? "border-rose-400/45 focus:border-rose-400/55 focus:ring-rose-500/25" : ""
+                    }`}
+                  />
+                  {fieldErrors.password?.trim() ? (
+                    <p className="mt-1.5 text-xs text-rose-300" role="alert">
+                      {fieldErrors.password}
+                    </p>
+                  ) : null}
+                </div>
+
+                {formError ? (
+                  <p className="text-center text-xs text-rose-300" role="alert">
+                    {formError}
+                  </p>
+                ) : null}
+
+                <motion.button
+                  type="submit"
+                  disabled={pending}
+                  aria-busy={pending}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ type: "spring", stiffness: 440, damping: 26 }}
+                  className="mt-1 w-full rounded-xl bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fbbf24] py-3.5 text-center text-sm font-bold text-[#1c0a02] shadow-[0_0_28px_rgba(251,146,60,0.28)] transition-[box-shadow,filter] duration-200 hover:shadow-[0_0_36px_rgba(253,186,116,0.38)] hover:brightness-[1.04] disabled:pointer-events-none disabled:opacity-55"
+                >
+                  {pending ? "Entering…" : "Enter Workspace"}
+                </motion.button>
+
+                <p className="pt-1 text-center text-[11px] font-medium tracking-wide text-white/40">
+                  Let&apos;s get to work.
+                </p>
+              </form>
+
+              <p className="mt-6 text-center text-[10px] leading-relaxed text-white/32">
+                Intelligence layer: Nexa guides execution inside your workspace.
+              </p>
+            </div>
+          </motion.div>
+        </section>
+      </div>
+    </motion.div>
   );
 }
 
 function LoginFallback() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[linear-gradient(165deg,#0B0F1A_0%,#111827_48%,#020617_100%)] px-6">
+    <div className="flex h-dvh max-h-dvh items-center justify-center overflow-hidden bg-[linear-gradient(135deg,#020617_0%,#0f172a_42%,#111827_100%)]">
       <div
         className="h-9 w-9 animate-spin rounded-full border-2 border-white/15 border-t-orange-400"
         aria-hidden
