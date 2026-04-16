@@ -1,8 +1,7 @@
 "use client";
 
-
 import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { z } from "zod";
@@ -26,6 +25,7 @@ function flattenZodFieldErrors(details: unknown): FieldErrors {
 }
 
 function IceconnectLoginForm() {
+  const reduceMotion = useReducedMotion();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -129,11 +129,7 @@ function IceconnectLoginForm() {
       }
 
       const u = data.user;
-      if (
-        u.needsOnboarding ||
-        u.companyId == null ||
-        u.needsWorkspaceActivation
-      ) {
+      if (u.needsOnboarding || u.companyId == null || u.needsWorkspaceActivation) {
         router.push("/onboarding");
         router.refresh();
         return;
@@ -188,56 +184,74 @@ function IceconnectLoginForm() {
   }
 
   const inputBase =
-    "w-full rounded-lg border border-gray-300 bg-white/80 px-4 py-3 outline-none transition-all duration-300 focus:border-yellow-400/80 focus:ring-2 focus:ring-yellow-400";
-
-  const cardMotion = {
-    initial: { opacity: 0, y: 20 },
-    animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const },
-  };
+    "w-full rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none transition-[box-shadow,border-color] duration-200 focus:border-indigo-400/50 focus:ring-2 focus:ring-indigo-500/35 focus:ring-offset-0";
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#F8FAFC] bg-gradient-to-br from-white via-[#F8FAFC] to-[#EEF2F7] px-6">
-      <motion.div
-        className="pointer-events-none absolute top-0 left-0 h-96 w-96 rounded-full bg-yellow-200 opacity-20 blur-3xl"
-        initial={{ x: 0, y: 0 }}
-        animate={{ x: [0, 24, -12, 0], y: [0, 16, 8, 0] }}
-        transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-5 py-12 sm:px-8">
+      {/* OS-style deep gradient + very light motion (CSS) */}
+      <div
+        className="pointer-events-none absolute inset-0 bg-[linear-gradient(165deg,#0B0F1A_0%,#111827_48%,#020617_100%)]"
         aria-hidden
       />
-      <motion.div
-        className="pointer-events-none absolute right-0 bottom-0 h-96 w-96 rounded-full bg-red-200 opacity-20 blur-3xl"
-        initial={{ x: 0, y: 0 }}
-        animate={{ x: [0, -20, 14, 0], y: [0, -12, -6, 0] }}
-        transition={{ duration: 26, repeat: Infinity, ease: "easeInOut" }}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-70 motion-reduce:opacity-40"
+        style={{
+          background:
+            "radial-gradient(ellipse 80% 50% at 20% -10%, rgba(99,102,241,0.14), transparent 50%), radial-gradient(ellipse 60% 40% at 100% 0%, rgba(59,130,246,0.12), transparent 45%)",
+        }}
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute left-1/2 top-1/3 h-[min(42rem,85vw)] w-[min(42rem,85vw)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-indigo-500/[0.07] blur-3xl motion-reduce:animate-none animate-pulse"
+        style={{ animationDuration: "7s" }}
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute bottom-0 right-0 h-72 w-72 translate-x-1/4 translate-y-1/4 rounded-full bg-violet-600/[0.06] blur-3xl motion-reduce:animate-none animate-pulse"
+        style={{ animationDuration: "9s", animationDelay: "1s" }}
         aria-hidden
       />
 
       <motion.div
-        className="relative z-10 w-full max-w-md"
-        {...cardMotion}
+        className="relative z-10 w-full max-w-[420px] group"
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
       >
-        <div
-          className="rounded-2xl border border-gray-200 bg-white/70 p-8 shadow-[0_20px_60px_rgba(0,0,0,0.08)] backdrop-blur-xl"
-        >
-          <div className="text-center">
+        <div className="relative overflow-hidden rounded-[20px] border border-white/[0.08] bg-[rgba(255,255,255,0.04)] p-8 shadow-[0_24px_80px_-16px_rgba(0,0,0,0.65)] backdrop-blur-[16px] transition-transform duration-300 ease-out will-change-transform group-hover:-translate-y-0.5 motion-reduce:group-hover:translate-y-0">
+          {/* Nexa orb — top-right, subtle */}
+          <div className="pointer-events-none absolute right-5 top-5 flex flex-col items-center gap-1.5 text-center sm:right-6 sm:top-6">
+            <motion.div
+              className="relative h-11 w-11 rounded-full bg-[radial-gradient(circle_at_35%_30%,#dbeafe_0%,#60a5fa_45%,#6366f1_100%)] shadow-[0_0_20px_rgba(99,102,241,0.35)]"
+              animate={
+                reduceMotion ? { scale: 1, opacity: 0.96 } : { scale: [1, 1.06, 1], opacity: [0.92, 1, 0.92] }
+              }
+              transition={
+                reduceMotion
+                  ? { duration: 0 }
+                  : { duration: 3.2, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }
+              }
+              aria-hidden
+            />
+            <span className="max-w-[7rem] text-[9px] font-medium uppercase leading-tight tracking-wide text-white/45">
+              Powered by Nexa — Your Virtual CEO
+            </span>
+          </div>
+
+          <div className="pr-16 text-left sm:pr-20">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={logoSrc}
               alt="ICECONNECT"
-              className="mx-auto mb-4 h-12 w-auto object-contain"
-              width={200}
-              height={48}
+              className="h-14 w-auto object-contain drop-shadow-[0_0_10px_rgba(255,200,0,0.3)]"
+              width={220}
+              height={56}
               onError={() => setLogoSrc("/bgos-logo-placeholder.svg")}
             />
-            <h1 className="text-center text-xl font-semibold tracking-tight text-gray-900">
-              ICECONNECT
-            </h1>
-            <p className="mt-1 text-center text-sm font-medium text-gray-600">
-              Sign in with email and password from your company
-            </p>
-            <p className="mt-1 text-center text-xs text-gray-400">
-              Powered by BGOS • Secure • Intelligent
+            <h1 className="mt-4 text-2xl font-bold tracking-tight text-white">ICECONNECT</h1>
+            <p className="mt-1 text-sm font-medium text-indigo-100/90">Your Company&apos;s Execution Engine</p>
+            <p className="mt-2 max-w-[280px] text-xs leading-relaxed text-white/55">
+              Operate teams. Track performance. Close faster.
             </p>
           </div>
 
@@ -251,7 +265,7 @@ function IceconnectLoginForm() {
                 name="email"
                 type="email"
                 autoComplete="email"
-                placeholder="Email"
+                placeholder="Enter your company email"
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value);
@@ -262,13 +276,11 @@ function IceconnectLoginForm() {
                 aria-invalid={emailInvalid}
                 aria-busy={pending}
                 className={`${inputBase} ${
-                  emailInvalid
-                    ? "border-red-400 focus:border-red-400 focus:ring-red-200"
-                    : ""
+                  emailInvalid ? "border-rose-400/50 focus:border-rose-400/60 focus:ring-rose-500/30" : ""
                 }`}
               />
               {fieldErrors.email?.trim() ? (
-                <p className="mt-1.5 text-sm text-red-600" role="alert">
+                <p className="mt-1.5 text-xs text-rose-300" role="alert">
                   {fieldErrors.email}
                 </p>
               ) : null}
@@ -283,7 +295,7 @@ function IceconnectLoginForm() {
                 name="password"
                 type="password"
                 autoComplete="current-password"
-                placeholder="Password"
+                placeholder="Enter your password"
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
@@ -293,20 +305,18 @@ function IceconnectLoginForm() {
                 }}
                 aria-invalid={passwordInvalid}
                 className={`${inputBase} ${
-                  passwordInvalid
-                    ? "border-red-400 focus:border-red-400 focus:ring-red-200"
-                    : ""
+                  passwordInvalid ? "border-rose-400/50 focus:border-rose-400/60 focus:ring-rose-500/30" : ""
                 }`}
               />
               {fieldErrors.password?.trim() ? (
-                <p className="mt-1.5 text-sm text-red-600" role="alert">
+                <p className="mt-1.5 text-xs text-rose-300" role="alert">
                   {fieldErrors.password}
                 </p>
               ) : null}
             </div>
 
             {formError ? (
-              <p className="text-center text-sm text-red-600" role="alert">
+              <p className="text-center text-xs text-rose-300" role="alert">
                 {formError}
               </p>
             ) : null}
@@ -315,22 +325,54 @@ function IceconnectLoginForm() {
               type="submit"
               disabled={pending}
               aria-busy={pending}
-              whileHover={{ scale: 1.05 }}
+              whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              transition={{ type: "spring", stiffness: 400, damping: 22 }}
-              className="w-full rounded-lg bg-gradient-to-r from-red-500 to-yellow-400 py-3 text-center font-semibold text-white shadow-md transition duration-300 hover:shadow-lg hover:brightness-110 disabled:pointer-events-none disabled:opacity-60"
+              transition={{ type: "spring", stiffness: 420, damping: 24 }}
+              className="relative w-full overflow-hidden rounded-xl bg-gradient-to-r from-[#ff7a18] to-[#ffb347] py-3.5 text-center text-sm font-semibold text-[#1a0a00] shadow-[0_0_24px_rgba(255,140,60,0.25)] transition-[box-shadow,filter] duration-200 hover:shadow-[0_0_32px_rgba(255,160,80,0.35)] hover:brightness-[1.03] disabled:pointer-events-none disabled:opacity-55"
             >
-              {pending ? "Signing in…" : "Sign in"}
+              {pending ? "Entering…" : "Enter Workspace"}
             </motion.button>
           </form>
 
-          <p className="mt-4 text-center text-xs text-gray-500">
-            Use credentials provided by your company
+          {/* Live system indicators (static display values) */}
+          <ul className="mt-5 flex flex-col gap-1.5 border-t border-white/[0.06] pt-5 text-[11px] text-white/55">
+            <li className="flex items-center gap-2">
+              <span aria-hidden>🔵</span>
+              <span>124 teams active</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <span aria-hidden>🟢</span>
+              <span>3,482 tasks completed today</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <span aria-hidden>⚡</span>
+              <span>Real-time execution enabled</span>
+            </li>
+          </ul>
+
+          <p className="mt-5 text-center text-[10px] leading-relaxed text-white/38">
+            Use credentials provided by your organization.
           </p>
 
-          <p className="mt-6 text-center text-[11px] tracking-wide text-gray-400/90">
-            Powered by BGOS
-          </p>
+          {/* Trust + security strip */}
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 border-t border-white/[0.06] pt-5 text-[10px] text-white/42">
+            <span className="inline-flex items-center gap-1">
+              <span aria-hidden>🔒</span>
+              Enterprise-grade security
+            </span>
+            <span className="hidden text-white/25 sm:inline">·</span>
+            <span className="inline-flex items-center gap-1">
+              <span aria-hidden>⚡</span>
+              Real-time tracking
+            </span>
+            <span className="hidden text-white/25 sm:inline">·</span>
+            <span className="inline-flex items-center gap-1">
+              <span aria-hidden>🌍</span>
+              Multi-team collaboration
+            </span>
+          </div>
+
+          <p className="mt-4 text-center text-[10px] tracking-wide text-white/30">Powered by BGOS</p>
         </div>
       </motion.div>
     </div>
@@ -339,9 +381,9 @@ function IceconnectLoginForm() {
 
 function LoginFallback() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#F8FAFC] bg-gradient-to-br from-white via-[#F8FAFC] to-[#EEF2F7] px-6">
+    <div className="flex min-h-screen items-center justify-center bg-[linear-gradient(165deg,#0B0F1A_0%,#111827_48%,#020617_100%)] px-6">
       <div
-        className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-amber-400"
+        className="h-9 w-9 animate-spin rounded-full border-2 border-white/15 border-t-orange-400"
         aria-hidden
       />
     </div>
