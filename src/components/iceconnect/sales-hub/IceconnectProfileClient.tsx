@@ -56,30 +56,49 @@ export function IceconnectProfileClient() {
   if (!ready) return null;
 
   return (
-    <div className="mx-auto max-w-md space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
-        <p className="mt-1 text-sm text-gray-500">Your account</p>
-      </div>
-      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-        <dl className="space-y-4 text-sm">
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Name</dt>
-            <dd className="mt-1 font-medium text-gray-900">{name || "—"}</dd>
+    <div className="mx-auto grid h-full max-w-2xl place-items-center p-4">
+      <div className="w-full rounded-2xl border border-white/10 bg-white/[0.04] p-8 text-center shadow-[0_22px_45px_-20px_rgba(0,0,0,0.65)] backdrop-blur-md">
+        <h1 className="text-2xl font-bold text-white">Profile</h1>
+        <p className="mt-1 text-sm text-slate-400">Your account center</p>
+        <div className="mx-auto mt-6 inline-flex h-20 w-20 items-center justify-center rounded-full border border-white/15 bg-white/5 text-2xl font-semibold text-white">
+          {(name || email || "U").charAt(0).toUpperCase()}
+        </div>
+        <p className="mt-4 text-lg font-semibold text-white">{name || "—"}</p>
+        <p className="text-sm text-slate-300">{email || "—"}</p>
+        <span className="mt-2 inline-flex rounded-full border border-sky-400/40 bg-sky-500/15 px-3 py-1 text-xs font-medium text-sky-200">
+          {(ROLE_LABEL[role] ?? role) || "—"}
+        </span>
+
+        <dl className="mt-8 grid gap-4 text-left text-sm sm:grid-cols-2">
+          <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+            <dt className="text-xs uppercase tracking-wide text-slate-400">Name</dt>
+            <dd className="mt-1 font-medium text-white">{name || "—"}</dd>
           </div>
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Role</dt>
-            <dd className="mt-1 font-medium text-gray-900">{(ROLE_LABEL[role] ?? role) || "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-gray-500">Email</dt>
-            <dd className="mt-1 break-all text-gray-800">{email || "—"}</dd>
+          <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+            <dt className="text-xs uppercase tracking-wide text-slate-400">Role</dt>
+            <dd className="mt-1 font-medium text-white">{(ROLE_LABEL[role] ?? role) || "—"}</dd>
           </div>
         </dl>
+
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold text-slate-100 transition hover:bg-white/10"
+          >
+            Edit Profile
+          </button>
+          <button
+            type="button"
+            className="rounded-xl border border-amber-300/40 bg-amber-400/10 px-4 py-2.5 text-sm font-semibold text-amber-200 transition hover:bg-amber-300/15"
+          >
+            Change Password
+          </button>
+        </div>
+
         <button
           type="button"
           onClick={() => void logout()}
-          className="mt-8 w-full rounded-xl border border-gray-300 bg-white py-3 text-sm font-semibold text-gray-800 shadow-sm transition hover:bg-gray-50"
+          className="mt-6 w-full rounded-xl border border-white/15 bg-white/5 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10"
         >
           Log out
         </button>

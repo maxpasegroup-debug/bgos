@@ -36,6 +36,33 @@ type SalesStats = {
   overdueTaskCount: number;
 };
 
+function roleDisplay(role: string): string {
+  if (role === "SALES_EXECUTIVE") return "Sales Executive";
+  if (role === "TELECALLER") return "Telecaller";
+  if (role === "MANAGER") return "Manager";
+  return role;
+}
+
+type MetroStage = "New" | "Introduced" | "Demo" | "Follow-up" | "Onboard" | "Subscription";
+const METRO_STAGES: MetroStage[] = [
+  "New",
+  "Introduced",
+  "Demo",
+  "Follow-up",
+  "Onboard",
+  "Subscription",
+];
+
+function leadToMetroStage(status: LeadStatus): MetroStage {
+  if (status === LeadStatus.NEW) return "New";
+  if (status === LeadStatus.CONTACTED || status === LeadStatus.QUALIFIED) return "Introduced";
+  if (status === LeadStatus.SITE_VISIT_SCHEDULED || status === LeadStatus.SITE_VISIT_COMPLETED || status === LeadStatus.PROPOSAL_SENT) return "Demo";
+  if (status === LeadStatus.NEGOTIATION) return "Follow-up";
+  if (status === LeadStatus.PROPOSAL_WON) return "Onboard";
+  if (status === LeadStatus.WON) return "Subscription";
+  return "New";
+}
+
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
@@ -139,6 +166,8 @@ export function IceconnectSalesDashboard() {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [employeeName, setEmployeeName] = useState("");
+  const [employeeRole, setEmployeeRole] = useState("SALES_EXECUTIVE");
+  const [activeStage, setActiveStage] = useState<MetroStage>("New");
 
   useEffect(() => {
     let c = true;
@@ -149,6 +178,9 @@ export function IceconnectSalesDashboard() {
         if (!c) return;
         if (typeof j.user?.name === "string" && j.user.name.trim()) {
           setEmployeeName(j.user.name.trim());
+        }
+        if (typeof j.user?.role === "string" && j.user.role.trim()) {
+          setEmployeeRole(j.user.role.trim());
         }
       } catch {
         /* ignore */
@@ -271,6 +303,30 @@ export function IceconnectSalesDashboard() {
     return Math.max(35, Math.min(100, base - penalty));
   }, [stats]);
 
+  const metroStageCounts = useMemo(() => {
+    const rows = METRO_STAGES.map((stage) => ({ stage, count: 0 }));
+    for (const l of leads) {
+      const stage = leadToMetroStage(l.status);
+      const row = rows.find((r) => r.stage === stage);
+      if (row) row.count += 1;
+    }
+    return rows;
+  }, [leads]);
+
+  const furthestStageIndex = useMemo(() => {
+    let max = 0;
+    for (const l of leads) {
+      const idx = METRO_STAGES.indexOf(leadToMetroStage(l.status));
+      if (idx > max) max = idx;
+    }
+    return max;
+  }, [leads]);
+
+  const leadsInActiveStage = useMemo(
+    () => leads.filter((l) => leadToMetroStage(l.status) === activeStage),
+    [activeStage, leads],
+  );
+
   async function updateStatus(leadId: string, status: LeadStatus) {
     setBusy(leadId);
     setErr(null);
@@ -335,19 +391,19 @@ export function IceconnectSalesDashboard() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          className="rounded-2xl border border-gray-200/90 bg-white/80 p-6 shadow-sm backdrop-blur-md"
+          className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-[0_20px_40px_-20px_rgba(0,0,0,0.6)] backdrop-blur-md"
         >
-          <p className="text-xs font-medium uppercase tracking-wider text-[color:var(--ice-primary)]">
+          <p className="text-xs font-medium uppercase tracking-wider text-sky-300">
             {cName}
           </p>
-          <h2 className="mt-1 text-2xl font-semibold tracking-tight text-gray-900">
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight text-white">
             Welcome back, {welcomeName}
           </h2>
-          <p className="mt-1 text-sm text-gray-500">Here’s your work for today</p>
+          <p className="mt-1 text-sm text-slate-300">Here’s your work for today</p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link
               href="/iceconnect/internal-sales"
-              className="inline-flex min-h-10 items-center rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-800 shadow-sm transition hover:border-[color:var(--ice-primary)] hover:bg-gray-50"
+              className="inline-flex min-h-10 items-center rounded-lg border border-white/15 bg-white/5 px-3 text-sm font-medium text-slate-100 transition hover:border-sky-400/40 hover:bg-white/10"
             >
               Team pipeline
             </Link>
@@ -355,7 +411,7 @@ export function IceconnectSalesDashboard() {
               href="/lead"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-h-10 items-center rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-800 shadow-sm transition hover:border-[color:var(--ice-primary)] hover:bg-gray-50"
+              className="inline-flex min-h-10 items-center rounded-lg border border-white/15 bg-white/5 px-3 text-sm font-medium text-slate-100 transition hover:border-sky-400/40 hover:bg-white/10"
             >
               Add lead
             </Link>
@@ -368,15 +424,15 @@ export function IceconnectSalesDashboard() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.05, duration: 0.35 }}
-              className="rounded-xl border border-gray-200/90 bg-white/85 p-4 shadow-sm backdrop-blur-sm transition hover:shadow-md"
+              className="rounded-xl border border-white/10 bg-white/[0.04] p-4 shadow-sm backdrop-blur-sm transition hover:-translate-y-0.5 hover:border-sky-400/30"
             >
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                 Tasks due today
               </p>
-              <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">{tasksDueToday}</p>
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-white">{tasksDueToday}</p>
+              <p className="mt-1 text-xs text-slate-400">
                 {stats.overdueTaskCount > 0 ? (
-                  <span className="font-medium text-amber-700">
+                  <span className="font-medium text-amber-300">
                     {stats.overdueTaskCount} urgent overdue
                   </span>
                 ) : (
@@ -388,42 +444,42 @@ export function IceconnectSalesDashboard() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1, duration: 0.35 }}
-              className="rounded-xl border border-gray-200/90 bg-white/85 p-4 shadow-sm backdrop-blur-sm transition hover:shadow-md"
+              className="rounded-xl border border-white/10 bg-white/[0.04] p-4 shadow-sm backdrop-blur-sm transition hover:-translate-y-0.5 hover:border-sky-400/30"
             >
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                 Assigned leads
               </p>
-              <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-white">
                 {stats.leadCount}
               </p>
-              <p className="mt-1 text-xs text-gray-500">Quick status updates below</p>
+              <p className="mt-1 text-xs text-slate-400">Quick status updates below</p>
             </motion.div>
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.15, duration: 0.35 }}
-              className="rounded-xl border border-gray-200/90 bg-white/85 p-4 shadow-sm backdrop-blur-sm transition hover:shadow-md"
+              className="rounded-xl border border-white/10 bg-white/[0.04] p-4 shadow-sm backdrop-blur-sm transition hover:-translate-y-0.5 hover:border-sky-400/30"
             >
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                 Performance
               </p>
-              <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-white">
                 {performanceScore ?? "—"}
               </p>
-              <p className="mt-1 text-xs text-gray-500">Tasks completed vs pending balance</p>
+              <p className="mt-1 text-xs text-slate-400">Tasks completed vs pending balance</p>
             </motion.div>
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2, duration: 0.35 }}
-              className="rounded-xl border border-amber-200/80 bg-gradient-to-br from-amber-50/90 to-white/90 p-4 shadow-sm backdrop-blur-sm"
+              className="rounded-xl border border-amber-300/20 bg-gradient-to-br from-amber-500/10 to-white/[0.03] p-4 shadow-sm backdrop-blur-sm"
             >
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-900/80">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-200/90">
                 NEXA assist
               </p>
-              <p className="mt-2 text-sm font-semibold text-gray-900">Next action:</p>
-              <p className="mt-0.5 text-sm text-gray-700">{nexaAssist.line}</p>
-              <p className="mt-2 text-xs text-gray-500">{nexaAssist.sub}</p>
+              <p className="mt-2 text-sm font-semibold text-white">Next action:</p>
+              <p className="mt-0.5 text-sm text-slate-100">{nexaAssist.line}</p>
+              <p className="mt-2 text-xs text-slate-300">{nexaAssist.sub}</p>
             </motion.div>
           </div>
         ) : null}
@@ -438,8 +494,8 @@ export function IceconnectSalesDashboard() {
 
   return (
     <IceconnectWorkspaceView
-      title="Sales"
-      subtitle="Leads assigned to you, tasks, and scheduled follow-ups."
+      title={`${cName} Sales`}
+      subtitle={`${roleDisplay(employeeRole)} • Leads assigned to you, tasks, and scheduled follow-ups.`}
       loading={loading}
       error={err}
       onRetry={() => void load()}
@@ -456,42 +512,67 @@ export function IceconnectSalesDashboard() {
         </button>
       </div>
 
-      <IcPanel title="Assigned leads">
-        {leads.length === 0 ? (
-          <p className="text-sm text-gray-500">No leads assigned to you yet.</p>
-        ) : (
-          <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white/90">
-            {leads.map((l) => {
-              const options = forwardLeadStatuses(l.status);
-              const valueText =
-                l.value != null && l.value > 0 ? `₹${l.value.toLocaleString("en-IN")}` : null;
-              return (
-                <li
-                  key={l.id}
-                  className="flex flex-col gap-3 p-4 sm:flex-row sm:items-end sm:justify-between sm:gap-4"
-                >
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <p className="truncate font-medium text-gray-900">{l.name || "Lead"}</p>
-                    <p className="text-sm text-gray-600">
-                      <span className="tabular-nums">{l.phone}</span>
-                      <span className="text-gray-300"> · </span>
-                      <span>{l.statusLabel}</span>
-                      {valueText ? (
-                        <>
-                          <span className="text-gray-300"> · </span>
-                          <span className="tabular-nums text-gray-700">{valueText}</span>
-                        </>
-                      ) : null}
-                    </p>
-                  </div>
-                  <div className="w-full shrink-0 sm:max-w-[14rem]">
-                    {options.length > 0 ? (
-                      <>
-                        <label className="sr-only" htmlFor={"lead-status-" + l.id}>
-                          Update status for {l.name}
-                        </label>
+      <IcPanel title="Leads metro tracker">
+        <div className="space-y-5">
+          <div className="relative overflow-x-auto pb-1">
+            <div className="absolute left-2 right-2 top-6 h-[2px] bg-white/15" />
+            <motion.div
+              className="absolute left-2 top-6 h-[2px] bg-gradient-to-r from-emerald-400 via-amber-300 to-sky-400"
+              animate={{ x: ["0%", "25%", "0%"] }}
+              transition={{ duration: 4.5, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
+              style={{ width: "35%" }}
+            />
+            <div className="relative grid min-w-[720px] grid-cols-6 gap-3">
+              {metroStageCounts.map((row, idx) => {
+                const done = idx <= furthestStageIndex;
+                const active = row.stage === activeStage;
+                return (
+                  <button
+                    key={row.stage}
+                    type="button"
+                    onClick={() => setActiveStage(row.stage)}
+                    className="flex flex-col items-center gap-2 text-center"
+                  >
+                    <motion.span
+                      animate={active ? { scale: [1, 1.08, 1] } : { scale: 1 }}
+                      transition={{ duration: 1.6, repeat: active ? Number.POSITIVE_INFINITY : 0 }}
+                      className={`inline-flex h-5 w-5 items-center justify-center rounded-full border ${
+                        active
+                          ? "border-amber-300 bg-amber-300/20 shadow-[0_0_18px_rgba(245,158,11,0.5)]"
+                          : done
+                            ? "border-emerald-400 bg-emerald-400/20"
+                            : "border-slate-500 bg-slate-700/40"
+                      }`}
+                    />
+                    <span className={`text-xs font-medium ${active ? "text-amber-200" : done ? "text-emerald-200" : "text-slate-400"}`}>
+                      {row.stage}
+                    </span>
+                    <span className="text-sm font-semibold text-white">{row.count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {leadsInActiveStage.length === 0 ? (
+            <p className="text-sm text-slate-400">No leads in {activeStage}.</p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {leadsInActiveStage.map((l) => {
+                const options = forwardLeadStatuses(l.status);
+                const valueText = l.value != null && l.value > 0 ? `₹${l.value.toLocaleString("en-IN")}` : null;
+                return (
+                  <div
+                    key={l.id}
+                    className="rounded-[14px] border border-white/10 bg-white/[0.04] p-4 backdrop-blur-md transition hover:-translate-y-0.5 hover:border-sky-400/30"
+                  >
+                    <p className="truncate font-semibold text-white">{l.name || "Lead"}</p>
+                    <p className="mt-1 text-xs text-slate-300">{l.phone}</p>
+                    <p className="mt-1 text-xs text-slate-400">{l.statusLabel}</p>
+                    {valueText ? <p className="mt-1 text-xs text-slate-300">{valueText}</p> : null}
+                    <div className="mt-3">
+                      {options.length > 0 ? (
                         <select
-                          id={"lead-status-" + l.id}
                           defaultValue=""
                           disabled={busy === l.id}
                           onChange={(e) => {
@@ -499,10 +580,10 @@ export function IceconnectSalesDashboard() {
                             if (v) void updateStatus(l.id, v);
                             e.target.value = "";
                           }}
-                          className="min-h-11 w-full cursor-pointer rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-[color:var(--ice-primary)] focus:ring-2 focus:ring-[color:var(--ice-primary)] disabled:opacity-50"
+                          className="min-h-10 w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white outline-none focus:border-sky-400/40"
                         >
                           <option value="" disabled>
-                            Update status…
+                            Move stage…
                           </option>
                           {options.map((st) => (
                             <option key={st} value={st}>
@@ -510,16 +591,16 @@ export function IceconnectSalesDashboard() {
                             </option>
                           ))}
                         </select>
-                      </>
-                    ) : (
-                      <p className="text-sm text-gray-400">Closed</p>
-                    )}
+                      ) : (
+                        <p className="text-xs text-slate-500">Closed</p>
+                      )}
+                    </div>
                   </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+                );
+              })}
+            </div>
+          )}
+        </div>
       </IcPanel>
 
       <IcPanel title="Follow-ups">

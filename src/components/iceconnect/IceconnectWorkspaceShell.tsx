@@ -89,7 +89,7 @@ function HeaderLogo({
 
 function IceconnectSalesHubChrome({
   employeeName,
-  email,
+  email: _email,
   role,
   companyCount,
   salesHubNav,
@@ -97,7 +97,7 @@ function IceconnectSalesHubChrome({
   children,
 }: Omit<ShellInnerProps, "nav"> & { salesHubNav: IceconnectNavItem[] }) {
   const pathname = usePathname();
-  const { ready } = useCompanyBranding();
+  const { ready, company } = useCompanyBranding();
   const roleDisplay = ROLE_LABEL[role] ?? role;
   const [badgeCount, setBadgeCount] = useState(0);
 
@@ -126,28 +126,41 @@ function IceconnectSalesHubChrome({
     return <SystemLoading subtle />;
   }
 
+  const displayCompany = company?.name?.trim() || "Your company";
+  const nexaHint =
+    badgeCount > 1 ? `${badgeCount} leads need attention` : badgeCount === 1 ? "1 onboarding pending" : "Workflow healthy";
+
   return (
-    <div className="relative min-h-screen bg-[#F6F7FB] text-gray-900 antialiased">
-      <div className="flex min-h-screen">
-        <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col border-r border-gray-200/90 bg-white shadow-sm">
-          <div className="border-b border-gray-100 px-4 py-5">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-400">ICECONNECT</p>
-            <p className="mt-1 text-sm font-semibold text-gray-900">{salesHubTitle ?? "Sales"}</p>
+    <div className="relative h-screen overflow-hidden bg-[linear-gradient(135deg,#020617_0%,#0f172a_45%,#111827_100%)] text-slate-100 antialiased">
+      <div className="pointer-events-none absolute -left-20 top-1/3 h-72 w-72 rounded-full bg-sky-500/10 blur-3xl" />
+      <div className="pointer-events-none absolute -right-12 bottom-0 h-80 w-80 rounded-full bg-violet-500/10 blur-3xl" />
+      <div className="relative flex h-screen">
+        <aside className="group/sidebar sticky top-0 flex h-screen w-16 shrink-0 flex-col border-r border-white/10 bg-[#0b1220]/95 backdrop-blur-xl transition-all duration-300 ease-out hover:w-[220px]">
+          <div className="border-b border-white/10 px-3 py-4">
+            <p className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300/90 opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100">
+              {salesHubTitle ?? "Sales"}
+            </p>
           </div>
-          <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
+          <nav className="flex-1 space-y-1 overflow-y-auto p-2">
             {salesHubNav.map((item) => {
               const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
                 <Link
                   key={item.seg}
                   href={item.href}
-                  className={`block rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                  title={item.label}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
                     active
-                      ? "bg-[color-mix(in_srgb,var(--ice-primary,#4f46e5)_12%,transparent)] text-[color:var(--ice-primary,#4f46e5)]"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                      ? "bg-sky-500/15 text-sky-300 shadow-[0_0_18px_rgba(56,189,248,0.25)]"
+                      : "text-slate-300/80 hover:bg-white/5 hover:text-white"
                   }`}
                 >
-                  {item.label}
+                  <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-[11px] font-semibold">
+                    {item.label.charAt(0)}
+                  </span>
+                  <span className="truncate opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100">
+                    {item.label}
+                  </span>
                 </Link>
               );
             })}
@@ -155,36 +168,49 @@ function IceconnectSalesHubChrome({
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-end gap-3 border-b border-gray-200/90 bg-white/95 px-4 backdrop-blur-sm">
-            {badgeCount > 0 ? (
-              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-                Nexa {badgeCount}
-              </span>
-            ) : null}
+          <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between border-b border-white/10 bg-[#0b1220]/85 px-4 backdrop-blur-xl sm:px-6">
+            <div className="min-w-0">
+              <p className="truncate text-lg font-semibold tracking-tight text-white sm:text-xl">
+                {displayCompany} Sales • {roleDisplay}
+              </p>
+              <p className="truncate text-xs text-slate-400">{employeeName}</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="group relative">
+                <motion.div
+                  className="h-9 w-9 rounded-full bg-[radial-gradient(circle_at_35%_30%,#dbeafe_0%,#60a5fa_45%,#7c3aed_100%)] shadow-[0_0_20px_rgba(99,102,241,0.45)]"
+                  animate={{ scale: [1, 1.06, 1], opacity: [0.9, 1, 0.9] }}
+                  transition={{ duration: 3.2, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
+                />
+                <div className="pointer-events-none absolute right-0 top-10 hidden min-w-52 rounded-lg border border-white/10 bg-[#0b1220] px-3 py-2 text-xs text-slate-200 shadow-xl group-hover:block">
+                  Nexa is monitoring your workflow. {nexaHint}.
+                </div>
+              </div>
+              {badgeCount > 0 ? (
+                <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
+                  Nexa {badgeCount}
+                </span>
+              ) : null}
+            </div>
+          </header>
+          <div className="flex h-0 min-h-0 flex-1 flex-col">
             {companyCount > 1 ? (
               <Link
                 href="/iceconnect/select-company"
-                className="text-xs font-medium text-gray-600 hover:text-gray-900"
+                className="self-end px-4 pt-2 text-xs font-medium text-slate-400 hover:text-slate-200"
               >
                 Switch company
               </Link>
             ) : null}
-            <div className="text-right text-xs">
-              <p className="font-medium text-gray-900">{employeeName}</p>
-              <p className="text-gray-500">
-                {roleDisplay} · <span className="tabular-nums text-gray-400">{email}</span>
-              </p>
-            </div>
-          </header>
-
-          <motion.main
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            className="relative flex-1 px-4 py-8 sm:px-8"
-          >
-            <div className="mx-auto max-w-5xl">{children}</div>
-          </motion.main>
+            <motion.main
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              className="relative min-h-0 flex-1 overflow-auto px-3 py-3 sm:px-4"
+            >
+              <div className="h-full w-full">{children}</div>
+            </motion.main>
+          </div>
         </div>
       </div>
     </div>
