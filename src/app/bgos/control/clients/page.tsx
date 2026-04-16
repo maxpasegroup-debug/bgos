@@ -6,30 +6,31 @@ import { useBgosTheme } from "@/components/bgos/BgosThemeContext";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
 import { apiFetch, formatFetchFailure, readApiJson } from "@/lib/api-fetch";
 
-type Category = "TRIAL" | "BASIC" | "PRO" | "ENTERPRISE" | "LOST";
+type IndustryFilter = "ALL" | "SOLAR" | "ACADEMY" | "BUILDERS" | "CUSTOM";
 
 type CompanyRow = {
   companyId: string;
   name: string;
-  category: Category;
+  category: string;
   plan: string;
   subscriptionStatus: string;
+  industry?: string;
+  status?: "ACTIVE" | "INACTIVE";
   bossName: string;
 };
 
-const TABS: { key: Category | "ALL"; label: string }[] = [
+const TABS: { key: IndustryFilter; label: string }[] = [
   { key: "ALL", label: "All" },
-  { key: "TRIAL", label: "Trial" },
-  { key: "BASIC", label: "Basic" },
-  { key: "PRO", label: "Pro" },
-  { key: "ENTERPRISE", label: "Enterprise" },
-  { key: "LOST", label: "Lost" },
+  { key: "SOLAR", label: "Solar" },
+  { key: "ACADEMY", label: "Academy" },
+  { key: "BUILDERS", label: "Builders" },
+  { key: "CUSTOM", label: "Custom (Others)" },
 ];
 
 export default function ControlClientsPage() {
   const { theme } = useBgosTheme();
   const light = theme === "light";
-  const [tab, setTab] = useState<Category | "ALL">("ALL");
+  const [tab, setTab] = useState<IndustryFilter>("ALL");
   const [companies, setCompanies] = useState<CompanyRow[]>([]);
   const [summary, setSummary] = useState<{
     totalCompanies: number;
@@ -88,7 +89,7 @@ export default function ControlClientsPage() {
 
   const filtered = useMemo(() => {
     if (tab === "ALL") return companies;
-    return companies.filter((c) => c.category === tab);
+    return companies.filter((c) => (c.industry ?? "").toUpperCase() === tab);
   }, [companies, tab]);
 
   const cardShell = light
@@ -107,7 +108,7 @@ export default function ControlClientsPage() {
             Clients
           </h1>
           <p className={mutedCls + " mt-1 max-w-2xl"}>
-            Customer companies by lifecycle. Open a card for billing, sales owner, and activity.
+            Client grid by industry and status. Open a card to control subscription, team, and performance.
           </p>
         </div>
         <Link
@@ -186,7 +187,10 @@ export default function ControlClientsPage() {
               <p className={light ? "text-lg font-bold text-slate-900" : "text-lg font-bold text-white"}>{c.name}</p>
               <p className={mutedCls + " mt-2 text-xs"}>by {c.bossName}</p>
               <p className={labelCls + " mt-3"}>
-                {c.category} · {c.plan}
+                {(c.industry ?? "CUSTOM").toUpperCase()} · {c.plan}
+              </p>
+              <p className={mutedCls + " mt-1 text-xs"}>
+                {c.status === "ACTIVE" ? "Active" : "Inactive"} · Owner: {c.bossName}
               </p>
             </Link>
           ))

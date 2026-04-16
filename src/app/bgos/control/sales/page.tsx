@@ -13,6 +13,13 @@ type SalesJson = {
   conversionRate?: number;
   funnel?: { leads: number; demo: number; onboarding: number; live: number };
   perEmployee?: { userId: string | null; name: string; email: string | null; leadCount: number }[];
+  nexaRevenue?: {
+    projectedRevenue: number;
+    monthlyTarget: number;
+    gapToTarget: number;
+    byExecutive: Record<string, number>;
+    alerts: string[];
+  };
 };
 
 type PartnerRow = {
@@ -101,6 +108,27 @@ export default function ControlSalesPage() {
             </div>
           </div>
 
+          {data.nexaRevenue ? (
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className={cardShell}>
+                <p className={muted}>Monthly projected revenue</p>
+                <p className={h1 + " mt-1 text-xl"}>₹{Math.round(data.nexaRevenue.projectedRevenue).toLocaleString("en-IN")}</p>
+              </div>
+              <div className={cardShell}>
+                <p className={muted}>Gap to target</p>
+                <p className={h1 + " mt-1 text-xl"}>₹{Math.round(data.nexaRevenue.gapToTarget).toLocaleString("en-IN")}</p>
+              </div>
+              <div className={cardShell}>
+                <p className={muted}>Team prediction health</p>
+                <p className={h1 + " mt-1 text-xl"}>
+                  {data.nexaRevenue.monthlyTarget > 0
+                    ? `${Math.round((data.nexaRevenue.projectedRevenue / data.nexaRevenue.monthlyTarget) * 100)}%`
+                    : "—"}
+                </p>
+              </div>
+            </div>
+          ) : null}
+
           <div className={cardShell}>
             <p className={light ? "font-bold text-slate-900" : "font-bold text-white"}>Funnel</p>
             <p className={muted + " mt-1 text-xs"}>Leads → Demo → Onboarding → Live</p>
@@ -139,6 +167,28 @@ export default function ControlSalesPage() {
                 ))
               )}
             </ul>
+            {data.nexaRevenue ? (
+              <div className="mt-4">
+                <p className={light ? "text-xs font-semibold text-slate-700" : "text-xs font-semibold text-slate-200"}>
+                  Team performance vs prediction
+                </p>
+                <ul className="mt-2 space-y-1 text-xs">
+                  {Object.entries(data.nexaRevenue.byExecutive)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 5)
+                    .map(([name, rev]) => (
+                      <li key={name} className={muted}>
+                        {name}: ₹{Math.round(rev).toLocaleString("en-IN")} projected
+                      </li>
+                    ))}
+                </ul>
+                <ul className="mt-2 space-y-1 text-xs text-amber-500">
+                  {data.nexaRevenue.alerts.map((a) => (
+                    <li key={a}>{a}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
 
           <div className={cardShell}>

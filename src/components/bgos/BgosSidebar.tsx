@@ -83,9 +83,9 @@ export function BgosSidebar() {
   if (controlShell) {
     return (
       <aside
-        className={`fixed bottom-0 left-0 top-0 z-40 flex w-16 flex-col border-r backdrop-blur-xl md:w-[240px] ${shell}`}
+        className={`group fixed bottom-0 left-0 top-0 z-40 flex w-16 flex-col border-r backdrop-blur-xl transition-[width] duration-300 hover:w-[240px] ${shell}`}
       >
-        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-1.5 py-3 md:px-2">
+        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-1.5 py-3">
           {superBossControlNav.map((item) => (
             <SidebarLink
               key={item.id}
@@ -132,7 +132,7 @@ export function BgosSidebar() {
           aria-expanded={moreOpen}
         >
           <MoreIcon className="h-[1.15rem] w-[1.15rem] shrink-0" />
-          <span className="hidden md:inline">More</span>
+          <span className="hidden group-hover:inline">More</span>
         </button>
         {moreOpen ? (
           <div className="mt-1 space-y-0.5 pb-1">
@@ -210,16 +210,16 @@ function SidebarLink({
           whileTap={{ scale: 0.98 }}
         >
           <Icon className="h-[1.15rem] w-[1.15rem] shrink-0" />
-          <span className="hidden max-w-[11rem] truncate font-medium md:inline">{label}</span>
+          <span className="hidden max-w-[11rem] truncate font-medium group-hover:inline">{label}</span>
           {booster ? (
-            <span className="hidden text-amber-400 md:inline" aria-hidden>
+            <span className="hidden text-amber-400 group-hover:inline" aria-hidden>
               ⚡
             </span>
           ) : null}
         </motion.span>
       </Link>
       <span
-        className={`pointer-events-none absolute left-full top-1/2 z-50 ml-2.5 hidden -translate-y-1/2 whitespace-nowrap rounded-lg border px-2 py-1 text-[11px] font-medium opacity-0 shadow-lg backdrop-blur-md transition-opacity duration-200 group-hover:opacity-100 md:hidden ${
+        className={`pointer-events-none absolute left-full top-1/2 z-50 ml-2.5 -translate-y-1/2 whitespace-nowrap rounded-lg border px-2 py-1 text-[11px] font-medium opacity-0 shadow-lg backdrop-blur-md transition-opacity duration-200 group-hover:opacity-100 group-hover:md:hidden ${
           light
             ? "border-slate-200 bg-white text-slate-800"
             : "border-white/10 bg-black/90 text-white"
@@ -506,6 +506,7 @@ function GiftIcon({ className }: { className?: string }) {
 }
 
 const superBossControlNav: NavDef[] = [
+  { id: "sb-home", label: "Home", href: "/bgos/control/home", icon: HomeIcon },
   { id: "sb-clients", label: "Clients", href: "/bgos/control/clients", icon: BuildingIcon },
   { id: "sb-team", label: "My Team", href: "/bgos/control/team", icon: TeamIcon },
   { id: "sb-sales", label: "Sales", href: "/bgos/control/sales", icon: SalesIcon },

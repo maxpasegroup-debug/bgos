@@ -12,6 +12,8 @@ export async function GET(request: NextRequest) {
     const cacheKey = "control:accounts-overview";
     const cached = getApiCache<{
       totalRevenueInr: number;
+      mrr: number;
+      pendingPayments: number;
       activePlans: { trialCompanies: number; paidCompanies: number };
       renewalsUpcoming30d: number;
       recentPayments: {
@@ -23,6 +25,8 @@ export async function GET(request: NextRequest) {
         createdAt: string;
       }[];
       companyBilling: { companyId: string; name: string; totalInr: number; payments: number }[];
+      planBreakdown: Record<string, number>;
+      industryBreakdown: Record<string, number>;
     }>(cacheKey);
     if (cached) {
       return NextResponse.json({ ok: true as const, ...cached });
@@ -41,7 +45,7 @@ export async function GET(request: NextRequest) {
         currency: true,
         status: true,
         createdAt: true,
-        company: { select: { name: true, internalSalesOrg: true } },
+        company: { select: { name: true, internalSalesOrg: true, plan: true, industry: true } },
       },
       orderBy: { createdAt: "desc" },
       take: 500,
@@ -49,6 +53,13 @@ export async function GET(request: NextRequest) {
 
     const customerPayments = payments.filter((p) => !p.company.internalSalesOrg);
     const totalRevenueInr = customerPayments.reduce((s, p) => s + (p.currency === "INR" ? p.amount : 0), 0);
+    const now = new Date();
+    const mrr = customerPayments
+      .filter((p) => p.createdAt.getMonth() === now.getMonth() && p.createdAt.getFullYear() === now.getFullYear())
+      .reduce((s, p) => s + (p.currency === "INR" ? p.amount : 0), 0);
+    const pendingPayments = payments
+      .filter((p) => ["created", "pending", "authorized"].includes(String(p.status).toLowerCase()))
+      .reduce((s, p) => s + (p.currency === "INR" ? p.amount : 0), 0);
 
     const [activeTrials, activePaid, expiringSoon] = await Promise.all([
       prisma.company.count({
@@ -82,10 +93,21 @@ export async function GET(request: NextRequest) {
       byCompanyMap.set(p.companyId, row);
     }
     const companyBilling = [...byCompanyMap.values()].sort((a, b) => b.totalInr - a.totalInr);
+    const planBreakdown: Record<string, number> = {};
+    const industryBreakdown: Record<string, number> = {};
+    for (const p of customerPayments) {
+      if (p.currency !== "INR") continue;
+      const plan = String(p.company.plan ?? "BASIC");
+      const ind = String(p.company.industry ?? "CUSTOM");
+      planBreakdown[plan] = (planBreakdown[plan] ?? 0) + p.amount;
+      industryBreakdown[ind] = (industryBreakdown[ind] ?? 0) + p.amount;
+    }
 
     const payload = {
       ok: true as const,
       totalRevenueInr,
+      mrr,
+      pendingPayments,
       activePlans: {
         trialCompanies: activeTrials,
         paidCompanies: activePaid,
@@ -100,13 +122,19 @@ export async function GET(request: NextRequest) {
         createdAt: p.createdAt.toISOString(),
       })),
       companyBilling,
+      planBreakdown,
+      industryBreakdown,
     };
     setApiCache(cacheKey, {
       totalRevenueInr: payload.totalRevenueInr,
+      mrr: payload.mrr,
+      pendingPayments: payload.pendingPayments,
       activePlans: payload.activePlans,
       renewalsUpcoming30d: payload.renewalsUpcoming30d,
       recentPayments: payload.recentPayments,
       companyBilling: payload.companyBilling,
+      planBreakdown: payload.planBreakdown,
+      industryBreakdown: payload.industryBreakdown,
     });
     return NextResponse.json(payload);
   } catch (e) {

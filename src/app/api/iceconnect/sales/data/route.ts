@@ -6,6 +6,8 @@ import { handleApiError } from "@/lib/route-error";
 import { requireIceconnectRole } from "@/lib/iceconnect-route-guard";
 import { isIceconnectPrivileged } from "@/lib/iceconnect-scope";
 import { serializeLead } from "@/lib/lead-serialize";
+import { runNexaLeadAutoMovement } from "@/lib/nexa-lead-intelligence";
+import { buildRevenueForecast } from "@/lib/nexa-revenue-intelligence";
 import { prisma } from "@/lib/prisma";
 import { serializeTask } from "@/lib/task-serialize";
 
@@ -39,6 +41,25 @@ export async function GET(request: NextRequest) {
   let leadCount: number;
   let pendingTaskCount: number;
   let overdueTaskCount: number;
+  let nexaSuggestion = "Follow up with priority leads today";
+  let nexaPreviewCount = 0;
+  let nexaAssistByLeadId = new Map<
+    string,
+    { suggestion: string; heat: "HOT" | "WARM" | "COLD"; urgencyMessage: string | null; atRisk: boolean }
+  >();
+  let revenueIntel: {
+    expectedRevenueThisMonth: number;
+    likelyClosures: number;
+    highProbabilityLeads: Array<{ leadId: string; name: string; probability: number; expectedRevenue: number; assignee: string }>;
+    riskLeads: Array<{ leadId: string; name: string; probability: number; inactivityHours: number }>;
+    alerts: string[];
+  } = {
+    expectedRevenueThisMonth: 0,
+    likelyClosures: 0,
+    highProbabilityLeads: [],
+    riskLeads: [],
+    alerts: [],
+  };
   try {
     const taskCountBase = { ...taskWhere, status: TaskStatus.PENDING };
     [leads, tasks, leadCount, pendingTaskCount, overdueTaskCount] = await Promise.all([
@@ -65,6 +86,57 @@ export async function GET(request: NextRequest) {
         },
       }),
     ]);
+
+    const preview = await runNexaLeadAutoMovement({
+      companyId,
+      actorUserId: session.sub,
+      previewOnly: true,
+      onlyAssignedTo: session.sub,
+    });
+    nexaPreviewCount = preview.preview.length;
+    if (preview.preview[0]?.suggestion) nexaSuggestion = preview.preview[0].suggestion;
+    nexaAssistByLeadId = new Map(
+      preview.preview.map((p) => [
+        p.leadId,
+        {
+          suggestion: p.suggestion,
+          heat: p.heat ?? "COLD",
+          urgencyMessage: p.urgencyMessage ?? null,
+          atRisk: p.atRisk === true,
+        },
+      ]),
+    );
+
+    const forecast = buildRevenueForecast(
+      leads.map((l) => ({
+        id: l.id,
+        name: l.name,
+        status: l.status,
+        value: l.value,
+        assignedTo: l.assignedTo ?? null,
+        assigneeName: l.assignee?.name ?? null,
+        updatedAt: l.updatedAt,
+        lastActivityAt: l.lastActivityAt ?? null,
+        activityCount: l.activityCount ?? 0,
+        responseStatus: l.responseStatus,
+        internalCallStatus: l.internalCallStatus ?? null,
+        iceconnectMetroStage: l.iceconnectMetroStage ?? null,
+        iceconnectCustomerPlan: l.iceconnectCustomerPlan ?? null,
+      })),
+    );
+    revenueIntel = {
+      expectedRevenueThisMonth: forecast.totalExpectedRevenue,
+      likelyClosures: forecast.likelyClosures,
+      highProbabilityLeads: forecast.highProbabilityLeads,
+      riskLeads: forecast.riskLeads,
+      alerts: forecast.alerts,
+    };
+    const leadIntelById = new Map(
+      forecast.scoredLeads.map((s) => [s.lead.id, s.intel] as const),
+    );
+    leads = leads
+      .map((l) => ({ ...l, _intel: leadIntelById.get(l.id) ?? null }))
+      .sort((a, b) => (b._intel?.priorityRank ?? 0) - (a._intel?.priorityRank ?? 0));
   } catch (e) {
     const p = prismaKnownErrorResponse(e);
     if (p) return p;
@@ -78,11 +150,24 @@ export async function GET(request: NextRequest) {
       pendingTaskCount,
       overdueTaskCount,
     },
+    nexa: {
+      suggestion: nexaSuggestion,
+      previewCount: nexaPreviewCount,
+    },
+    revenueIntel,
     leads: leads.map((l) => ({
       ...serializeLead({
         ...l,
         assignee: l.assignee,
       }),
+      conversionProbability: l._intel?.conversionProbability ?? 0,
+      expectedRevenue: l._intel?.expectedRevenue ?? 0,
+      predictedCloseDate: l._intel?.predictedCloseDate ?? null,
+      probabilityBand: l._intel?.probabilityBand ?? "RISK",
+      heat: nexaAssistByLeadId.get(l.id)?.heat ?? "COLD",
+      nexaAssistSuggestion: nexaAssistByLeadId.get(l.id)?.suggestion ?? null,
+      urgencyMessage: nexaAssistByLeadId.get(l.id)?.urgencyMessage ?? null,
+      atRisk: nexaAssistByLeadId.get(l.id)?.atRisk ?? false,
     })),
     tasks: tasks.map(serializeTask),
   });

@@ -8,6 +8,8 @@ import { apiFetch, formatFetchFailure, readApiJson } from "@/lib/api-fetch";
 type AccountsJson = {
   ok?: boolean;
   totalRevenueInr?: number;
+  mrr?: number;
+  pendingPayments?: number;
   activePlans?: { trialCompanies: number; paidCompanies: number };
   renewalsUpcoming30d?: number;
   companyBilling?: { companyId: string; name: string; totalInr: number; payments: number }[];
@@ -18,6 +20,8 @@ type AccountsJson = {
     status: string;
     createdAt: string;
   }[];
+  planBreakdown?: Record<string, number>;
+  industryBreakdown?: Record<string, number>;
 };
 
 export default function ControlAccountsPage() {
@@ -63,6 +67,8 @@ export default function ControlAccountsPage() {
   const h1 = light ? "text-2xl font-bold text-slate-900" : "text-2xl font-bold text-white";
 
   const rev = data?.totalRevenueInr != null ? (data.totalRevenueInr / 100).toFixed(2) : "—";
+  const mrr = data?.mrr != null ? (data.mrr / 100).toFixed(2) : "—";
+  const pending = data?.pendingPayments != null ? (data.pendingPayments / 100).toFixed(2) : "—";
 
   return (
     <div className={`mx-auto max-w-6xl pb-16 pt-6 ${BGOS_MAIN_PAD}`}>
@@ -76,6 +82,14 @@ export default function ControlAccountsPage() {
             <div className={cardShell}>
               <p className={muted}>Total revenue (INR)</p>
               <p className={h1 + " mt-1 text-xl"}>₹{rev}</p>
+            </div>
+            <div className={cardShell}>
+              <p className={muted}>MRR (this month)</p>
+              <p className={h1 + " mt-1 text-xl"}>₹{mrr}</p>
+            </div>
+            <div className={cardShell}>
+              <p className={muted}>Pending payments</p>
+              <p className={h1 + " mt-1 text-xl"}>₹{pending}</p>
             </div>
             <div className={cardShell}>
               <p className={muted}>Active plans</p>
@@ -98,6 +112,31 @@ export default function ControlAccountsPage() {
                 </li>
               ))}
             </ul>
+          </div>
+          <div className={`lg:col-span-2 ${cardShell}`}>
+            <p className={light ? "font-bold text-slate-900" : "font-bold text-white"}>Plan-wise / Industry-wise breakdown</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div>
+                <p className={muted + " text-xs"}>By plan</p>
+                <ul className="mt-2 space-y-1 text-sm">
+                  {Object.entries(data.planBreakdown ?? {}).map(([k, v]) => (
+                    <li key={k} className={muted}>
+                      {k}: ₹{(v / 100).toFixed(2)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <p className={muted + " text-xs"}>By industry</p>
+                <ul className="mt-2 space-y-1 text-sm">
+                  {Object.entries(data.industryBreakdown ?? {}).map(([k, v]) => (
+                    <li key={k} className={muted}>
+                      {k}: ₹{(v / 100).toFixed(2)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
           </div>
           <div className={`lg:col-span-2 ${cardShell}`}>
             <p className={light ? "font-bold text-slate-900" : "font-bold text-white"}>Recent payments</p>

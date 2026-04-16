@@ -21,6 +21,8 @@ const phoneSchema = z
 const formSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200, "Name is too long"),
   phone: phoneSchema,
+  company: z.string().trim().max(200, "Company is too long").optional(),
+  industry: z.string().trim().max(120, "Industry is too long").optional(),
   valueStr: z.string().optional(),
   assignedToUserId: z.string().optional(),
   automationAction: z.enum(["assign", "whatsapp", "both"]).optional(),
@@ -51,6 +53,8 @@ export function BgosAddLeadModal({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [valueStr, setValueStr] = useState("");
+  const [company, setCompany] = useState("");
+  const [industry, setIndustry] = useState("");
   const [assignedToUserId, setAssignedToUserId] = useState("");
   const [automationAction, setAutomationAction] = useState<"assign" | "whatsapp" | "both">("both");
   const [users, setUsers] = useState<PublicUser[]>([]);
@@ -143,6 +147,8 @@ export function BgosAddLeadModal({
   function resetForm() {
     setName("");
     setPhone("");
+    setCompany("");
+    setIndustry("");
     setValueStr("");
     setAssignedToUserId("");
     setFieldErrors({});
@@ -162,6 +168,8 @@ export function BgosAddLeadModal({
     const parsed = formSchema.safeParse({
       name,
       phone,
+      company: company.trim() || undefined,
+      industry: industry.trim() || undefined,
       valueStr: valueStr.trim() || undefined,
       assignedToUserId: assignedToUserId || undefined,
       automationAction,
@@ -192,6 +200,8 @@ export function BgosAddLeadModal({
       name: string;
       phone: string;
       value?: number;
+      company?: string;
+      industry?: string;
       assignedToUserId?: string;
       automationAction?: "assign" | "whatsapp" | "both";
     } = {
@@ -199,6 +209,8 @@ export function BgosAddLeadModal({
       phone: parsed.data.phone,
     };
     if (value !== undefined) body.value = value;
+    if (parsed.data.company?.trim()) body.company = parsed.data.company.trim();
+    if (parsed.data.industry?.trim()) body.industry = parsed.data.industry.trim();
     if (parsed.data.assignedToUserId?.trim()) {
       body.assignedToUserId = parsed.data.assignedToUserId.trim();
     }
@@ -264,7 +276,7 @@ export function BgosAddLeadModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto overflow-x-hidden p-5 sm:p-6"
+      className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto overflow-x-hidden p-5 sm:p-6"
       role="presentation"
     >
       <div
@@ -335,6 +347,39 @@ export function BgosAddLeadModal({
                 {fieldErrors.phone}
               </p>
             ) : null}
+          </div>
+
+          <div>
+            <label htmlFor="add-lead-company" className="text-[10px] font-semibold uppercase tracking-wider text-white/45">
+              Company
+            </label>
+            <input
+              id="add-lead-company"
+              name="company"
+              value={company}
+              onChange={(e) => setCompany(e.target.value)}
+              className={inputClass}
+              placeholder="Company name"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="add-lead-industry" className="text-[10px] font-semibold uppercase tracking-wider text-white/45">
+              Industry
+            </label>
+            <select
+              id="add-lead-industry"
+              name="industry"
+              value={industry}
+              onChange={(e) => setIndustry(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">Select industry</option>
+              <option value="Solar">Solar</option>
+              <option value="Academy">Academy</option>
+              <option value="Builders">Builders</option>
+              <option value="Custom">Custom (Others)</option>
+            </select>
           </div>
 
           <div>

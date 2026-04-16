@@ -74,6 +74,12 @@ enum LeadStatus {
   LOST
 }
 
+enum LeadResponseStatus {
+  RESPONSIVE
+  SILENT
+  COOLING
+}
+
 /** BGOS Internal sales metro pipeline (company with `internalSalesOrg`). Linear order — no skips. */
 enum InternalSalesStage {
   LEAD_ADDED
@@ -784,6 +790,16 @@ model Lead {
   iceconnectMetroStage      IceconnectMetroStage?
   iceconnectCustomerPlan    IceconnectCustomerPlan?
   iceconnectSubscribedAt    DateTime?
+  /** Nexa intelligence state for metro pipeline automation. */
+  currentStage              String?
+  lastActivityAt            DateTime?
+  nextActionDue             DateTime?
+  activityCount             Int                 @default(0)
+  responseStatus            LeadResponseStatus  @default(RESPONSIVE)
+  confidenceScore           Int                 @default(50)
+  nexaPriority              Boolean             @default(false)
+  nexaMovedAt               DateTime?
+  nexaMovedReason           String?
 
   onboardingTasks                 OnboardingTask[]
   onboardingWorkflowSubmission    OnboardingSubmission?

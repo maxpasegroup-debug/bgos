@@ -4,7 +4,7 @@
  */
 
 /** Platform owner (`BGOS_BOSS_EMAIL` + JWT `superBoss`) — internal control plane, not tenant solar dashboard. */
-export const SUPER_BOSS_HOME_PATH = "/bgos/control/clients";
+export const SUPER_BOSS_HOME_PATH = "/bgos/control/home";
 export const TECH_EXEC_HOME_PATH = "/iceconnect/tech";
 export const MICRO_FRANCHISE_HOME_PATH = "/iceconnect/micro-franchise";
 

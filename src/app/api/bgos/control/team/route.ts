@@ -1,3 +1,4 @@
+import { TaskStatus } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
@@ -42,10 +43,26 @@ export async function GET(request: NextRequest) {
     where: { companyId: org.companyId },
     select: {
       jobRole: true,
-      user: { select: { id: true, name: true, email: true } },
+      user: { select: { id: true, name: true, email: true, isActive: true } },
     },
     orderBy: { createdAt: "asc" },
   });
+
+  const ids = memberships.map((m) => m.user.id);
+  const [leadCounts, taskCounts] = await Promise.all([
+    prisma.lead.groupBy({
+      by: ["assignedTo"],
+      where: { assignedTo: { in: ids } },
+      _count: { _all: true },
+    }),
+    prisma.task.groupBy({
+      by: ["userId"],
+      where: { userId: { in: ids }, status: TaskStatus.PENDING },
+      _count: { _all: true },
+    }),
+  ]);
+  const leadMap = new Map(leadCounts.map((x) => [x.assignedTo ?? "", x._count._all]));
+  const taskMap = new Map(taskCounts.map((x) => [x.userId ?? "", x._count._all]));
 
   const sales = memberships
     .filter((m) => SALES_DEPT_ROLES.includes(m.jobRole))
@@ -54,6 +71,9 @@ export async function GET(request: NextRequest) {
       name: m.user.name,
       email: m.user.email,
       role: m.jobRole,
+      isActive: m.user.isActive,
+      assignedClients: leadMap.get(m.user.id) ?? 0,
+      pendingTasks: taskMap.get(m.user.id) ?? 0,
     }));
 
   const tech = memberships
@@ -63,6 +83,9 @@ export async function GET(request: NextRequest) {
       name: m.user.name,
       email: m.user.email,
       role: m.jobRole,
+      isActive: m.user.isActive,
+      assignedClients: leadMap.get(m.user.id) ?? 0,
+      pendingTasks: taskMap.get(m.user.id) ?? 0,
     }));
 
     const payload = {

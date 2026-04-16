@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function BgosControlIndexPage() {
-  redirect("/bgos/control/clients");
+  redirect("/bgos/control/home");
 }

@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
     select: {
       id: true,
       name: true,
+      industry: true,
       plan: true,
       subscriptionStatus: true,
       isTrialActive: true,
@@ -45,6 +46,8 @@ export async function GET(request: NextRequest) {
       return {
         companyId: c.id,
         name: c.name,
+        industry: c.industry,
+        status: c.subscriptionStatus === "ACTIVE" || c.isTrialActive ? "ACTIVE" : "INACTIVE",
         category,
         plan: c.plan,
         subscriptionStatus: c.subscriptionStatus,

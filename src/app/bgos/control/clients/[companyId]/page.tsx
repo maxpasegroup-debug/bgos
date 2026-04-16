@@ -37,6 +37,7 @@ export default function ControlClientDetailPage() {
   const light = theme === "light";
   const [data, setData] = useState<DetailJson | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     if (!companyId) return;
@@ -70,6 +71,31 @@ export default function ControlClientDetailPage() {
 
   const c = data?.company;
 
+  async function patchCompany(payload: Record<string, unknown>) {
+    if (!companyId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`/api/bgos/control/clients/${companyId}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const j = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !j.ok) {
+        setError(j.error || "Could not update client.");
+        return;
+      }
+      await load();
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setError(formatFetchFailure(e, "Could not update client"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className={`mx-auto max-w-4xl pb-16 pt-6 ${BGOS_MAIN_PAD}`}>
       <Link
@@ -100,6 +126,32 @@ export default function ControlClientDetailPage() {
                   <li>Subscription period end: {new Date(c.subscriptionPeriodEnd).toLocaleString()}</li>
                 ) : null}
               </ul>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void patchCompany({ subscriptionStatus: "ACTIVE" })}
+                  className="rounded-lg border border-emerald-300/35 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-200"
+                >
+                  Activate
+                </button>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void patchCompany({ markInactive: true })}
+                  className="rounded-lg border border-amber-300/35 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-100"
+                >
+                  Deactivate
+                </button>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void patchCompany({ archive: true })}
+                  className="rounded-lg border border-rose-300/35 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-100"
+                >
+                  Archive
+                </button>
+              </div>
             </div>
 
             <div className={cardShell}>

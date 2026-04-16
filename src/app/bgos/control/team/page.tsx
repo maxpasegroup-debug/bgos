@@ -18,7 +18,15 @@ const iceconnectEmployeeSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
-type Member = { userId: string; name: string; email: string; role: string };
+type Member = {
+  userId: string;
+  name: string;
+  email: string;
+  role: string;
+  isActive?: boolean;
+  assignedClients?: number;
+  pendingTasks?: number;
+};
 
 type TeamJson = {
   ok?: boolean;
@@ -44,6 +52,10 @@ export default function ControlTeamPage() {
   const [saving, setSaving] = useState(false);
   const [formMsg, setFormMsg] = useState<string | null>(null);
   const [formMsgIsError, setFormMsgIsError] = useState(false);
+  const [selected, setSelected] = useState<Member | null>(null);
+  const [panelBusy, setPanelBusy] = useState(false);
+  const [panelMsg, setPanelMsg] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState("");
 
   const load = useCallback(async () => {
     setError(null);
@@ -81,6 +93,7 @@ export default function ControlTeamPage() {
     if (!data || !dept) return [];
     return dept === "sales" ? data.sales : data.tech;
   }, [data, dept]);
+  const recycleBin = useMemo(() => members.filter((m) => m.isActive === false), [members]);
 
   const cardShell = light
     ? "rounded-2xl border border-slate-200/90 bg-white/90 p-6 shadow-sm"
@@ -139,6 +152,60 @@ export default function ControlTeamPage() {
       setFormMsgIsError(true);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function patchMember(id: string, payload: Record<string, unknown>) {
+    setPanelBusy(true);
+    setPanelMsg(null);
+    try {
+      const res = await apiFetch(`/api/users/${id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const j = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !j.ok) {
+        setPanelMsg(j.error || "Could not update member.");
+        return;
+      }
+      setPanelMsg("Saved.");
+      await load();
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setPanelMsg(formatFetchFailure(e, "Could not update member"));
+    } finally {
+      setPanelBusy(false);
+    }
+  }
+
+  async function resetMemberPassword(id: string) {
+    if (!newPassword.trim() || newPassword.trim().length < 8) {
+      setPanelMsg("Password must be at least 8 characters.");
+      return;
+    }
+    setPanelBusy(true);
+    setPanelMsg(null);
+    try {
+      const res = await apiFetch(`/api/users/${id}/reset-password`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: newPassword.trim() }),
+      });
+      const j = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !j.ok) {
+        setPanelMsg(j.error || "Could not reset password.");
+        return;
+      }
+      setPanelMsg("Password reset complete.");
+      setNewPassword("");
+    } catch (e) {
+      console.error("API ERROR:", e);
+      setPanelMsg(formatFetchFailure(e, "Could not reset password"));
+    } finally {
+      setPanelBusy(false);
     }
   }
 
@@ -272,31 +339,138 @@ export default function ControlTeamPage() {
           >
             ← Departments
           </button>
-          <div className="flex flex-wrap justify-center gap-6 py-8">
+          <div className="grid gap-4 py-6 sm:grid-cols-2 lg:grid-cols-3">
             {members.length === 0 ? (
               <p className={muted}>No employees in this department yet.</p>
             ) : (
               members.map((m) => (
-                <div key={m.userId} className="flex w-28 flex-col items-center gap-2 text-center">
+                <button
+                  key={m.userId}
+                  type="button"
+                  onClick={() => setSelected(m)}
+                  className={
+                    cardShell +
+                    " flex items-center gap-3 text-left transition hover:-translate-y-0.5 hover:border-cyan-400/35"
+                  }
+                >
                   <div
                     className={
                       light
-                        ? "flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100 text-lg font-bold text-indigo-900"
-                        : "flex h-16 w-16 items-center justify-center rounded-full bg-cyan-500/20 text-lg font-bold text-cyan-100"
+                        ? "flex h-12 w-12 items-center justify-center rounded-full bg-indigo-100 text-sm font-bold text-indigo-900"
+                        : "flex h-12 w-12 items-center justify-center rounded-full bg-cyan-500/20 text-sm font-bold text-cyan-100"
                     }
                   >
                     {initials(m.name)}
                   </div>
-                  <p className={light ? "text-xs font-semibold text-slate-900" : "text-xs font-semibold text-white"}>
-                    {m.name}
-                  </p>
-                  <p className={light ? "text-[10px] text-slate-500" : "text-[10px] text-white/50"}>{m.role}</p>
-                </div>
+                  <div className="min-w-0">
+                    <p className={light ? "truncate text-sm font-semibold text-slate-900" : "truncate text-sm font-semibold text-white"}>
+                      {m.name}
+                    </p>
+                    <p className={light ? "text-xs text-slate-500" : "text-xs text-white/50"}>{m.role}</p>
+                    <p className={light ? "text-[11px] text-slate-500" : "text-[11px] text-white/55"}>
+                      Clients: {m.assignedClients ?? 0} · Pending: {m.pendingTasks ?? 0}
+                    </p>
+                  </div>
+                </button>
               ))
             )}
           </div>
+          {recycleBin.length > 0 ? (
+            <div className={cardShell + " mt-4"}>
+              <p className={light ? "text-sm font-semibold text-slate-900" : "text-sm font-semibold text-white"}>
+                Recycle Bin
+              </p>
+              <div className="mt-2 space-y-2">
+                {recycleBin.map((m) => (
+                  <div key={m.userId} className="flex items-center justify-between gap-2">
+                    <p className={muted}>{m.name}</p>
+                    <button
+                      type="button"
+                      onClick={() => void patchMember(m.userId, { isActive: true })}
+                      className="rounded-lg border border-emerald-400/35 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-200"
+                    >
+                      Restore
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
+      {selected ? (
+        <div className="fixed inset-0 z-[110] grid place-items-center bg-black/65 p-4">
+          <div className={cardShell + " w-full max-w-xl"}>
+            <div className="flex items-center justify-between">
+              <p className={light ? "text-lg font-semibold text-slate-900" : "text-lg font-semibold text-white"}>
+                Employee Control Panel
+              </p>
+              <button type="button" onClick={() => setSelected(null)} className={muted}>
+                Close
+              </button>
+            </div>
+            <div className="mt-4 space-y-2 text-sm">
+              <p className={muted}>Name: {selected.name}</p>
+              <p className={muted}>Role: {selected.role}</p>
+              <p className={muted}>Email: {selected.email}</p>
+              <p className={muted}>Assigned clients: {selected.assignedClients ?? 0}</p>
+              <p className={muted}>Performance score: {Math.max(35, 100 - (selected.pendingTasks ?? 0) * 8)}</p>
+            </div>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                disabled={panelBusy}
+                onClick={() =>
+                  void patchMember(selected.userId, {
+                    role:
+                      selected.role === UserRole.SALES_EXECUTIVE
+                        ? UserRole.MANAGER
+                        : UserRole.SALES_EXECUTIVE,
+                  })
+                }
+                className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white"
+              >
+                Change role
+              </button>
+              <button
+                type="button"
+                disabled={panelBusy}
+                onClick={() =>
+                  void patchMember(selected.userId, {
+                    isActive: selected.isActive === false,
+                  })
+                }
+                className="rounded-lg border border-sky-300/30 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-200"
+              >
+                {selected.isActive === false ? "Restore employee" : "Archive employee"}
+              </button>
+            </div>
+            <div className="mt-3">
+              <input
+                type="password"
+                minLength={8}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="New password (min 8)"
+                className={
+                  light
+                    ? "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                    : "w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white"
+                }
+              />
+              <button
+                type="button"
+                disabled={panelBusy}
+                onClick={() => void resetMemberPassword(selected.userId)}
+                className="mt-2 rounded-lg border border-amber-300/35 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-100"
+              >
+                Reset password
+              </button>
+            </div>
+            {panelMsg ? <p className={muted + " mt-3"}>{panelMsg}</p> : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

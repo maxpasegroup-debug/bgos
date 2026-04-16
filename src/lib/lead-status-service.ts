@@ -1,6 +1,6 @@
 import "server-only";
 
-import { DealStatus, LeadStatus, TaskStatus } from "@prisma/client";
+import { DealStatus, LeadResponseStatus, LeadStatus, TaskStatus } from "@prisma/client";
 import { ACTIVITY_TYPES, logActivity } from "@/lib/activity-log";
 import { leadStatusLabel, validateLeadStatusTransition } from "@/lib/lead-pipeline";
 import { serializeLead } from "@/lib/lead-serialize";
@@ -117,6 +117,13 @@ export async function applyLeadPipelineUpdate(
       where: { id: leadId },
       data: {
         ...(statusChanging ? { status: targetStatus } : {}),
+        lastActivityAt: new Date(),
+        activityCount: { increment: 1 },
+        responseStatus: LeadResponseStatus.RESPONSIVE,
+        currentStage: statusChanging ? targetStatus : existing.currentStage ?? existing.status,
+        nextActionDue: new Date(Date.now() + 24 * 36e5),
+        confidenceScore: Math.min(100, (existing.confidenceScore ?? 50) + (statusChanging ? 5 : 2)),
+        nexaPriority: false,
         ...(assigneeChanging ? { assignedTo: resolvedAssigneeId as string | null } : {}),
       },
       include: assignInclude,
@@ -232,6 +239,35 @@ export async function applyLeadPipelineUpdate(
           companyId,
           dueDate: due,
           priority: taskPriorityAfterStatusChange(targetStatus),
+        });
+      }
+
+      if (targetStatus === LeadStatus.NEGOTIATION) {
+        const ownerId = updated.assignedTo ?? actorId;
+        const now = Date.now();
+        await createLeadTask(tx, {
+          title: `Call follow-up: ${updated.name}`,
+          userId: ownerId,
+          leadId: updated.id,
+          companyId,
+          dueDate: new Date(now + 2 * 36e5),
+          priority: 3,
+        });
+        await createLeadTask(tx, {
+          title: `Send message template: ${updated.name}`,
+          userId: ownerId,
+          leadId: updated.id,
+          companyId,
+          dueDate: new Date(now + 6 * 36e5),
+          priority: 2,
+        });
+        await createLeadTask(tx, {
+          title: `Reminder check-in: ${updated.name}`,
+          userId: ownerId,
+          leadId: updated.id,
+          companyId,
+          dueDate: new Date(now + 24 * 36e5),
+          priority: 2,
         });
       }
     }

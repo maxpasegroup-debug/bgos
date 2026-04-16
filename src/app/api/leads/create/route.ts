@@ -21,6 +21,8 @@ import { isCompanyBasicTrialExpired, trialExpiredJsonResponse } from "@/lib/tria
 const bodySchema = z.object({
   name: z.string().trim().min(1).max(200),
   phone: z.string().trim().min(1).max(32),
+  company: z.string().trim().max(200).optional(),
+  industry: z.string().trim().max(120).optional(),
   value: z.number().nonnegative().optional(),
   assignedToUserId: z.string().optional(),
   partnerId: z.string().cuid().optional(),
@@ -38,7 +40,7 @@ export async function POST(request: NextRequest) {
   const parsed = await parseJsonBodyZod(request, bodySchema);
   if (!parsed.ok) return parsed.response;
 
-  const { name, phone, value, assignedToUserId, partnerId, automationAction } = parsed.data;
+  const { name, phone, company, industry, value, assignedToUserId, partnerId, automationAction } = parsed.data;
   const companyId = session.companyId;
   const actorId = session.sub;
 
@@ -67,6 +69,8 @@ export async function POST(request: NextRequest) {
         name,
         phone,
         value: value ?? null,
+        leadCompanyName: company?.trim() || null,
+        businessType: industry?.trim() || null,
         companyId,
         createdByUserId: actorId,
         assignedTo: assigneeId,

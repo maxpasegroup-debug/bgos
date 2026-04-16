@@ -77,12 +77,31 @@ export default function ControlTechnicalPage() {
     : "rounded-xl border border-white/[0.08] bg-[#121821]/80 p-4";
   const muted = light ? "text-sm text-slate-600" : "text-sm text-white/65";
   const h1 = light ? "text-2xl font-bold text-slate-900" : "text-2xl font-bold text-white";
+  const stageCounts = {
+    new: items.filter((i) => i.uiStage.toLowerCase().includes("new")).length,
+    assigned: items.filter((i) => i.uiStage.toLowerCase().includes("assign")).length,
+    inProgress: items.filter((i) => i.uiStage.toLowerCase().includes("progress") || i.uiStage.toLowerCase().includes("setup")).length,
+    completed: items.filter((i) => i.uiStage.toLowerCase().includes("ready") || i.uiStage.toLowerCase().includes("complete")).length,
+  };
 
   return (
     <div className={`mx-auto max-w-4xl pb-16 pt-6 ${BGOS_MAIN_PAD}`}>
       <h1 className={h1}>Technical Dept</h1>
       <p className={muted + " mt-1"}>Onboarding queue — Enterprise → Pro → Basic. Setup → Config → Testing → Ready.</p>
       {error ? <p className="mt-4 text-sm text-amber-500">{error}</p> : null}
+      <div className="mt-4 grid gap-3 sm:grid-cols-4">
+        {[
+          ["New", stageCounts.new],
+          ["Assigned", stageCounts.assigned],
+          ["In Progress", stageCounts.inProgress],
+          ["Completed", stageCounts.completed],
+        ].map(([k, v]) => (
+          <div key={k} className={cardShell}>
+            <p className={muted + " text-xs"}>{k}</p>
+            <p className={h1 + " mt-1 text-lg"}>{v as number}</p>
+          </div>
+        ))}
+      </div>
 
       <ul className="mt-6 space-y-2">
         {items.length === 0 && !error ? <li className={muted}>Queue is empty.</li> : null}
