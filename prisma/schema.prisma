@@ -1467,3 +1467,147 @@ model OnboardingSubmissionTechTask {
 
   @@index([status])
 }
+
+// --- Platform Offers & Incentives (BGOS Control — super boss) ---
+
+enum IncentiveAudience {
+  SALES
+  FRANCHISE
+  BOTH
+  NICEJOBS
+}
+
+enum TargetRoleCategory {
+  SALES_EXECUTIVE
+  SALES_MANAGER
+  MICRO_FRANCHISE
+}
+
+enum TargetDurationPreset {
+  MONTHLY
+  WEEKLY
+  CUSTOM
+}
+
+enum TargetMetricType {
+  LEADS
+  ONBOARDINGS
+  SUBSCRIPTIONS
+  REVENUE
+}
+
+enum TargetAssignScope {
+  INDIVIDUAL
+  DEPARTMENT
+  ALL_FRANCHISE_USERS
+  ALL_SALES_USERS
+}
+
+enum BonusConditionType {
+  TARGET_ACHIEVED
+  TOP_PERFORMER
+  ONBOARDING_COUNT
+  REVENUE
+}
+
+enum BonusValueType {
+  FIXED
+  PERCENTAGE
+  GIFT
+}
+
+enum IncentiveCommissionPlanTier {
+  BASIC
+  PRO
+  ENTERPRISE
+  SPECIAL
+}
+
+enum IncentiveCampaignLifecycle {
+  DRAFT
+  ACTIVE
+  UPCOMING
+  COMPLETED
+}
+
+model TargetCampaign {
+  id               String               @id @default(cuid())
+  title            String
+  roleCategory     TargetRoleCategory
+  durationPreset   TargetDurationPreset
+  metricType       TargetMetricType
+  targetNumber     Float
+  startDate        DateTime
+  endDate          DateTime
+  assignScope      TargetAssignScope
+  assigneeUserId   String?
+  departmentLabel  String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@index([startDate, endDate])
+  @@index([roleCategory])
+}
+
+model BonusCampaign {
+  id                String                      @id @default(cuid())
+  title             String
+  eligibleAudience  IncentiveAudience
+  conditionType     BonusConditionType
+  bonusType         BonusValueType
+  bonusValue        Float?
+  notes             String?                     @db.Text
+  validMonth        String
+  poolAmount        Float?
+  lifecycle         IncentiveCampaignLifecycle  @default(ACTIVE)
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+
+  @@index([validMonth])
+  @@index([eligibleAudience])
+}
+
+model MegaPrizeCampaign {
+  id                 String                      @id @default(cuid())
+  name               String
+  audience           IncentiveAudience
+  eligibilityRules   String                      @db.Text
+  prizeDescription   String                      @db.Text
+  winnerRule         String                      @db.Text
+  startDate          DateTime
+  endDate            DateTime
+  lifecycle          IncentiveCampaignLifecycle  @default(ACTIVE)
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+
+  @@index([startDate, endDate])
+}
+
+model CommissionRule {
+  id                 String                      @id @default(cuid())
+  planName           String
+  planTier           IncentiveCommissionPlanTier
+  commissionType     String
+  value              Float
+  recurring          Boolean                     @default(true)
+  instantSaleBonus   Float                     @default(0)
+  isActive           Boolean                     @default(true)
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+
+  @@index([planTier, isActive])
+}
+
+model OfferAnnouncement {
+  id         String             @id @default(cuid())
+  title      String
+  body       String             @db.Text
+  audience   IncentiveAudience  @default(BOTH)
+  startsAt   DateTime?
+  endsAt     DateTime?
+  isActive   Boolean            @default(true)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  @@index([audience, isActive])
+}

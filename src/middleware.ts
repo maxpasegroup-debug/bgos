@@ -67,6 +67,8 @@ function isPublicRoute(pathname: string): boolean {
   const p = normalizePathname(pathname);
   if (isOnboardingPublicPath(p)) return true;
   if (p === "/micro-franchise/apply" || p.startsWith("/micro-franchise/apply")) return true;
+  if (p === "/contact" || p === "/privacy" || p === "/terms") return true;
+  if (p === "/legal" || p.startsWith("/legal/")) return true;
   for (const route of PUBLIC_ROUTES) {
     if (p === route || p.startsWith(`${route}/`)) return true;
   }

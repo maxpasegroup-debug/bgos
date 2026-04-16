@@ -491,13 +491,28 @@ function MoreIcon({ className }: { className?: string }) {
   );
 }
 
+function GiftIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" aria-hidden>
+      <path
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.75}
+        d="M20 12v8a2 2 0 01-2 2H6a2 2 0 01-2-2v-8M2 12h20M12 22V8M12 8H7.5A3.5 3.5 0 017 4.5 3.5 3.5 0 0110.5 8M12 8h4.5A3.5 3.5 0 0017 4.5 3.5 3.5 0 0013.5 8"
+      />
+    </svg>
+  );
+}
+
 const superBossControlNav: NavDef[] = [
   { id: "sb-clients", label: "Clients", href: "/bgos/control/clients", icon: BuildingIcon },
   { id: "sb-team", label: "My Team", href: "/bgos/control/team", icon: TeamIcon },
   { id: "sb-sales", label: "Sales", href: "/bgos/control/sales", icon: SalesIcon },
-  { id: "sb-mf", label: "Micro Franchise", href: "/bgos/control/micro-franchise", icon: NexaIcon },
   { id: "sb-tech", label: "Technical Dept", href: "/bgos/control/technical", icon: OpsIcon },
   { id: "sb-accounts", label: "Accounts", href: "/bgos/control/accounts", icon: BillingIcon },
+  { id: "sb-mf", label: "Micro Franchise", href: "/bgos/control/micro-franchise", icon: NexaIcon },
+  { id: "sb-offers", label: "Offers & Incentives", href: "/bgos/control/offers-incentives", icon: GiftIcon },
   { id: "sb-vision", label: "Vision & Targets", href: "/bgos/control/vision", icon: PricingIcon },
   { id: "sb-booster", label: "Sales Booster", href: "/bgos/control/sales-booster", icon: LightningIcon },
 ];

@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useCompanyBranding } from "@/contexts/company-branding-context";
 import { forwardLeadStatuses, leadStatusLabel } from "@/lib/lead-pipeline";
+import { IncentivesFeedBanner } from "@/components/incentives/IncentivesFeedBanner";
 import { IceconnectWorkspaceView } from "./IceconnectWorkspaceView";
 import { IcPanel } from "./IcPanel";
 
@@ -329,6 +330,7 @@ export function IceconnectSalesDashboard() {
 
   const hero = (
       <div className="space-y-5">
+        <IncentivesFeedBanner variant="sales" />
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}

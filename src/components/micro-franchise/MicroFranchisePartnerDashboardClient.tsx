@@ -14,6 +14,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { IncentivesFeedBanner } from "@/components/incentives/IncentivesFeedBanner";
 import { apiFetch, formatFetchFailure, readApiJson } from "@/lib/api-fetch";
 import { publicBgosOrigin } from "@/lib/host-routing";
 
@@ -291,6 +292,7 @@ export function MicroFranchisePartnerDashboardClient() {
       </header>
 
       <div className="mx-auto max-w-6xl space-y-8 px-4 py-8 sm:px-6">
+        <IncentivesFeedBanner variant="franchise" />
         {/* Hero stats */}
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <motion.div
