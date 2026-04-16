@@ -47,7 +47,7 @@ export default function IceconnectCustomerPortalPage() {
 
   async function logout() {
     await apiFetch("/api/customer/auth/logout", { method: "POST", credentials: "include" });
-    router.replace("/iceconnect/customer-login");
+    router.replace("/");
   }
 
   return (

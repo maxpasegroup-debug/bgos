@@ -1,12 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { motion } from "framer-motion";
 import { LegalFooterMenu } from "./LegalFooterMenu";
 import { Container } from "./Container";
 import { sectionDivider, sectionY } from "./spacing";
-
-const links = [{ label: "Contact", href: "/contact" }];
 
 export function Footer() {
   return (
@@ -31,15 +28,6 @@ export function Footer() {
             </p>
           </div>
           <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 sm:justify-end">
-            {links.map((l) => (
-              <Link
-                key={l.label}
-                href={l.href}
-                className="text-sm font-medium tracking-wide text-white/65 transition-colors duration-300 hover:text-white"
-              >
-                {l.label}
-              </Link>
-            ))}
             <LegalFooterMenu />
           </nav>
         </div>

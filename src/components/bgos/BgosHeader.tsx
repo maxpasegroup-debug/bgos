@@ -142,7 +142,7 @@ export function BgosHeader() {
         credentials: "include",
       });
     } finally {
-      window.location.assign("/login");
+      window.location.assign("/");
     }
   }
 

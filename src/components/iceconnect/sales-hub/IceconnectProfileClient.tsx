@@ -49,7 +49,7 @@ export function IceconnectProfileClient() {
     } catch {
       /* ignore */
     }
-    router.replace("/iceconnect/login");
+    router.replace("/");
     router.refresh();
   }, [router]);
 

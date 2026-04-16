@@ -48,7 +48,7 @@ export function OnboardingClientPage() {
 
   const signOut = useCallback(async () => {
     await apiFetch("/api/auth/logout", { method: "POST", credentials: "include" });
-    router.replace("/login");
+    router.replace("/");
   }, [router]);
 
   useLayoutEffect(() => {
