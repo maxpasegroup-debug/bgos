@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getAuthUserFromHeaders } from "@/lib/auth";
 import { isBossReady } from "@/lib/boss-ready";
-import { OnboardingClientPage } from "./OnboardingClientPage";
+import { NexaUnifiedOnboardingClient } from "@/components/onboarding/NexaUnifiedOnboardingClient";
 
 type Search = { addBusiness?: string };
 
@@ -16,5 +16,6 @@ export default async function OnboardingPage({
   if (user && isBossReady(user.role, user.companyId) && !allowAddBusiness) {
     redirect("/bgos/dashboard");
   }
-  return <OnboardingClientPage />;
+  const displayName = user?.email?.split("@")[0] || "there";
+  return <NexaUnifiedOnboardingClient source="DIRECT" employeeName={displayName} />;
 }

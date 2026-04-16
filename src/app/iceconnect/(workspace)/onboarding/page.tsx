@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { IceconnectSalesOnboardingClient } from "@/components/iceconnect/sales-hub/IceconnectSalesOnboardingClient";
+import { NexaUnifiedOnboardingClient } from "@/components/onboarding/NexaUnifiedOnboardingClient";
 import { getAuthUserFromHeaders } from "@/lib/auth";
 import { canAccessIceconnectDashboard, getRoleHome } from "@/lib/role-routing";
 
@@ -9,5 +9,6 @@ export default async function IceconnectOnboardingPage() {
   if (!canAccessIceconnectDashboard("onboarding", user.role)) {
     redirect(getRoleHome(user.role));
   }
-  return <IceconnectSalesOnboardingClient />;
+  const displayName = user.email?.split("@")[0] || "there";
+  return <NexaUnifiedOnboardingClient source="SALES" employeeName={displayName} />;
 }
