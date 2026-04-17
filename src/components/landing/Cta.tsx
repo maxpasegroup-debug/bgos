@@ -43,7 +43,7 @@ export function Cta() {
               transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
             >
               <Link
-                href="/signup"
+                href="/onboarding/nexa"
                 className="relative inline-flex min-h-[52px] items-center justify-center overflow-hidden rounded-xl bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] px-12 py-4 text-base font-bold tracking-wide text-white shadow-[0_0_0_1px_rgba(255,255,255,0.12)_inset,0_12px_40px_-8px_rgba(99,102,241,0.5)] transition-shadow duration-300 hover:shadow-[0_0_0_1px_rgba(255,255,255,0.2)_inset,0_16px_48px_-6px_rgba(139,92,246,0.5)]"
               >
                 <span

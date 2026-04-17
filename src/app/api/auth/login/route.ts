@@ -17,6 +17,7 @@ import {
   SUPER_BOSS_HOME_PATH,
   TECH_EXEC_HOME_PATH,
 } from "@/lib/role-routing";
+import { BGOS_BOSS_READY_HOME, BGOS_ONBOARDING_ENTRY } from "@/lib/system-readiness";
 import {
   applyProductionBossJwtMembershipOverrides,
   isBgosProductionBossBypassEmail,
@@ -46,8 +47,7 @@ function crossDomainLoginRequired(hostHeader: string | null, role: UserRole): bo
 }
 
 /**
- * Post-login path: boss + company ⇒ dashboard only; new user ⇒ onboarding; else role home.
- * `needsOnboarding` / `workspaceActivatedAt` do not apply to ADMIN once `companyId` exists.
+ * Post-login path: boss + company + activated workspace ⇒ control home; else Nexa or role home.
  */
 function internalPostLoginLocation(
   role: UserRole,
@@ -66,13 +66,13 @@ function internalPostLoginLocation(
     return MICRO_FRANCHISE_HOME_PATH;
   }
   if (isBossReady(role, companyId)) {
-    return "/bgos/control/home";
+    return workspaceActivated ? BGOS_BOSS_READY_HOME : BGOS_ONBOARDING_ENTRY;
   }
   if (companyId == null || companyId === "") {
-    return "/onboarding/nexa";
+    return BGOS_ONBOARDING_ENTRY;
   }
   if (!workspaceActivated) {
-    return "/onboarding/nexa";
+    return BGOS_ONBOARDING_ENTRY;
   }
   return postLoginDestination(String(role), from?.trim() ?? null);
 }
@@ -244,12 +244,20 @@ export async function POST(request: Request) {
     }
 
     const resolvedCompanyId = primary?.companyId ?? companyId;
-    const bossLockedJwt = isBossReady(effectiveRole, resolvedCompanyId);
-    const workspaceReady = bossLockedJwt
-      ? true
-      : needsOnboarding
-        ? false
-        : Boolean(user.workspaceActivatedAt);
+    let workspaceActivatedAt = user.workspaceActivatedAt;
+    if (
+      loginHostTenant !== "ice" &&
+      isBossReady(effectiveRole, resolvedCompanyId) &&
+      !workspaceActivatedAt
+    ) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { workspaceActivatedAt: new Date() },
+      });
+      workspaceActivatedAt = new Date();
+    }
+    const workspaceActivated = Boolean(workspaceActivatedAt);
+    const workspaceReady = needsOnboarding ? false : workspaceActivated;
 
     const token = signAccessToken({
       sub: user.id,
@@ -269,33 +277,20 @@ export async function POST(request: Request) {
         jobRole: m.jobRole,
       })) ?? [];
 
-    const bossLockedResponse = isBossReady(effectiveRole, companyId);
-    const userPayload = bossLockedResponse
-      ? {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: effectiveRole,
-          companyId,
-          companyPlan: productionBossBypass && companyId ? CompanyPlan.PRO : companyPlan,
-          workspaceReady: true as const,
-        }
-      : {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: effectiveRole,
-          companyId,
-          companyPlan: productionBossBypass && companyId ? CompanyPlan.PRO : companyPlan,
-          ...(needsOnboarding
-            ? { needsOnboarding: true as const }
-            : {
-                workspaceReady: Boolean(user.workspaceActivatedAt),
-                ...(user.workspaceActivatedAt
-                  ? {}
-                  : { needsWorkspaceActivation: true as const }),
-              }),
-        };
+    const userPayload = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: effectiveRole,
+      companyId,
+      companyPlan: productionBossBypass && companyId ? CompanyPlan.PRO : companyPlan,
+      ...(needsOnboarding
+        ? { needsOnboarding: true as const }
+        : {
+            workspaceReady: workspaceReady as boolean,
+            ...(!workspaceReady ? { needsWorkspaceActivation: true as const } : {}),
+          }),
+    };
 
     console.info("[auth/login] session-routing", {
       userId: user.id,
@@ -305,7 +300,7 @@ export async function POST(request: Request) {
       companyId,
       membershipCount: user.memberships.length,
       needsOnboarding,
-      workspaceActivatedAt: user.workspaceActivatedAt?.toISOString() ?? null,
+      workspaceActivatedAt: workspaceActivatedAt?.toISOString() ?? null,
       isSuperBoss: boss,
       companyPlan,
     });
@@ -327,21 +322,17 @@ export async function POST(request: Request) {
         ? TECH_EXEC_HOME_PATH
         : effectiveRole === UserRole.MICRO_FRANCHISE
           ? MICRO_FRANCHISE_HOME_PATH
-          : isBossReady(effectiveRole, companyId)
-            ? "/bgos/dashboard"
-            : internalPostLoginLocation(
+          : internalPostLoginLocation(
                 effectiveRole,
                 parsed.data.from?.trim() || undefined,
                 companyId,
-                Boolean(user.workspaceActivatedAt),
+                workspaceActivated,
                 user.email,
               );
     const forcedNextPath = forcePasswordReset
       ? "/reset-password"
       : inProgressSession
-        ? effectiveRole === UserRole.ADMIN
-          ? "/onboarding/nexa?resume=1"
-          : "/iceconnect/onboarding?resume=1"
+        ? `${BGOS_ONBOARDING_ENTRY}?resume=1`
         : nextPath;
 
     await prisma.user.update({

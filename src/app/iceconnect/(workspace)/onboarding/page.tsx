@@ -1,14 +1,7 @@
 import { redirect } from "next/navigation";
-import { NexaUnifiedOnboardingClient } from "@/components/onboarding/NexaUnifiedOnboardingClient";
-import { getAuthUserFromHeaders } from "@/lib/auth";
-import { canAccessIceconnectDashboard, getRoleHome } from "@/lib/role-routing";
+import { publicBgosOrigin } from "@/lib/host-routing";
 
-export default async function IceconnectOnboardingPage() {
-  const user = await getAuthUserFromHeaders();
-  if (!user) redirect("/iceconnect/login?from=/iceconnect/onboarding");
-  if (!canAccessIceconnectDashboard("onboarding", user.role)) {
-    redirect(getRoleHome(user.role));
-  }
-  const displayName = user.email?.split("@")[0] || "there";
-  return <NexaUnifiedOnboardingClient source="SALES" employeeName={displayName} />;
+/** Sales-led boss onboarding runs only on BGOS (Nexa). */
+export default function IceconnectOnboardingRedirectPage() {
+  redirect(new URL("/onboarding/nexa?source=sales", publicBgosOrigin()).toString());
 }

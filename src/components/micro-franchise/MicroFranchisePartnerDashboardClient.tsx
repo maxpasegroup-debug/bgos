@@ -197,7 +197,7 @@ export function MicroFranchisePartnerDashboardClient() {
   const shareUrl = useMemo(() => publicBgosOrigin().replace(/\/+$/, ""), []);
   const referralShareText = useMemo(() => {
     if (!data) return "";
-    return `I'm your BGOS micro-franchise partner. When you onboard on BGOS, use my referral phone: ${displayPhone}\nStart here: ${shareUrl}/signup`;
+    return `I'm your BGOS micro-franchise partner. When you onboard on BGOS, use my referral phone: ${displayPhone}\nStart here: ${shareUrl}/onboarding/nexa?source=franchise`;
   }, [data, displayPhone, shareUrl]);
 
   const chartData = useMemo(() => {

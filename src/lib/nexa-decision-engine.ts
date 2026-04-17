@@ -76,7 +76,7 @@ export const defaultDecisionRules: NexaDecisionRule[] = [
     condition: (i) => i.onboardingWeekCount < 3,
     message: "You're close. Onboard 2 more companies.",
     ctaLabel: "Start Onboarding",
-    ctaHref: "/iceconnect/onboarding",
+    ctaHref: "/onboarding/nexa?source=sales",
     mode: "Motivating",
   },
   {

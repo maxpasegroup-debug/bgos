@@ -160,7 +160,10 @@ export function useBgosData(
   const controlShell =
     pathForShell === "/bgos/control" || pathForShell.startsWith("/bgos/control/");
   const bossLandingPath =
-    pathname === "/bgos/dashboard" || pathname === "/bgos";
+    pathname === "/bgos/dashboard" ||
+    pathname === "/bgos" ||
+    pathname === "/bgos/control/home" ||
+    pathname.startsWith("/bgos/control/");
   const sbLandingMeChecked = useRef(false);
   const superBossNoCompanyRef = useRef(false);
   const [superBossNoCompany, setSuperBossNoCompany] = useState(false);

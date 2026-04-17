@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
+import { BGOS_ONBOARDING_ENTRY } from "@/lib/system-readiness";
 
 type Search = { addBusiness?: string; source?: string; resume?: string };
 
-/** Legacy `/onboarding` — unified product flow lives at `/onboarding/nexa`. */
+/** Legacy `/onboarding` — unified product flow lives at Nexa. */
 export default async function OnboardingPage({
   searchParams,
 }: {
@@ -14,5 +15,5 @@ export default async function OnboardingPage({
   if (sp.source != null) qs.set("source", String(sp.source));
   if (sp.resume != null) qs.set("resume", String(sp.resume));
   const q = qs.toString();
-  redirect(q ? `/onboarding/nexa?${q}` : "/onboarding/nexa");
+  redirect(q ? `${BGOS_ONBOARDING_ENTRY}?${q}` : BGOS_ONBOARDING_ENTRY);
 }

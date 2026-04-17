@@ -1,9 +1,6 @@
-import { CustomOnboardingFormClient } from "@/components/onboarding/CustomOnboardingFormClient";
+import { redirect } from "next/navigation";
+import { BGOS_ONBOARDING_ENTRY } from "@/lib/system-readiness";
 
 export default function OnboardingCustomFormPage() {
-  return (
-    <div className="min-h-screen bg-[#0B0F19]">
-      <CustomOnboardingFormClient />
-    </div>
-  );
+  redirect(BGOS_ONBOARDING_ENTRY);
 }

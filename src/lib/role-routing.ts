@@ -392,6 +392,7 @@ export function roleCanAccessPath(
   }
 
   if (p === "/bgos/control" || p.startsWith("/bgos/control/")) {
+    if (role === "ADMIN" && !opts?.superBoss) return true;
     return false;
   }
 

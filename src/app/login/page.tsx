@@ -103,12 +103,22 @@ function LoginForm() {
       }
 
       const u = data.user;
-      const bossHasCompany = role === "ADMIN" && typeof u?.companyId === "string" && u.companyId.length > 0;
-      if (
-        !bossHasCompany &&
-        (u?.needsOnboarding === true ||
-          u?.companyId == null ||
-          u?.needsWorkspaceActivation === true)
+      if (role === "ADMIN") {
+        const ready =
+          typeof u?.companyId === "string" &&
+          u.companyId.length > 0 &&
+          u.needsOnboarding !== true &&
+          u.needsWorkspaceActivation !== true &&
+          (u as { workspaceReady?: boolean }).workspaceReady === true;
+        if (!ready) {
+          router.replace("/onboarding/nexa");
+          router.refresh();
+          return;
+        }
+      } else if (
+        u?.needsOnboarding === true ||
+        u?.companyId == null ||
+        u?.needsWorkspaceActivation === true
       ) {
         router.replace("/onboarding/nexa");
         router.refresh();
@@ -133,7 +143,11 @@ function LoginForm() {
       }
 
       if (role === "ADMIN") {
-        router.replace("/bgos/dashboard");
+        const dest =
+          typeof data.nextPath === "string" && data.nextPath.startsWith("/")
+            ? data.nextPath
+            : "/onboarding/nexa";
+        router.replace(dest);
         router.refresh();
         return;
       }
@@ -217,7 +231,7 @@ function LoginForm() {
         </form>
         <p className="mt-6 text-center text-sm text-white/50">
           New to BGOS?{" "}
-          <Link href="/signup" className="font-medium text-cyan-400 hover:text-cyan-300">
+          <Link href="/onboarding/nexa" className="font-medium text-cyan-400 hover:text-cyan-300">
             Create an account
           </Link>
         </p>

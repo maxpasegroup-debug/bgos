@@ -41,6 +41,7 @@ import {
 import { jwtCompanyPlanFromUnknown, jwtPlanIsProPlus } from "@/lib/plan-tier";
 import { isBgosProductionBossBypassEmail } from "@/lib/bgos-production-boss-bypass";
 import { isSuperBossEmail } from "@/lib/super-boss";
+import { BGOS_ONBOARDING_ENTRY, isSystemReadyFromJwtPayload } from "@/lib/system-readiness";
 
 function normalizePathname(pathname: string): string {
   if (pathname.length > 1 && pathname.endsWith("/")) {
@@ -286,9 +287,9 @@ export async function middleware(request: NextRequest) {
       if (pathname.startsWith("/api/iceconnect")) {
         return wrongHostJson("ICECONNECT API is only available on iceconnect.in");
       }
-    } else if (pathname === "/iceconnect" || pathname.startsWith("/iceconnect/")) {
+    } else     if (pathname === "/iceconnect" || pathname.startsWith("/iceconnect/")) {
       /** Same-origin BGOS host: never mount ICECONNECT workspace here (avoids boss flicker / wrong shell). */
-      let destPath = "/bgos/dashboard";
+      let destPath: string = BGOS_ONBOARDING_ENTRY;
       const earlyT = readToken(request);
       if (earlyT) {
         const ev = await verifyJwtEdge(earlyT);
@@ -297,6 +298,8 @@ export async function middleware(request: NextRequest) {
           const em = typeof pl.email === "string" ? pl.email : "";
           if (pl.superBoss === true && isSuperBossEmail(em)) {
             destPath = SUPER_BOSS_HOME_PATH;
+          } else if (isSystemReadyFromJwtPayload(pl, request.cookies.get(ACTIVE_COMPANY_COOKIE_NAME)?.value)) {
+            destPath = getRoleHome(String(pl.role ?? "ADMIN"));
           }
         }
       }
@@ -304,7 +307,7 @@ export async function middleware(request: NextRequest) {
       dest.search = request.nextUrl.search;
       return NextResponse.redirect(dest);
     } else if (!bgosAllowsPagePath(pathname)) {
-      let destPath = "/bgos/dashboard";
+      let destPath: string = BGOS_ONBOARDING_ENTRY;
       const earlyT = readToken(request);
       if (earlyT) {
         const ev = await verifyJwtEdge(earlyT);
@@ -313,6 +316,8 @@ export async function middleware(request: NextRequest) {
           const em = typeof pl.email === "string" ? pl.email : "";
           if (pl.superBoss === true && isSuperBossEmail(em)) {
             destPath = SUPER_BOSS_HOME_PATH;
+          } else if (isSystemReadyFromJwtPayload(pl, request.cookies.get(ACTIVE_COMPANY_COOKIE_NAME)?.value)) {
+            destPath = getRoleHome(String(pl.role ?? "ADMIN"));
           }
         }
       }
@@ -369,7 +374,14 @@ export async function middleware(request: NextRequest) {
           const p = loginVerified.payload as Record<string, unknown>;
           const em = typeof p.email === "string" ? p.email : "";
           const sb = p.superBoss === true && isSuperBossEmail(em);
-          const homePath = sb ? SUPER_BOSS_HOME_PATH : getRoleHome(String(p.role));
+          const activeCo = request.cookies.get(ACTIVE_COMPANY_COOKIE_NAME)?.value;
+          const ready = isSystemReadyFromJwtPayload(p, activeCo ?? undefined);
+          const roleStr = String(p.role);
+          const homePath = sb
+            ? SUPER_BOSS_HOME_PATH
+            : ready
+              ? getRoleHome(roleStr)
+              : BGOS_ONBOARDING_ENTRY;
           return NextResponse.redirect(absoluteRoleHomeUrl(tenant, homePath, request.url));
         }
       }
@@ -453,6 +465,10 @@ export async function middleware(request: NextRequest) {
   const isOnboardingPipelineGet = normalizedPath === "/api/onboarding/pipeline" && method === "GET";
   const isCompanyBuildingStatusGet =
     normalizedPath === "/api/company/building-status" && method === "GET";
+  const isBossBuildingDashboardGet =
+    method === "GET" &&
+    normalizedPath === "/bgos/dashboard" &&
+    request.nextUrl.searchParams.get("building") === "1";
 
   if (needsCompany) {
     const allowed =
@@ -490,7 +506,7 @@ export async function middleware(request: NextRequest) {
           { status: 403 },
         );
       }
-      return NextResponse.redirect(new URL("/onboarding/nexa", request.url));
+      return NextResponse.redirect(new URL(BGOS_ONBOARDING_ENTRY, request.url));
     }
   }
 
@@ -528,6 +544,8 @@ export async function middleware(request: NextRequest) {
         isSystemInitPost ||
         isOnboardingPipelineGet ||
         isCompanyBuildingStatusGet ||
+        isBossBuildingDashboardGet ||
+        (normalizedPath === "/api/dashboard" && method === "GET") ||
         (edgeSuperBoss &&
           (normalizedPath === "/bgos/control" ||
             normalizedPath.startsWith("/bgos/control/"))) ||
@@ -543,8 +561,27 @@ export async function middleware(request: NextRequest) {
             { status: 403 },
           );
         }
-        return NextResponse.redirect(new URL("/onboarding/nexa?resume=1", request.url));
+        return NextResponse.redirect(new URL(`${BGOS_ONBOARDING_ENTRY}?resume=1`, request.url));
       }
+    }
+  }
+
+  if (
+    tenant === "bgos" &&
+    !pathname.startsWith("/api") &&
+    !edgeSuperBoss &&
+    (normalizedPath === "/bgos" || normalizedPath.startsWith("/bgos/"))
+  ) {
+    const ac = request.cookies.get(ACTIVE_COMPANY_COOKIE_NAME)?.value;
+    const buildingShell =
+      method === "GET" &&
+      normalizedPath === "/bgos/dashboard" &&
+      request.nextUrl.searchParams.get("building") === "1";
+    if (
+      !isSystemReadyFromJwtPayload(verified.payload as Record<string, unknown>, ac ?? undefined) &&
+      !buildingShell
+    ) {
+      return NextResponse.redirect(new URL(BGOS_ONBOARDING_ENTRY, request.url));
     }
   }
 
@@ -615,7 +652,7 @@ export async function middleware(request: NextRequest) {
     normalizedPath === "/bgos/control" ||
     normalizedPath.startsWith("/bgos/control/")
   ) {
-    if (!edgeSuperBoss) {
+    if (!edgeSuperBoss && role !== "ADMIN") {
       if (pathname.startsWith("/api")) {
         return NextResponse.json(
           { ok: false, error: "Forbidden", code: "FORBIDDEN" },

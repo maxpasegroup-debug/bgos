@@ -1,11 +1,12 @@
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Landing } from "@/components/landing/Landing";
-import { AUTH_COOKIE_NAME } from "@/lib/auth-config";
+import { ACTIVE_COMPANY_COOKIE_NAME, AUTH_COOKIE_NAME } from "@/lib/auth-config";
 import { hostTenantFromHeader } from "@/lib/host-routing";
 import { verifyAccessTokenResult } from "@/lib/jwt";
 import { getRoleHome, SUPER_BOSS_HOME_PATH } from "@/lib/role-routing";
 import { isSuperBossEmail } from "@/lib/super-boss";
+import { BGOS_ONBOARDING_ENTRY, isSystemReadyFromJwtPayload } from "@/lib/system-readiness";
 
 export default async function Home() {
   const host = (await headers()).get("host") ?? "";
@@ -23,10 +24,11 @@ export default async function Home() {
         if (isSuperBossEmail(em)) {
           redirect(SUPER_BOSS_HOME_PATH);
         }
-        if (role === "ADMIN") {
-          redirect("/bgos/dashboard");
+        const activeCo = jar.get(ACTIVE_COMPANY_COOKIE_NAME)?.value;
+        if (isSystemReadyFromJwtPayload(p, activeCo ?? undefined)) {
+          redirect(getRoleHome(role));
         }
-        redirect(getRoleHome(role));
+        redirect(BGOS_ONBOARDING_ENTRY);
       }
     }
   }

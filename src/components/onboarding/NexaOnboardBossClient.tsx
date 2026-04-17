@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch, readApiJson } from "@/lib/api-fetch";
 
@@ -60,6 +61,7 @@ export function NexaOnboardBossClient({
   urlFranchiseId?: string;
   urlReferralSource?: string;
 } = {}) {
+  const router = useRouter();
   const initialMode: Mode =
     entrySource === "sales" ? "sales" : entrySource === "manager" ? "manager" : "new";
   const [state, setState] = useState<OnboardingState>({
@@ -95,6 +97,11 @@ export function NexaOnboardBossClient({
   const STORAGE_KEY = "bgos_nexa_onboard_state_v1";
 
   const progress = useMemo(() => Math.round(((state.step + 1) / STEP_LABELS.length) * 100), [state.step]);
+
+  useEffect(() => {
+    const path = `${window.location.pathname}${window.location.search}`;
+    router.replace(path, { scroll: false });
+  }, [router]);
 
   useEffect(() => {
     if (urlLeadId?.trim()) setAttrLeadId(urlLeadId.trim());

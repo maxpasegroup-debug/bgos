@@ -301,7 +301,7 @@ export function IceconnectSalesLeadsClient() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
-            href="/iceconnect/onboarding"
+            href="/onboarding/nexa?source=sales"
             className="inline-flex shrink-0 items-center justify-center rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-sm font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-50"
           >
             Open Onboarding

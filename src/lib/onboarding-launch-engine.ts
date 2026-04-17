@@ -197,7 +197,7 @@ function loginUrlForRole(role: UserRole): string {
  * BGOS for company ADMIN; ICECONNECT (and partner) homes for employee job roles — see {@link ROLE_HOME}.
  */
 function dashboardsAssignedFor(employeeJobRoles: UserRole[]): string[] {
-  const set = new Set<string>(["/bgos/dashboard"]);
+  const set = new Set<string>(["/bgos/control/home"]);
   for (const r of employeeJobRoles) {
     set.add(getRoleHome(r));
   }
@@ -220,22 +220,24 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
     where: { ownerId: input.ownerUserId, name: { equals: name, mode: "insensitive" } },
     select: { id: true },
   });
-  if (existingByOwnerAndName) {
+    if (existingByOwnerAndName) {
     try {
       const ownerRow = await prisma.user.findUnique({
         where: { id: input.ownerUserId },
-        select: { name: true, email: true },
+        select: { name: true, email: true, workspaceActivatedAt: true },
       });
       const mems = await loadMembershipsForJwt(input.ownerUserId);
       const primary = mems[0]!;
       const jwtCompany = mems.find((m) => m.companyId === existingByOwnerAndName.id) ?? primary;
+      const workspaceReady =
+        input.addingAnotherBusiness || Boolean(ownerRow?.workspaceActivatedAt);
       const sessionJwt = signAccessToken({
         sub: input.ownerUserId,
         email: input.ownerEmail,
         role: jwtCompany.jobRole,
         companyId: jwtCompany.companyId,
         companyPlan: jwtCompany.plan,
-        workspaceReady: input.addingAnotherBusiness,
+        workspaceReady,
         memberships: mems,
         ...(isSuperBossEmail(input.ownerEmail) ? { superBoss: true as const } : {}),
       });
@@ -254,7 +256,7 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
         ok: true,
         companyId: existingByOwnerAndName.id,
         employeesCreated: 0,
-        dashboardsAssigned: ["/bgos/dashboard"],
+        dashboardsAssigned: ["/bgos/control/home"],
         credentials: dupCreds,
         credentialsFile: {
           filename: `${name.replace(/\s+/g, "_")}_credentials.xlsx`,
@@ -645,6 +647,14 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
         });
       }
 
+      /** Readymade / trial workspace: owner can use BGOS immediately (Nexa → control home). Custom PAYMENT_PENDING stays on payment / building shell. */
+      if (businessType !== CompanyBusinessType.CUSTOM) {
+        await tx.user.update({
+          where: { id: input.ownerUserId },
+          data: { workspaceActivatedAt: new Date() },
+        });
+      }
+
       await applyIndustryTemplateWithClient(
         tx,
         co.id,
@@ -694,7 +704,12 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
     const mems = await loadMembershipsForJwt(input.ownerUserId);
     const primary = mems[0]!;
     const jwtCompany = mems.find((m) => m.companyId === companyId) ?? primary;
-    const workspaceReady = input.addingAnotherBusiness;
+    const ownerForJwt = await prisma.user.findUnique({
+      where: { id: input.ownerUserId },
+      select: { workspaceActivatedAt: true },
+    });
+    const workspaceReady =
+      input.addingAnotherBusiness || Boolean(ownerForJwt?.workspaceActivatedAt);
 
     let sessionJwt: string;
     try {

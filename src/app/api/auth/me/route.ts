@@ -177,10 +177,9 @@ export async function GET() {
           companyName,
           companyPlan: bossBillingBypass ? CompanyPlan.PRO : session.user.companyPlan,
           needsOnboarding: bossLocked ? false : session.user.companyId === null,
-          workspaceReady: bossLocked ? true : session.user.workspaceReady,
-          needsWorkspaceActivation: bossLocked
-            ? false
-            : session.user.companyId !== null && !session.user.workspaceReady,
+          workspaceReady: session.user.workspaceReady === true,
+          needsWorkspaceActivation:
+            session.user.companyId !== null && session.user.workspaceReady !== true,
           activeCompanyIdCookie,
           memberships: session.user.memberships ?? null,
           isSuperBoss,

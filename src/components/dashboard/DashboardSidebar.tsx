@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
 
 const navItems = [
-  { id: "home", label: "Home", href: "/bgos/dashboard", icon: HomeIcon },
+  { id: "home", label: "Home", href: "/bgos/control/home", icon: HomeIcon },
   { id: "sales", label: "Sales", href: "/bgos/sales", icon: SalesIcon },
   {
     id: "operations",

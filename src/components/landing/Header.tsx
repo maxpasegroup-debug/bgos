@@ -37,7 +37,7 @@ export function Header() {
           </Link>
           <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
             <Link
-              href="/signup"
+              href="/onboarding/nexa"
               className="relative inline-flex min-h-[40px] items-center justify-center overflow-hidden rounded-xl bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] px-5 py-2 text-sm font-bold tracking-wide text-white shadow-md shadow-indigo-500/25 transition-shadow duration-300 hover:shadow-lg hover:shadow-violet-500/30"
             >
               <span

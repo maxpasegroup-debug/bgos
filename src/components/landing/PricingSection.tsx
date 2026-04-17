@@ -27,14 +27,14 @@ export function PricingSection() {
             price={`₹${PRICING.BASIC.price}/month`}
             points={["Manage your business"]}
             ctaLabel="Start Free Trial"
-            ctaHref="/signup"
+            ctaHref="/onboarding/nexa"
           />
           <PlanCard
             title="Pro"
             price={`₹${PRICING.PRO.price}/month`}
             points={["Everything in Basic", "Sales Booster included"]}
             ctaLabel="Upgrade to Pro"
-            ctaHref="/signup"
+            ctaHref="/onboarding/nexa"
             highlight
             badge="Most Popular"
           />
