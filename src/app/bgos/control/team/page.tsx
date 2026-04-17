@@ -119,7 +119,6 @@ export default function ControlTeamPage() {
 
   const [pName, setPName] = useState("");
   const [pPhone, setPPhone] = useState("");
-  const [pRole, setPRole] = useState<UserRole>(UserRole.SALES_EXECUTIVE);
   const [pDepartment, setPDepartment] = useState("");
   const [tMonthlyTarget, setTMonthlyTarget] = useState("0");
   const [tSalary, setTSalary] = useState("0");
@@ -245,7 +244,10 @@ export default function ControlTeamPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const j = (await res.json()) as { ok?: boolean; error?: string };
+      const j = ((await readApiJson(res, "control-team-patch-member")) ?? {}) as {
+        ok?: boolean;
+        error?: string;
+      };
       if (!res.ok || !j.ok) {
         setPanelMsg(j.error || "Could not update member.");
         return;
@@ -265,7 +267,9 @@ export default function ControlTeamPage() {
     setPanelMsg(null);
     try {
       const res = await apiFetch(`/api/bgos/control/team/employees/${id}`, { credentials: "include" });
-      const j = (await res.json()) as EmployeePanelData & { error?: string };
+      const j = ((await readApiJson(res, "control-team-load-panel")) ?? {}) as EmployeePanelData & {
+        error?: string;
+      };
       if (!res.ok || !j?.ok) {
         setPanelMsg(j?.error || "Could not load employee panel.");
         setPanelData(null);
@@ -274,7 +278,6 @@ export default function ControlTeamPage() {
       setPanelData(j);
       setPName(j.employee.name);
       setPPhone(j.employee.phone ?? "");
-      setPRole(j.employee.role);
       setPDepartment(j.employee.department ?? "");
       setTMonthlyTarget(String(j.compensation.target.targetCount ?? 0));
       setTSalary(String(j.compensation.target.baseSalaryRupees ?? 0));
@@ -312,7 +315,10 @@ export default function ControlTeamPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: newPassword.trim() }),
       });
-      const j = (await res.json()) as { ok?: boolean; error?: string };
+      const j = ((await readApiJson(res, "control-team-reset-password")) ?? {}) as {
+        ok?: boolean;
+        error?: string;
+      };
       if (!res.ok || !j.ok) {
         setPanelMsg(j.error || "Could not reset password.");
         return;
@@ -339,11 +345,13 @@ export default function ControlTeamPage() {
         body: JSON.stringify({
           name: pName.trim(),
           mobile: pPhone.trim(),
-          role: pRole,
           department: pDepartment.trim(),
         }),
       });
-      const j = (await res.json()) as { ok?: boolean; error?: string };
+      const j = ((await readApiJson(res, "control-team-save-profile")) ?? {}) as {
+        ok?: boolean;
+        error?: string;
+      };
       if (!res.ok || !j.ok) {
         setPanelMsg(j.error || "Could not save profile");
         return;
@@ -373,7 +381,10 @@ export default function ControlTeamPage() {
           targetPlan: tPlan,
         }),
       });
-      const j = (await res.json()) as { ok?: boolean; error?: string };
+      const j = ((await readApiJson(res, "control-team-save-targets")) ?? {}) as {
+        ok?: boolean;
+        error?: string;
+      };
       if (!res.ok || !j.ok) {
         setPanelMsg(j.error || "Could not save targets");
         return;
@@ -406,7 +417,10 @@ export default function ControlTeamPage() {
           promotionPerformanceThreshold: Number(pPerfThreshold) || 80,
         }),
       });
-      const j = (await res.json()) as { ok?: boolean; error?: string };
+      const j = ((await readApiJson(res, "control-team-save-incentives")) ?? {}) as {
+        ok?: boolean;
+        error?: string;
+      };
       if (!res.ok || !j.ok) {
         setPanelMsg(j.error || "Could not save incentives");
         return;
@@ -437,7 +451,10 @@ export default function ControlTeamPage() {
           idDocumentId: kycIdDoc.trim() || null,
         }),
       });
-      const j = (await res.json()) as { ok?: boolean; error?: string };
+      const j = ((await readApiJson(res, "control-team-save-kyc")) ?? {}) as {
+        ok?: boolean;
+        error?: string;
+      };
       if (!res.ok || !j.ok) {
         setPanelMsg(j.error || "Could not save KYC");
         return;
@@ -460,7 +477,10 @@ export default function ControlTeamPage() {
         method: "POST",
         credentials: "include",
       });
-      const j = (await res.json()) as { ok?: boolean; error?: string };
+      const j = ((await readApiJson(res, "control-team-archive")) ?? {}) as {
+        ok?: boolean;
+        error?: string;
+      };
       if (!res.ok || !j.ok) {
         setPanelMsg(j.error || "Could not archive employee.");
         return;
@@ -485,7 +505,10 @@ export default function ControlTeamPage() {
         method: "POST",
         credentials: "include",
       });
-      const j = (await res.json()) as { ok?: boolean; error?: string };
+      const j = ((await readApiJson(res, "control-team-restore")) ?? {}) as {
+        ok?: boolean;
+        error?: string;
+      };
       if (!res.ok || !j.ok) {
         setPanelMsg(j.error || "Could not restore employee.");
         return;
@@ -730,15 +753,40 @@ export default function ControlTeamPage() {
             </div>
 
             <div className="mt-4 max-h-[65vh] overflow-y-auto rounded-xl border border-white/10 bg-black/15 p-4">
-              {panelLoading || !panelData ? <p className="text-sm text-white/70">Loading...</p> : null}
+              {panelLoading ? (
+                <div className="flex items-center gap-3">
+                  <p className="text-sm text-white/70">Loading employee data...</p>
+                  {selected ? (
+                    <button
+                      type="button"
+                      onClick={() => void loadEmployeePanel(selected.userId)}
+                      className="rounded-lg bg-white/10 px-2.5 py-1 text-xs font-semibold text-white"
+                    >
+                      Retry
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+              {!panelLoading && !panelData ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-rose-200">Failed to load employee data.</p>
+                  {selected ? (
+                    <button
+                      type="button"
+                      onClick={() => void loadEmployeePanel(selected.userId)}
+                      className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white"
+                    >
+                      Retry
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
               {tab === "profile" && panelData ? (
                 <div className="grid gap-3 sm:grid-cols-2">
                   <input value={pName} onChange={(e) => setPName(e.target.value)} placeholder="Name" className="rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-sm" />
                   <input value={panelData.employee.email} readOnly className="rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/60" />
                   <input value={pPhone} onChange={(e) => setPPhone(e.target.value)} placeholder="Phone" className="rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-sm" />
-                  <select value={pRole} onChange={(e) => setPRole(e.target.value as UserRole)} className="rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-sm">
-                    {INTERNAL_ORG_EMPLOYEE_ROLE_OPTIONS.map((o) => <option key={o.value} value={o.value} className="bg-slate-900">{o.label}</option>)}
-                  </select>
+                  <input value={panelData.employee.role} readOnly className="rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/60" />
                   <input value={pDepartment} onChange={(e) => setPDepartment(e.target.value)} placeholder="Department" className="rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-sm" />
                   <input value={new Date(panelData.employee.joiningDate).toLocaleDateString()} readOnly className="rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/60" />
                   <div className="sm:col-span-2 text-xs text-white/60">Assigned Clients: {panelData.employee.assignedClients}</div>

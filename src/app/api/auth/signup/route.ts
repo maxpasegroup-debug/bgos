@@ -7,6 +7,7 @@ import { handleApiError } from "@/lib/route-error";
 import { hashPassword } from "@/lib/password";
 import { signAccessToken } from "@/lib/jwt";
 import { hostTenantFromHeader } from "@/lib/host-routing";
+import { startNexaOnboarding } from "@/lib/nexa-onboarding-start";
 import { prisma } from "@/lib/prisma";
 import { setSessionCookie } from "@/lib/session-cookie";
 import {
@@ -108,7 +109,13 @@ export async function POST(request: Request) {
 
   const res = NextResponse.json({
     ok: true as const,
-    redirect: "/onboarding?source=DIRECT" as const,
+    success: true as const,
+    redirect: "/onboarding?source=signup" as const,
+    onboarding: {
+      user_id: user.id,
+      email: user.email,
+      session_id: null as string | null,
+    },
     user: {
       id: user.id,
       name: user.name,
@@ -118,6 +125,22 @@ export async function POST(request: Request) {
   });
 
   await setSessionCookie(res, token);
+
+  try {
+    const started = await startNexaOnboarding({
+      userId: user.id,
+      source: "DIRECT",
+    });
+    res.cookies.set("bgos_onboarding_sid", started.sessionId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 6,
+    });
+  } catch (e) {
+    console.error("[auth/signup] onboarding init failed", e);
+  }
 
   return res;
 }

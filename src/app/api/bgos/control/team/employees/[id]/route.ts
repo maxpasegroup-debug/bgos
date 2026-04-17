@@ -6,8 +6,6 @@ import { prisma } from "@/lib/prisma";
 import { requireSuperBossApi } from "@/lib/require-super-boss";
 import { getOrCreateInternalSalesCompanyId } from "@/lib/internal-sales-org";
 import { eligibleSalaryRupees, currentPeriod, monthBoundsUTC } from "@/lib/iceconnect-sales-hub";
-import { isAllowedHrEmployeeRole } from "@/lib/internal-hr-roles";
-import { companyMembershipClass } from "@/lib/user-company";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -411,7 +409,6 @@ const patchSchema = z
   .object({
     name: z.string().trim().min(1).max(200).optional(),
     mobile: z.string().trim().min(1).max(32).optional(),
-    role: z.nativeEnum(UserRole).optional(),
     department: z.string().trim().max(200).optional(),
     incentivesEnabled: z.boolean().optional(),
     bonusDealsThreshold: z.number().int().min(0).optional(),
@@ -442,7 +439,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
   const companyId = org.companyId;
 
-  const { name, mobile, role, department, incentivesEnabled, bonusDealsThreshold, bonusDealsAmount, incentivesValidUntil, promotionEnabled, promotionValidUntil, promotionPerformanceThreshold } =
+  const { name, mobile, department, incentivesEnabled, bonusDealsThreshold, bonusDealsAmount, incentivesValidUntil, promotionEnabled, promotionValidUntil, promotionPerformanceThreshold } =
     parsed.data;
 
   const membership = await prisma.userCompany.findUnique({
@@ -458,20 +455,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         data: {
           ...(name !== undefined ? { name } : {}),
           ...(mobile !== undefined ? { mobile } : {}),
-        },
-      });
-    }
-
-    if (role !== undefined && role !== membership.jobRole) {
-      // Ensure role is allowed for this internal org.
-      if (!isAllowedHrEmployeeRole(true, role)) {
-        throw new Error("Invalid role for this company");
-      }
-      await tx.userCompany.update({
-        where: { userId_companyId: { userId: employeeId, companyId } },
-        data: {
-          jobRole: role,
-          role: companyMembershipClass(role),
         },
       });
     }

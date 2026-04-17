@@ -9,12 +9,12 @@ export const TECH_EXEC_HOME_PATH = "/iceconnect/tech";
 export const MICRO_FRANCHISE_HOME_PATH = "/iceconnect/micro-franchise";
 
 export const ROLE_HOME: Readonly<Record<string, string>> = {
-  ADMIN: "/bgos/dashboard",
+  ADMIN: "/bgos/control/home",
   MANAGER: "/iceconnect/manager",
-  SALES_EXECUTIVE: "/iceconnect/leads",
+  SALES_EXECUTIVE: "/iceconnect/sales",
   TELECALLER: "/iceconnect/leads",
-  TECH_HEAD: TECH_EXEC_HOME_PATH,
-  TECH_EXECUTIVE: TECH_EXEC_HOME_PATH,
+  TECH_HEAD: "/iceconnect/technical",
+  TECH_EXECUTIVE: "/iceconnect/technical",
   SALES_HEAD: "/iceconnect/sales-head",
   CHANNEL_PARTNER: "/iceconnect/partner",
   MICRO_FRANCHISE: MICRO_FRANCHISE_HOME_PATH,
@@ -96,6 +96,7 @@ const PAGE_RULES: RouteRule[] = [
     roles: new Set([...ICE_SALES_HUB, "MICRO_FRANCHISE"]),
   },
   { prefix: "/iceconnect/tech", roles: ICE_TECH_HUB },
+  { prefix: "/iceconnect/technical", roles: ICE_TECH_HUB },
   { prefix: "/onboarding/manage", roles: ONBOARDING_WORKFLOW_ROLES },
   {
     prefix: "/iceconnect/tech/onboarding",
@@ -452,6 +453,7 @@ export const ICECONNECT_DASHBOARD_ROLES: Record<string, readonly string[]> = {
   profile: ["SALES_EXECUTIVE", "TELECALLER", "MICRO_FRANCHISE"],
   "micro-franchise": ["MICRO_FRANCHISE"],
   tech: ["TECH_HEAD", "TECH_EXECUTIVE"],
+  technical: ["TECH_HEAD", "TECH_EXECUTIVE"],
   "tech-onboarding": ["TECH_HEAD", "TECH_EXECUTIVE"],
   sales: ["SALES_EXECUTIVE", "TELECALLER"],
   "sales-head": ["SALES_HEAD"],

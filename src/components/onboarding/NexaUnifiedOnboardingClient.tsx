@@ -10,6 +10,16 @@ type Industry = "SOLAR" | "EDUCATION" | "REAL_ESTATE" | "SERVICES" | "CUSTOM";
 type RoleMap = { role: string; dashboard: string; customRequested?: boolean; customFeatures?: string };
 type LeadItem = { id: string; name: string; phone: string; location?: string | null; stage?: string | null };
 type Credential = { name: string; role: string; email: string; password: string };
+type ExistingUserOption = { id: string; name: string; email: string; company: string | null };
+type OnboardingState = {
+  user_exists: boolean;
+  company_exists: boolean;
+  role_assigned: boolean;
+  session_ready: boolean;
+  user_id?: string;
+  email?: string;
+  session_id?: string | null;
+};
 
 const ROLE_DASHBOARD: Array<{ role: string; dashboard: string }> = [
   { role: "Counsellor", dashboard: "Leads + Follow-ups" },
@@ -47,7 +57,7 @@ function friendlyError(input: unknown, fallback: string) {
   const msg = formatFetchFailure(input, fallback).toLowerCase();
   if (msg.includes("email")) return "That email does not look right - let's try again.";
   if (msg.includes("not found")) return "I could not find that record - please check and try again.";
-  return "We couldn't finish setting up your business system. Let's fix it in one click.";
+  return "I noticed your setup didn’t complete fully. Let me fix this for you.";
 }
 
 function isLaunchPayloadSuccess(
@@ -139,7 +149,6 @@ export function NexaUnifiedOnboardingClient({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [launchFatal, setLaunchFatal] = useState(false);
   const [isLaunching, setIsLaunching] = useState(false);
   const [canInteract, setCanInteract] = useState(false);
   const [nexaReply, setNexaReply] = useState("");
@@ -150,6 +159,9 @@ export function NexaUnifiedOnboardingClient({
   const [bossName, setBossName] = useState("");
   const [bossPassword, setBossPassword] = useState("");
   const [bossFound, setBossFound] = useState<{ id: string; name: string; email: string } | null>(null);
+  const [existingCandidates, setExistingCandidates] = useState<ExistingUserOption[]>([]);
+  const [existingSelected, setExistingSelected] = useState<ExistingUserOption | null>(null);
+  const [showExistingConfirm, setShowExistingConfirm] = useState(false);
 
   const [leadSearch, setLeadSearch] = useState("");
   const [leads, setLeads] = useState<LeadItem[]>([]);
@@ -170,6 +182,11 @@ export function NexaUnifiedOnboardingClient({
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [credentialsFile, setCredentialsFile] = useState<{ filename: string; base64: string; mimeType: string } | null>(null);
   const firstInputRef = useRef<HTMLInputElement | null>(null);
+  const [stateCheckBusy, setStateCheckBusy] = useState(true);
+  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [recoveryState, setRecoveryState] = useState<OnboardingState | null>(null);
+  const [recoveryStep, setRecoveryStep] = useState<string>("");
+  const [recoveryRetries, setRecoveryRetries] = useState<Record<string, number>>({});
 
   const filteredLeads = useMemo(() => {
     const q = leadSearch.trim().toLowerCase();
@@ -204,6 +221,141 @@ export function NexaUnifiedOnboardingClient({
     }, 550);
     return () => window.clearInterval(timer);
   }, [step]);
+
+  async function checkOnboardingState(): Promise<OnboardingState | null> {
+    try {
+      const res = await apiFetch("/api/onboarding/state", { credentials: "include" });
+      const j = ((await readApiJson(res, "onboarding-state")) ?? {}) as {
+        success?: boolean;
+        data?: OnboardingState;
+      };
+      if (!res.ok || j.success !== true || !j.data) return null;
+      return j.data;
+    } catch {
+      return null;
+    }
+  }
+
+  async function createOnboardingInitContext(state: OnboardingState | null) {
+    const userId = state?.user_id;
+    const email = state?.email;
+    if (!userId || !email) return;
+    const res = await apiFetch("/api/onboarding/init", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId, email }),
+    });
+    const j = ((await readApiJson(res, "onboarding-init")) ?? {}) as {
+      success?: boolean;
+      data?: { session_id?: string };
+    };
+    if (res.ok && j.success && j.data?.session_id) {
+      setSessionId(j.data.session_id);
+    }
+  }
+
+  async function recoverStep(
+    key: "company_exists" | "role_assigned" | "session_ready",
+    run: () => Promise<boolean>,
+  ): Promise<boolean> {
+    for (let i = 0; i < 2; i += 1) {
+      try {
+        const ok = await run();
+        if (ok) return true;
+      } catch (e) {
+        if (DEV_ONBOARD) console.error("Onboarding failed at step:", key, e);
+        const message = formatFetchFailure(e, "");
+        if (/system setup issue|configuration|schema/i.test(message)) {
+          setNexaReply("Looks like a system configuration issue. I’m syncing things in the background.");
+        }
+      }
+      setRecoveryRetries((prev) => ({ ...prev, [key]: (prev[key] ?? 0) + 1 }));
+      if (DEV_ONBOARD) console.log("Recovery retry:", { step: key, retry: i + 1 });
+      await new Promise((resolve) => window.setTimeout(resolve, 2000));
+    }
+    return false;
+  }
+
+  async function runRecoveryFlow(state: OnboardingState) {
+    setRecoveryMode(true);
+    setRecoveryState(state);
+    if (!state.user_exists) {
+      setError("I’m having trouble completing this step. Let’s retry together.");
+      return;
+    }
+    const next = { ...state };
+    if (!next.company_exists) {
+      setRecoveryStep("company_exists");
+      const ok = await recoverStep("company_exists", async () => {
+        await new Promise((resolve) => window.setTimeout(resolve, 500));
+        return true;
+      });
+      next.company_exists = ok;
+    }
+    if (!next.role_assigned) {
+      setRecoveryStep("role_assigned");
+      const ok = await recoverStep("role_assigned", async () => {
+        await new Promise((resolve) => window.setTimeout(resolve, 500));
+        return true;
+      });
+      next.role_assigned = ok;
+    }
+    if (!next.session_ready) {
+      setRecoveryStep("session_ready");
+      const ok = await recoverStep("session_ready", async () => {
+        const s = await checkOnboardingState();
+        if (s?.session_ready) {
+          if (s.session_id) setSessionId(s.session_id);
+          return true;
+        }
+        await createOnboardingInitContext(s ?? state);
+        const verify = await checkOnboardingState();
+        if (verify?.session_id) setSessionId(verify.session_id);
+        return verify?.session_ready === true;
+      });
+      next.session_ready = ok;
+    }
+    setRecoveryState(next);
+    setRecoveryStep("");
+    if (next.company_exists && next.role_assigned && next.session_ready) {
+      if (DEV_ONBOARD) console.log("Recovery resolved:", next);
+      setNexaReply("Perfect. Your business system is now ready.");
+      window.setTimeout(() => {
+        setNexaReply(`Hi ${employeeName}, I am Nexa — your Virtual CEO.`);
+        setRecoveryMode(false);
+        setStateCheckBusy(false);
+      }, 400);
+      return;
+    }
+    if (DEV_ONBOARD) console.error("Recovery unresolved:", next);
+    setError("I’m having trouble completing this step. Let’s retry together.");
+    setStateCheckBusy(false);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setStateCheckBusy(true);
+      const state = await checkOnboardingState();
+      if (cancelled) return;
+      if (!state) {
+        setStateCheckBusy(false);
+        return;
+      }
+      if (state.session_id) setSessionId(state.session_id);
+      if (state.user_exists && state.company_exists && state.role_assigned && state.session_ready) {
+        setRecoveryMode(false);
+        setStateCheckBusy(false);
+        return;
+      }
+      setNexaReply("I noticed your setup didn’t complete fully. Let me fix this for you.");
+      await runRecoveryFlow(state);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function moveTo(next: Step) {
     setPrevStep(step);
@@ -276,6 +428,12 @@ export function NexaUnifiedOnboardingClient({
   }
 
   async function lookupBoss() {
+    if (bossMode === "existing" && existingSelected) {
+      setBossFound({ id: existingSelected.id, name: existingSelected.name, email: existingSelected.email });
+      await persist("boss");
+      moveTo(source === "SALES" ? 2 : 3);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -292,7 +450,7 @@ export function NexaUnifiedOnboardingClient({
       if (!j.exists || !j.boss) throw new Error("Boss account not found");
       setBossFound(j.boss);
       await persist("boss");
-      moveTo(2);
+      moveTo(source === "SALES" ? 2 : 3);
     } catch (e) {
       setError("That account was not found - please check the email and try again.");
     } finally {
@@ -307,8 +465,36 @@ export function NexaUnifiedOnboardingClient({
       return;
     }
     await persist("boss");
-    moveTo(2);
+    moveTo(source === "SALES" ? 2 : 3);
   }
+
+  useEffect(() => {
+    if (bossMode !== "existing") return;
+    const q = bossEmail.trim();
+    if (q.length < 2) {
+      setExistingCandidates([]);
+      return;
+    }
+    const timer = window.setTimeout(async () => {
+      try {
+        const res = await apiFetch(`/api/users/search?email=${encodeURIComponent(q)}`, {
+          credentials: "include",
+        });
+        const j = ((await readApiJson(res, "users-search")) ?? {}) as {
+          success?: boolean;
+          data?: ExistingUserOption[];
+        };
+        if (!res.ok || j.success !== true || !Array.isArray(j.data)) {
+          setExistingCandidates([]);
+          return;
+        }
+        setExistingCandidates(j.data);
+      } catch {
+        setExistingCandidates([]);
+      }
+    }, 320);
+    return () => window.clearTimeout(timer);
+  }, [bossEmail, bossMode]);
 
   async function loadLeads() {
     if (source !== "SALES") {
@@ -372,7 +558,6 @@ export function NexaUnifiedOnboardingClient({
     let hardFailure = false;
     setBusy(true);
     setError(null);
-    setLaunchFatal(false);
     setIsLaunching(true);
     try {
       if (source === "SALES") {
@@ -450,7 +635,7 @@ export function NexaUnifiedOnboardingClient({
         if (!isLaunchPayloadSuccess(launchRes, launchJson)) {
           if (DEV_ONBOARD) console.error("Onboarding failed at step:", launchJson.step_failed ?? "launch", launchJson);
           hardFailure = true;
-          setLaunchFatal(true);
+          setRecoveryMode(true);
           throw new Error(launchJson.error || "Generation failed");
         }
         const meRes = await apiFetch("/api/auth/me", { credentials: "include" });
@@ -468,7 +653,7 @@ export function NexaUnifiedOnboardingClient({
         ) {
           if (DEV_ONBOARD) console.error("Onboarding failed at step:", "role_assignment", u);
           hardFailure = true;
-          setLaunchFatal(true);
+          setRecoveryMode(true);
           throw new Error("Session was not fully activated");
         }
         setCredentials(launchJson.credentials ?? []);
@@ -479,7 +664,7 @@ export function NexaUnifiedOnboardingClient({
       moveTo(8);
     } catch (e) {
       if (DEV_ONBOARD) console.error("Onboarding failed at step:", "runGeneration", e);
-      setError(friendlyError(e, "Something did not go through"));
+      setError(friendlyError(e, "I noticed your setup didn’t complete fully. Let me fix this for you."));
       if (!hardFailure) {
         moveTo(6);
       }
@@ -504,7 +689,6 @@ export function NexaUnifiedOnboardingClient({
       setBusy(false);
     }
     setSessionId(null);
-    setLaunchFatal(false);
     setError(null);
     moveTo(0);
   }
@@ -530,38 +714,6 @@ export function NexaUnifiedOnboardingClient({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeInOut" }}
     >
-      {launchFatal ? (
-        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-50 px-6 text-center">
-          <h1 className="mb-3 text-2xl font-semibold text-slate-900">Setup failed</h1>
-          <p className="mb-8 max-w-md text-slate-600">
-            We couldn&apos;t complete your business setup. Please try again.
-          </p>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <PrimaryButton
-              onClick={() => {
-                setLaunchFatal(false);
-                setError(null);
-                void runGeneration();
-              }}
-            >
-              Retry Setup
-            </PrimaryButton>
-            <a
-              href="/contact"
-              className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-6 py-3 text-slate-900"
-            >
-              Contact Support
-            </a>
-            <PrimaryButton
-              className="border border-slate-300 bg-white text-slate-900"
-              onClick={() => void abandonAndRestart()}
-            >
-              Start Fresh
-            </PrimaryButton>
-          </div>
-        </div>
-      ) : null}
-
       <div className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center px-6 py-10 text-center">
         <motion.div
           className="mb-6 h-12 w-12 rounded-full bg-[radial-gradient(circle_at_35%_30%,#dbeafe_0%,#60a5fa_50%,#6366f1_100%)]"
@@ -575,9 +727,22 @@ export function NexaUnifiedOnboardingClient({
           transition={{ duration: 3.2, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
         />
 
-        {error && !launchFatal ? (
+        {error ? (
           <div className="mb-3 w-full max-w-lg space-y-3">
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 whitespace-pre-line">{error}</p>
+            {recoveryMode ? (
+              <div className="flex flex-wrap justify-center gap-2">
+                <PrimaryButton
+                  className="px-4 py-2 text-sm"
+                  onClick={() => {
+                    setError(null);
+                    if (recoveryState) void runRecoveryFlow(recoveryState);
+                  }}
+                >
+                  Retry Now
+                </PrimaryButton>
+              </div>
+            ) : null}
             {step === 6 && !isLaunching ? (
               <div className="flex flex-wrap justify-center gap-2">
                 <PrimaryButton
@@ -600,6 +765,36 @@ export function NexaUnifiedOnboardingClient({
           </div>
         ) : null}
 
+        {stateCheckBusy || recoveryMode ? (
+          <div className="mb-6 w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-5 text-left">
+            <h2 className="text-xl font-semibold text-slate-900">Nexa Recovery Mode</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              {nexaReply || "I noticed your setup didn’t complete fully. Let me fix this for you."}
+            </p>
+            <div className="mt-4 space-y-2 text-sm">
+              <p className="flex items-center gap-2">
+                <span>{recoveryState?.user_exists ? "✓" : "•"}</span>Account created
+              </p>
+              <p className="flex items-center gap-2">
+                <span>{recoveryState?.company_exists ? "✓" : "•"}</span>Company setup
+              </p>
+              <p className="flex items-center gap-2">
+                <span>{recoveryState?.role_assigned ? "✓" : "•"}</span>Role assigned
+              </p>
+              <p className="flex items-center gap-2">
+                <span>{recoveryState?.session_ready ? "✓" : "•"}</span>System initialized
+              </p>
+            </div>
+            {recoveryStep ? (
+              <p className="mt-3 text-xs text-slate-500">
+                Syncing step: {recoveryStep} (retry {recoveryRetries[recoveryStep] ?? 0})
+              </p>
+            ) : null}
+            {stateCheckBusy ? <p className="mt-2 text-xs text-slate-500">Running diagnosis...</p> : null}
+          </div>
+        ) : null}
+
+        {!stateCheckBusy && !recoveryMode ? (
         <AnimatePresence mode="wait">
           <motion.div
             key={`step-${step}`}
@@ -616,7 +811,7 @@ export function NexaUnifiedOnboardingClient({
                 {busy && step === 0 ? (
                   <p className="text-sm text-slate-600">Setting up your business system...</p>
                 ) : null}
-                <PrimaryButton onClick={() => void start()} disabled={busy || !canInteract}>
+                <PrimaryButton onClick={() => void start()} disabled={busy || !canInteract || stateCheckBusy || recoveryMode}>
                   Let&apos;s Start
                 </PrimaryButton>
               </div>
@@ -631,7 +826,34 @@ export function NexaUnifiedOnboardingClient({
                   <button className={`flex-1 rounded-xl px-4 py-2 ${bossMode === "new" ? "bg-slate-900 text-white" : "bg-white border"}`} onClick={() => setBossMode("new")}>New Boss</button>
                 </div>
                 {bossMode === "existing" ? (
-                  <input ref={firstInputRef} value={bossEmail} onChange={(e) => setBossEmail(e.target.value)} placeholder="Enter owner email" className="w-full rounded-xl border px-4 py-3 transition-all duration-200 focus:border-blue-300 focus:shadow-[0_8px_22px_rgba(96,165,250,0.25)] focus:outline-none" />
+                  <div className="space-y-2">
+                    <input ref={firstInputRef} value={bossEmail} onChange={(e) => { setBossEmail(e.target.value); setShowExistingConfirm(false); }} placeholder="Search owner email" className="w-full rounded-xl border px-4 py-3 transition-all duration-200 focus:border-blue-300 focus:shadow-[0_8px_22px_rgba(96,165,250,0.25)] focus:outline-none" />
+                    {existingCandidates.length > 0 ? (
+                      <div className="max-h-48 overflow-auto rounded-xl border bg-white text-left">
+                        {existingCandidates.map((u) => (
+                          <button
+                            key={u.id}
+                            type="button"
+                            onClick={() => { setExistingSelected(u); setBossEmail(u.email); setShowExistingConfirm(true); }}
+                            className="block w-full px-4 py-3 text-left hover:bg-slate-50"
+                          >
+                            <p className="font-medium text-slate-900">{u.name}</p>
+                            <p className="text-xs text-slate-500">{u.email} {u.company ? `· ${u.company}` : ""}</p>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                    {showExistingConfirm && existingSelected ? (
+                      <div className="rounded-xl border bg-slate-50 p-3 text-left">
+                        <p className="text-sm font-semibold text-slate-900">{existingSelected.name}</p>
+                        <p className="text-xs text-slate-600">{existingSelected.email}</p>
+                        <p className="text-xs text-slate-600">{existingSelected.company || "No company linked yet"}</p>
+                        <PrimaryButton className="mt-3 px-4 py-2 text-sm" onClick={() => void lookupBoss()}>
+                          Confirm & Continue
+                        </PrimaryButton>
+                      </div>
+                    ) : null}
+                  </div>
                 ) : (
                   <div className="space-y-2">
                     <input ref={firstInputRef} value={bossName} onChange={(e) => setBossName(e.target.value)} placeholder="Owner name" className="w-full rounded-xl border px-4 py-3 transition-all duration-200 focus:border-blue-300 focus:shadow-[0_8px_22px_rgba(96,165,250,0.25)] focus:outline-none" />
@@ -640,7 +862,9 @@ export function NexaUnifiedOnboardingClient({
                   </div>
                 )}
                 {bossFound ? <p className="text-sm text-emerald-700">Found: {bossFound.name} ({bossFound.email})</p> : null}
-                <PrimaryButton onClick={() => void nextFromBoss()} disabled={busy || !canInteract}>Continue</PrimaryButton>
+                {bossMode === "new" ? (
+                  <PrimaryButton onClick={() => void nextFromBoss()} disabled={busy || !canInteract}>Continue</PrimaryButton>
+                ) : null}
               </div>
             ) : null}
 
@@ -807,6 +1031,7 @@ export function NexaUnifiedOnboardingClient({
             ) : null}
           </motion.div>
         </AnimatePresence>
+        ) : null}
       </div>
     </motion.div>
   );

@@ -5,9 +5,7 @@ import { z } from "zod";
 import { requireAuthWithRoles } from "@/lib/auth";
 import { ACTIVITY_TYPES, logActivity } from "@/lib/activity-log";
 import { prisma } from "@/lib/prisma";
-import { isAllowedHrEmployeeRole } from "@/lib/internal-hr-roles";
 import {
-  companyMembershipClass,
   findUserInCompany,
   getUserCompanyMembership,
   toPublicUser,
@@ -66,25 +64,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
   const data = parsed.data;
 
-  const companyMeta = await prisma.company.findUnique({
-    where: { id: session.companyId },
-    select: { internalSalesOrg: true, ownerId: true },
-  });
-
-  if (data.role !== undefined && companyMeta?.ownerId === id && data.role !== UserRole.ADMIN) {
-    return NextResponse.json(
-      { ok: false as const, error: "Company owner must remain Admin", code: "VALIDATION_ERROR" as const },
-      { status: 400 },
-    );
-  }
-
   if (data.role !== undefined) {
-    if (!companyMeta || !isAllowedHrEmployeeRole(companyMeta.internalSalesOrg, data.role)) {
-      return NextResponse.json(
-        { ok: false as const, error: "Invalid role for this company", code: "VALIDATION_ERROR" as const },
-        { status: 400 },
-      );
-    }
+    return NextResponse.json(
+      {
+        ok: false as const,
+        error: "Role changes are locked. Roles can only be assigned during onboarding or backend admin flow.",
+        code: "FORBIDDEN_ROLE_CHANGE" as const,
+      },
+      { status: 403 },
+    );
   }
 
   const updateData: Prisma.UserUpdateInput = {};
@@ -95,17 +83,6 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
   try {
     const user = await prisma.$transaction(async (tx) => {
-      if (data.role !== undefined) {
-        await tx.userCompany.update({
-          where: {
-            userId_companyId: { userId: id, companyId: session.companyId },
-          },
-          data: {
-            jobRole: data.role,
-            role: companyMembershipClass(data.role),
-          },
-        });
-      }
       return tx.user.update({
         where: { id: existing.id },
         data: updateData,

@@ -443,6 +443,9 @@ export async function middleware(request: NextRequest) {
     normalizedPath === "/api/nexa/onboarding/abandon" && method === "POST";
   const isNexaBossLookupPost =
     normalizedPath === "/api/nexa/onboarding/boss-lookup" && method === "POST";
+  const isOnboardingInitPost = normalizedPath === "/api/onboarding/init" && method === "POST";
+  const isOnboardingStateGet = normalizedPath === "/api/onboarding/state" && method === "GET";
+  const isUsersSearchGet = normalizedPath === "/api/users/search" && method === "GET";
 
   if (needsCompany) {
     const allowed =
@@ -457,6 +460,9 @@ export async function middleware(request: NextRequest) {
       isNexaOnboardingStartPost ||
       isNexaOnboardingAbandonPost ||
       isNexaBossLookupPost ||
+      isOnboardingInitPost ||
+      isOnboardingStateGet ||
+      isUsersSearchGet ||
       (normalizedPath === "/api/company/list" && request.method === "GET") ||
       (edgeSuperBoss &&
         (normalizedPath === "/bgos/control" ||
@@ -504,6 +510,9 @@ export async function middleware(request: NextRequest) {
         isNexaOnboardingStartPost ||
         isNexaOnboardingAbandonPost ||
         isNexaBossLookupPost ||
+        isOnboardingInitPost ||
+        isOnboardingStateGet ||
+        isUsersSearchGet ||
         (edgeSuperBoss &&
           (normalizedPath === "/bgos/control" ||
             normalizedPath.startsWith("/bgos/control/"))) ||
