@@ -1,10 +1,11 @@
-import { CompanyIndustry, UserRole } from "@prisma/client";
+import { CompanyIndustry, Prisma, UserRole } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { parseJsonBodyZod } from "@/lib/api-response";
-import { requireAuthWithRoles } from "@/lib/auth";
+import { forbidden, requireActiveCompanyMembership } from "@/lib/auth";
 import { applyIndustryTemplate } from "@/lib/industry-templates";
+import { prisma } from "@/lib/prisma";
 
 const bodySchema = z.object({
   companyId: z.string().trim().min(1),
@@ -13,15 +14,42 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const session = await requireAuthWithRoles(request, [UserRole.ADMIN, UserRole.MANAGER]);
+  const session = await requireActiveCompanyMembership(request);
   if (session instanceof NextResponse) return session;
+  if (session.role !== UserRole.ADMIN && session.role !== UserRole.MANAGER) return forbidden();
   const parsed = await parseJsonBodyZod(request, bodySchema);
   if (!parsed.ok) return parsed.response;
+
+  if (parsed.data.companyId !== session.companyId) {
+    return NextResponse.json({ success: false as const, message: "Company mismatch" }, { status: 403 });
+  }
 
   try {
     const category = parsed.data.category.toUpperCase();
     if (category === CompanyIndustry.SOLAR) {
       await applyIndustryTemplate(parsed.data.companyId, "SOLAR");
+    }
+    if (category === "CUSTOM" && parsed.data.custom != null) {
+      const company = await prisma.company.findUnique({
+        where: { id: parsed.data.companyId },
+        select: { dashboardConfig: true },
+      });
+      const prev =
+        company?.dashboardConfig && typeof company.dashboardConfig === "object" && !Array.isArray(company.dashboardConfig)
+          ? (company.dashboardConfig as Record<string, unknown>)
+          : {};
+      const merged: Prisma.InputJsonValue = {
+        ...prev,
+        nexaOnboardBoss: {
+          customSpec: parsed.data.custom,
+          updatedAt: new Date().toISOString(),
+        },
+        onboardingStatus: "under_review",
+      };
+      await prisma.company.update({
+        where: { id: parsed.data.companyId },
+        data: { dashboardConfig: merged },
+      });
     }
     return NextResponse.json({
       success: true as const,

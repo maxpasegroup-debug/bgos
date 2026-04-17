@@ -1,5 +1,10 @@
+import { Suspense } from "react";
 import { BgosDashboardView } from "@/components/bgos/BgosDashboardView";
 
 export default function BgosDashboardPage() {
-  return <BgosDashboardView />;
+  return (
+    <Suspense fallback={null}>
+      <BgosDashboardView />
+    </Suspense>
+  );
 }

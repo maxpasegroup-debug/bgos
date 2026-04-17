@@ -73,7 +73,7 @@ export default function SignupPage() {
         return;
       }
 
-      router.push(data.redirect ?? "/onboarding");
+      router.push(data.redirect ?? "/onboarding/nexa");
       router.refresh();
     } catch (e) {
       console.error("API ERROR:", e);

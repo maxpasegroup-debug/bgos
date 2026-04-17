@@ -1,7 +1,9 @@
 "use client";
 
 import { UserRole } from "@prisma/client";
-import { apiFetch } from "@/lib/api-fetch";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { apiFetch, readApiJson } from "@/lib/api-fetch";
 import { useEffect, useState } from "react";
 import { BgosDashboardGrid } from "./BgosDashboardGrid";
 import { BgosDashboardSkeletons, BgosIntelligenceHomeSkeleton } from "./BgosDashboardSkeletons";
@@ -21,6 +23,7 @@ const routeToSection: Record<string, string> = {
 };
 
 export function BgosDashboardView({ section }: { section?: string }) {
+  const searchParams = useSearchParams();
   const isIntelHome = !section;
   const {
     dashboard,
@@ -36,6 +39,7 @@ export function BgosDashboardView({ section }: { section?: string }) {
     sessionRole === UserRole.ADMIN || isSuperBoss === true;
   const scrollKey = section ? routeToSection[section] ?? section : undefined;
   const [userName, setUserName] = useState("Boss");
+  const [showBuildingPanel, setShowBuildingPanel] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,6 +67,26 @@ export function BgosDashboardView({ section }: { section?: string }) {
     }, 140);
     return () => window.clearTimeout(timer);
   }, [scrollKey, isLoading]);
+
+  useEffect(() => {
+    if (searchParams.get("building") === "1") {
+      setShowBuildingPanel(true);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch("/api/company/building-status", { credentials: "include" });
+        const j = ((await readApiJson(res, "building-status")) ?? {}) as { building?: boolean };
+        if (!cancelled && res.ok && j.building === true) setShowBuildingPanel(true);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams]);
 
   if (isLoading) {
     if (isIntelHome && !useBossCommandCenterHome) {
@@ -97,6 +121,29 @@ export function BgosDashboardView({ section }: { section?: string }) {
 
   return (
     <>
+      {showBuildingPanel ? (
+        <section className={`${BGOS_MAIN_PAD} pb-2 pt-5`}>
+          <div className="mx-auto max-w-3xl rounded-2xl border border-cyan-400/25 bg-gradient-to-br from-cyan-950/60 via-slate-950/80 to-indigo-950/60 px-5 py-5 text-slate-100 shadow-lg sm:px-6">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-200/80">Setup</p>
+            <h2 className="mt-1 text-lg font-semibold tracking-tight text-white">Your system is being prepared</h2>
+            <p className="mt-2 text-sm text-slate-200/90">
+              Setup is in progress. Our team is building your dashboard — you can keep exploring BGOS; modules will
+              unlock as soon as we finish.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Link
+                href="/contact"
+                className="inline-flex rounded-xl bg-white/10 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/15"
+              >
+                Contact support
+              </Link>
+              <span className="inline-flex items-center rounded-xl border border-white/10 px-4 py-2 text-xs text-white/50">
+                View updates (coming soon)
+              </span>
+            </div>
+          </div>
+        </section>
+      ) : null}
       <section className={`${BGOS_MAIN_PAD} pb-2 pt-5`}>
         <div className="rounded-2xl border border-white/[0.10] bg-gradient-to-br from-white/[0.07] via-white/[0.03] to-transparent px-5 py-5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] backdrop-blur-xl sm:px-6 sm:py-5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">

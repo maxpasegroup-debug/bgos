@@ -110,7 +110,7 @@ export async function POST(request: Request) {
   const res = NextResponse.json({
     ok: true as const,
     success: true as const,
-    redirect: "/onboarding?source=signup" as const,
+    redirect: "/onboarding/nexa" as const,
     onboarding: {
       user_id: user.id,
       email: user.email,

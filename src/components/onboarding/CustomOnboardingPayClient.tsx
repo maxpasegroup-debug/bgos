@@ -50,7 +50,7 @@ export function CustomOnboardingPayClient() {
         return;
       }
       if (j.businessType !== "CUSTOM") {
-        router.replace("/onboarding");
+        router.replace("/onboarding/nexa");
         return;
       }
       if (j.subscriptionStatus !== "PAYMENT_PENDING") {

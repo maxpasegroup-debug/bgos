@@ -37,10 +37,43 @@ function Orb() {
   );
 }
 
-export function NexaOnboardBossClient() {
-  const [state, setState] = useState<OnboardingState>({ step: 0, mode: "new", user: {}, company: {} });
+type NexaBanner = {
+  text: string;
+  showRetry: boolean;
+  onRetry?: () => void | Promise<void>;
+};
+
+export function NexaOnboardBossClient({
+  entrySource,
+  resume,
+  addBusiness,
+  urlLeadId,
+  urlSalesOwnerId,
+  urlFranchiseId,
+  urlReferralSource,
+}: {
+  entrySource?: string;
+  resume?: boolean;
+  addBusiness?: boolean;
+  urlLeadId?: string;
+  urlSalesOwnerId?: string;
+  urlFranchiseId?: string;
+  urlReferralSource?: string;
+} = {}) {
+  const initialMode: Mode =
+    entrySource === "sales" ? "sales" : entrySource === "manager" ? "manager" : "new";
+  const [state, setState] = useState<OnboardingState>({
+    step: 0,
+    mode: initialMode,
+    user: {},
+    company: {},
+  });
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [banner, setBanner] = useState<NexaBanner | null>(null);
+  const [attrLeadId, setAttrLeadId] = useState(urlLeadId?.trim() ?? "");
+  const [attrSalesOwnerId, setAttrSalesOwnerId] = useState(urlSalesOwnerId?.trim() ?? "");
+  const [attrFranchiseId, setAttrFranchiseId] = useState(urlFranchiseId?.trim() ?? "");
+  const [attrReferralSource, setAttrReferralSource] = useState(urlReferralSource?.trim() ?? "");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -64,6 +97,13 @@ export function NexaOnboardBossClient() {
   const progress = useMemo(() => Math.round(((state.step + 1) / STEP_LABELS.length) * 100), [state.step]);
 
   useEffect(() => {
+    if (urlLeadId?.trim()) setAttrLeadId(urlLeadId.trim());
+    if (urlSalesOwnerId?.trim()) setAttrSalesOwnerId(urlSalesOwnerId.trim());
+    if (urlFranchiseId?.trim()) setAttrFranchiseId(urlFranchiseId.trim());
+    if (urlReferralSource?.trim()) setAttrReferralSource(urlReferralSource.trim());
+  }, [urlLeadId, urlSalesOwnerId, urlFranchiseId, urlReferralSource]);
+
+  useEffect(() => {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
@@ -73,12 +113,26 @@ export function NexaOnboardBossClient() {
         email?: string;
         companyName?: string;
         category?: string;
+        attrLeadId?: string;
+        attrSalesOwnerId?: string;
+        attrFranchiseId?: string;
+        attrReferralSource?: string;
       };
       if (saved.state) setState(saved.state);
       if (typeof saved.name === "string") setName(saved.name);
       if (typeof saved.email === "string") setEmail(saved.email);
       if (typeof saved.companyName === "string") setCompanyName(saved.companyName);
       if (typeof saved.category === "string") setCategory(saved.category);
+      if (!urlLeadId?.trim() && typeof saved.attrLeadId === "string") setAttrLeadId(saved.attrLeadId);
+      if (!urlSalesOwnerId?.trim() && typeof saved.attrSalesOwnerId === "string") {
+        setAttrSalesOwnerId(saved.attrSalesOwnerId);
+      }
+      if (!urlFranchiseId?.trim() && typeof saved.attrFranchiseId === "string") {
+        setAttrFranchiseId(saved.attrFranchiseId);
+      }
+      if (!urlReferralSource?.trim() && typeof saved.attrReferralSource === "string") {
+        setAttrReferralSource(saved.attrReferralSource);
+      }
     } catch {
       // ignore stale local payload
     }
@@ -89,23 +143,40 @@ export function NexaOnboardBossClient() {
   useEffect(() => {
     window.localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ state, name, email, companyName, category }),
+      JSON.stringify({
+        state,
+        name,
+        email,
+        companyName,
+        category,
+        attrLeadId,
+        attrSalesOwnerId,
+        attrFranchiseId,
+        attrReferralSource,
+      }),
     );
-  }, [state, name, email, companyName, category]);
+  }, [state, name, email, companyName, category, attrLeadId, attrSalesOwnerId, attrFranchiseId, attrReferralSource]);
 
   async function nextFromIntro() {
+    setBanner(null);
     setState((s) => ({ ...s, step: 1 }));
   }
 
   async function nextName() {
-    if (!name.trim()) return setErr("Please enter your name.");
-    setErr(null);
+    if (!name.trim()) {
+      setBanner({ text: "I need your name so I can personalize your workspace.", showRetry: false });
+      return;
+    }
+    setBanner(null);
     setState((s) => ({ ...s, step: 2, user: { ...s.user, name: name.trim() } }));
   }
 
   async function nextEmail() {
-    if (!email.trim()) return setErr("Please enter your email.");
-    setErr(null);
+    if (!email.trim()) {
+      setBanner({ text: "I need a valid email to continue.", showRetry: false });
+      return;
+    }
+    setBanner(null);
     setBusy(true);
     try {
       const res = await apiFetch(`/api/users/check?email=${encodeURIComponent(email.trim())}`, {
@@ -119,15 +190,64 @@ export function NexaOnboardBossClient() {
     }
   }
 
+  function buildInitBody(userId: string, emailStr: string) {
+    return {
+      user_id: userId,
+      email: emailStr,
+      ...(attrLeadId.trim() ? { lead_id: attrLeadId.trim() } : {}),
+      ...(attrSalesOwnerId.trim() ? { sales_owner_id: attrSalesOwnerId.trim() } : {}),
+      ...(attrFranchiseId.trim() ? { franchise_id: attrFranchiseId.trim() } : {}),
+      ...(attrReferralSource.trim() ? { referral_source: attrReferralSource.trim() } : {}),
+    };
+  }
+
+  async function postOnboardingInitWithRetries(userId: string, emailStr: string) {
+    const body = buildInitBody(userId, emailStr);
+    let lastMessage = "";
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const initRes = await apiFetch("/api/onboarding/init", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const initJ = ((await readApiJson(initRes, "onboarding-init")) ?? {}) as {
+        success?: boolean;
+        data?: { user_id?: string };
+        message?: string;
+      };
+      if (initRes.ok && initJ.success === true) {
+        return { ok: true as const, userId: initJ.data?.user_id ?? userId };
+      }
+      lastMessage = typeof initJ.message === "string" ? initJ.message : "";
+      console.error("[NexaOnboardBoss] onboarding/init failed", { attempt, lastMessage, status: initRes.status });
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 2000));
+    }
+    return { ok: false as const, message: lastMessage };
+  }
+
+  async function checkOnboardingState() {
+    const res = await apiFetch("/api/onboarding/state", { credentials: "include" });
+    const j = ((await readApiJson(res, "onboarding-state-check")) ?? {}) as {
+      success?: boolean;
+      data?: { company_exists?: boolean; session_ready?: boolean; role_assigned?: boolean };
+    };
+    if (!res.ok || j.success !== true || !j.data) return null;
+    return j.data;
+  }
+
   async function submitAccount() {
-    if (!password.trim()) return setErr("Please set your password.");
-    setErr(null);
+    if (!password.trim()) {
+      setBanner({ text: "I need a secure password to protect your account.", showRetry: false });
+      return;
+    }
+    setBanner(null);
     setBusy(true);
     try {
       const endpoint = state.mode === "existing" ? "/api/auth/login" : "/api/auth/signup";
       const payload =
         state.mode === "existing"
-          ? { email: email.trim(), password: password.trim() }
+          ? { email: email.trim(), password: password.trim(), from: "/onboarding/nexa" }
           : { name: name.trim(), email: email.trim(), password: password.trim() };
       const res = await apiFetch(endpoint, {
         method: "POST",
@@ -142,23 +262,46 @@ export function NexaOnboardBossClient() {
         error?: string;
       };
       if (!res.ok || (j.ok !== true && j.success !== true)) {
-        setErr(j.error || "I’ll fix this for you… please retry.");
+        console.error("[NexaOnboardBoss] auth failed", j);
+        setBanner({
+          text: "I’m fixing a system issue. Let’s retry together.",
+          showRetry: true,
+          onRetry: () => void submitAccount(),
+        });
         return;
       }
-      const initRes = await apiFetch("/api/onboarding/init", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: j.user?.id, email: email.trim() }),
-      });
-      const initJ = ((await readApiJson(initRes, "onboarding-init")) ?? {}) as {
-        success?: boolean;
-        data?: { user_id?: string };
-      };
+      const authedUserId =
+        typeof j.user?.id === "string" && j.user.id.trim() ? j.user.id.trim() : undefined;
+      if (!authedUserId) {
+        setBanner({
+          text: "I’m fixing a system issue. Let’s retry together.",
+          showRetry: true,
+          onRetry: () => void submitAccount(),
+        });
+        return;
+      }
+      const initResult = await postOnboardingInitWithRetries(authedUserId, email.trim());
+      if (!initResult.ok) {
+        const st = await checkOnboardingState();
+        if (st?.session_ready) {
+          setState((s) => ({
+            ...s,
+            step: 4,
+            user: { ...s.user, id: authedUserId },
+          }));
+          return;
+        }
+        setBanner({
+          text: "I’m fixing a system issue. Let’s retry together.",
+          showRetry: true,
+          onRetry: () => void submitAccount(),
+        });
+        return;
+      }
       setState((s) => ({
         ...s,
         step: 4,
-        user: { ...s.user, id: initJ.data?.user_id || j.user?.id },
+        user: { ...s.user, id: initResult.userId },
       }));
     } finally {
       setBusy(false);
@@ -184,8 +327,11 @@ export function NexaOnboardBossClient() {
 
   async function chooseFlow() {
     const c = categories.find((x) => x.id === category);
-    if (!companyName.trim() || !c) return setErr("Please enter business name and category.");
-    setErr(null);
+    if (!companyName.trim() || !c) {
+      setBanner({ text: "I need your business name and industry to continue.", showRetry: false });
+      return;
+    }
+    setBanner(null);
     setState((s) => ({
       ...s,
       step: 6,
@@ -196,44 +342,51 @@ export function NexaOnboardBossClient() {
 
   async function runReadymade() {
     setBusy(true);
-    setErr(null);
+    setBanner(null);
     try {
-      const createRes = await apiFetch("/api/company/create", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source: "NEXA_ENGINE",
-          name: companyName.trim(),
-          industry: category === "SOLAR" ? "SOLAR" : "CUSTOM",
-          businessType: category === "SOLAR" ? "SOLAR" : "CUSTOM",
-        }),
-      });
-      const created = ((await readApiJson(createRes, "company-create")) ?? {}) as {
-        ok?: boolean;
-        companyId?: string;
+      const body = {
+        source: "NEXA_ENGINE",
+        name: companyName.trim(),
+        industry: "SOLAR",
+        businessType: "SOLAR",
       };
-      const companyId = created.companyId;
-      if (!createRes.ok || created.ok !== true || !companyId) {
-        setErr("I’ll fix this for you… retrying is safe.");
+      let companyId: string | undefined;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const createRes = await apiFetch("/api/company/create", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const created = ((await readApiJson(createRes, "company-create")) ?? {}) as {
+          ok?: boolean;
+          companyId?: string;
+        };
+        companyId = created.companyId;
+        if (createRes.ok && created.ok === true && companyId) break;
+        console.error("[NexaOnboardBoss] company/create attempt failed", { attempt, status: createRes.ok });
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 2000));
+      }
+      if (!companyId) {
+        const st = await checkOnboardingState();
+        if (st?.company_exists) {
+          setBanner({
+            text: "Your company is already linked. Continue when you’re ready.",
+            showRetry: false,
+          });
+          return;
+        }
+        setBanner({
+          text: "I’m fixing a system issue. Let’s retry together.",
+          showRetry: true,
+          onRetry: () => void runReadymade(),
+        });
         return;
       }
-      await apiFetch("/api/role/assign", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyId, role: "boss" }),
-      });
-      await apiFetch("/api/system/init", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyId, category }),
-      });
       setState((s) => ({ ...s, step: 7, company: { ...s.company, id: companyId } }));
       window.localStorage.removeItem(STORAGE_KEY);
       window.setTimeout(() => {
-        window.location.assign("/bgos/dashboard");
+        window.location.assign("/bgos/control/home");
       }, 800);
     } finally {
       setBusy(false);
@@ -242,48 +395,65 @@ export function NexaOnboardBossClient() {
 
   async function submitCustom() {
     setBusy(true);
-    setErr(null);
+    setBanner(null);
     try {
-      const createRes = await apiFetch("/api/company/create", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source: "NEXA_ENGINE",
-          name: companyName.trim(),
-          industry: "CUSTOM",
-          businessType: "CUSTOM",
-          plan: "PRO",
-        }),
-      });
-      const created = ((await readApiJson(createRes, "company-create-custom")) ?? {}) as {
-        ok?: boolean;
-        companyId?: string;
+      const createBody = {
+        source: "NEXA_ENGINE",
+        name: companyName.trim(),
+        industry: "CUSTOM",
+        businessType: "CUSTOM",
+        plan: "PRO",
       };
-      if (!createRes.ok || created.ok !== true || !created.companyId) {
-        setErr("I’ll fix this for you… retrying is safe.");
+      let newCompanyId: string | undefined;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const createRes = await apiFetch("/api/company/create", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(createBody),
+        });
+        const created = ((await readApiJson(createRes, "company-create-custom")) ?? {}) as {
+          ok?: boolean;
+          companyId?: string;
+        };
+        if (createRes.ok && created.ok === true && created.companyId) {
+          newCompanyId = created.companyId;
+          break;
+        }
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 2000));
+      }
+      if (!newCompanyId) {
+        setBanner({
+          text: "I’m fixing a system issue. Let’s retry together.",
+          showRetry: true,
+          onRetry: () => void submitCustom(),
+        });
         return;
       }
-      await apiFetch("/api/system/init", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          companyId: created.companyId,
-          category: "CUSTOM",
-          custom: {
-            businessType: customBusinessType,
-            departments: customDepartments,
-            features: customFeatures,
-            team: customTeam,
-            status: "under_review",
-          },
-        }),
-      });
-      setState((s) => ({ ...s, step: 7, company: { ...s.company, id: created.companyId } }));
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const initSys = await apiFetch("/api/system/init", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            companyId: newCompanyId,
+            category: "CUSTOM",
+            custom: {
+              businessType: customBusinessType,
+              departments: customDepartments,
+              features: customFeatures,
+              team: customTeam,
+              status: "under_review",
+            },
+          }),
+        });
+        if (initSys.ok) break;
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 2000));
+      }
+      setState((s) => ({ ...s, step: 7, company: { ...s.company, id: newCompanyId } }));
       window.localStorage.removeItem(STORAGE_KEY);
       window.setTimeout(() => {
-        window.location.assign("/bgos/dashboard");
+        window.location.assign("/bgos/dashboard?building=1");
       }, 800);
     } finally {
       setBusy(false);
@@ -309,6 +479,15 @@ export function NexaOnboardBossClient() {
                 <div className="space-y-4 text-center">
                   <h1 className="text-2xl font-semibold">Hi, I’m Nexa — your Virtual CEO.</h1>
                   <p className="text-sm text-white/75">I’ll set up your business system in minutes.</p>
+                  {resume ? (
+                    <p className="text-xs text-white/55">Picking up where you left off…</p>
+                  ) : null}
+                  {addBusiness ? (
+                    <p className="text-xs text-white/55">Adding another business to your account.</p>
+                  ) : null}
+                  {entrySource === "sales" || entrySource === "franchise" ? (
+                    <p className="text-xs text-white/55">Guided onboarding{entrySource === "franchise" ? " (franchise channel)" : ""}.</p>
+                  ) : null}
                   <button onClick={() => void nextFromIntro()} className="rounded-xl bg-indigo-600 px-5 py-2.5 font-semibold">Start</button>
                 </div>
               ) : null}
@@ -411,10 +590,23 @@ export function NexaOnboardBossClient() {
             </motion.div>
           </AnimatePresence>
 
-          {err ? (
-            <p className="mt-4 rounded-lg border border-amber-300/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
-              {err}
-            </p>
+          {banner ? (
+            <div className="mt-4 rounded-xl border border-indigo-400/25 bg-indigo-950/40 px-4 py-3 text-sm text-indigo-50 shadow-inner">
+              <p className="font-medium leading-relaxed">{banner.text}</p>
+              {banner.showRetry ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setBanner(null);
+                    void banner.onRetry?.();
+                  }}
+                  className="mt-3 w-full rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/15 disabled:opacity-50"
+                >
+                  Retry Now
+                </button>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </div>

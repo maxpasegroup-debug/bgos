@@ -129,7 +129,7 @@ function IceconnectLoginForm() {
 
       const u = data.user;
       if (u.needsOnboarding || u.companyId == null || u.needsWorkspaceActivation) {
-        router.push("/onboarding");
+        router.push("/onboarding/nexa");
         router.refresh();
         return;
       }

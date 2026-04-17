@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
 export default async function SalesBoosterLandingRoute() {
   const user = await getAuthUserFromHeaders();
   if (!user?.companyId) {
-    redirect("/onboarding");
+    redirect("/onboarding/nexa");
   }
 
   const row = await prisma.company.findUnique({

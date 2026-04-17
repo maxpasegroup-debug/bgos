@@ -110,7 +110,7 @@ function LoginForm() {
           u?.companyId == null ||
           u?.needsWorkspaceActivation === true)
       ) {
-        router.replace("/onboarding");
+        router.replace("/onboarding/nexa");
         router.refresh();
         return;
       }

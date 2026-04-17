@@ -448,6 +448,11 @@ export async function middleware(request: NextRequest) {
   const isOnboardingInitPost = normalizedPath === "/api/onboarding/init" && method === "POST";
   const isOnboardingStateGet = normalizedPath === "/api/onboarding/state" && method === "GET";
   const isUsersSearchGet = normalizedPath === "/api/users/search" && method === "GET";
+  const isRoleAssignPost = normalizedPath === "/api/role/assign" && method === "POST";
+  const isSystemInitPost = normalizedPath === "/api/system/init" && method === "POST";
+  const isOnboardingPipelineGet = normalizedPath === "/api/onboarding/pipeline" && method === "GET";
+  const isCompanyBuildingStatusGet =
+    normalizedPath === "/api/company/building-status" && method === "GET";
 
   if (needsCompany) {
     const allowed =
@@ -465,6 +470,10 @@ export async function middleware(request: NextRequest) {
       isOnboardingInitPost ||
       isOnboardingStateGet ||
       isUsersSearchGet ||
+      isRoleAssignPost ||
+      isSystemInitPost ||
+      isOnboardingPipelineGet ||
+      isCompanyBuildingStatusGet ||
       (normalizedPath === "/api/company/list" && request.method === "GET") ||
       (edgeSuperBoss &&
         (normalizedPath === "/bgos/control" ||
@@ -481,7 +490,7 @@ export async function middleware(request: NextRequest) {
           { status: 403 },
         );
       }
-      return NextResponse.redirect(new URL("/onboarding?source=DIRECT", request.url));
+      return NextResponse.redirect(new URL("/onboarding/nexa", request.url));
     }
   }
 
@@ -515,6 +524,10 @@ export async function middleware(request: NextRequest) {
         isOnboardingInitPost ||
         isOnboardingStateGet ||
         isUsersSearchGet ||
+        isRoleAssignPost ||
+        isSystemInitPost ||
+        isOnboardingPipelineGet ||
+        isCompanyBuildingStatusGet ||
         (edgeSuperBoss &&
           (normalizedPath === "/bgos/control" ||
             normalizedPath.startsWith("/bgos/control/"))) ||
@@ -530,7 +543,7 @@ export async function middleware(request: NextRequest) {
             { status: 403 },
           );
         }
-        return NextResponse.redirect(new URL("/onboarding?resume=1", request.url));
+        return NextResponse.redirect(new URL("/onboarding/nexa?resume=1", request.url));
       }
     }
   }

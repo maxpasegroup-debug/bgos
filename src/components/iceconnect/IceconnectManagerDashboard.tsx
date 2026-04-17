@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiFetch, formatFetchFailure, readApiJson } from "@/lib/api-fetch";
 import { OnboardBossButton } from "@/components/onboarding/OnboardBossButton";
 
@@ -40,10 +40,23 @@ type ManagerData = {
   };
 };
 
+type PipelineRow = {
+  id: string;
+  companyName: string;
+  status: string;
+  stage: string;
+  salesOwner: { id: string; name: string; email: string } | null;
+  leadId: string;
+  customerCompanyId: string | null;
+};
+
 export function IceconnectManagerDashboard() {
   const [data, setData] = useState<ManagerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pipeline, setPipeline] = useState<PipelineRow[]>([]);
+  const [pipelineLoading, setPipelineLoading] = useState(true);
+  const [pipelineError, setPipelineError] = useState<string | null>(null);
 
   async function loadDashboard() {
     setLoading(true);
@@ -75,6 +88,36 @@ export function IceconnectManagerDashboard() {
     return () => window.clearInterval(id);
   }, []);
 
+  const loadPipeline = useCallback(async () => {
+    setPipelineLoading(true);
+    setPipelineError(null);
+    try {
+      const res = await apiFetch("/api/onboarding/pipeline", { credentials: "include" });
+      const j = ((await readApiJson(res, "onboarding-pipeline")) ?? {}) as {
+        success?: boolean;
+        data?: PipelineRow[];
+        message?: string;
+      };
+      if (!res.ok || j.success !== true || !Array.isArray(j.data)) {
+        setPipeline([]);
+        setPipelineError(j.message || "Could not load onboarding pipeline");
+        return;
+      }
+      setPipeline(j.data);
+    } catch (e) {
+      setPipeline([]);
+      setPipelineError(formatFetchFailure(e, "Could not load onboarding pipeline"));
+    } finally {
+      setPipelineLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadPipeline();
+    const id = window.setInterval(() => void loadPipeline(), 45_000);
+    return () => window.clearInterval(id);
+  }, [loadPipeline]);
+
   if (loading) {
     return <div className="text-sm text-white/70">Loading manager dashboard...</div>;
   }
@@ -99,6 +142,52 @@ export function IceconnectManagerDashboard() {
       <div className="flex justify-end">
         <OnboardBossButton />
       </div>
+
+      <section className="rounded-xl border border-white/10 bg-white/5 p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-white">Boss onboarding pipeline</h2>
+          <button
+            type="button"
+            onClick={() => void loadPipeline()}
+            className="rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-[11px] font-semibold text-white/80 hover:bg-white/10"
+          >
+            Refresh
+          </button>
+        </div>
+        {pipelineLoading ? (
+          <p className="text-xs text-white/55">Loading pipeline…</p>
+        ) : pipelineError ? (
+          <p className="text-xs text-rose-200">{pipelineError}</p>
+        ) : pipeline.length === 0 ? (
+          <p className="text-xs text-white/55">No onboarding rows yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[32rem] border-collapse text-left text-xs text-white/85">
+              <thead>
+                <tr className="border-b border-white/10 text-[10px] uppercase tracking-wide text-white/45">
+                  <th className="py-2 pr-3 font-semibold">Company</th>
+                  <th className="py-2 pr-3 font-semibold">Stage</th>
+                  <th className="py-2 pr-3 font-semibold">Status</th>
+                  <th className="py-2 font-semibold">Sales owner</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pipeline.map((row) => (
+                  <tr key={row.id} className="border-b border-white/[0.06]">
+                    <td className="py-2 pr-3 font-medium text-white">{row.companyName}</td>
+                    <td className="py-2 pr-3 capitalize">{row.stage.replace("_", " ")}</td>
+                    <td className="py-2 pr-3">{row.status}</td>
+                    <td className="py-2 text-white/70">
+                      {row.salesOwner ? `${row.salesOwner.name} · ${row.salesOwner.email}` : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
       <section className="grid gap-3 sm:grid-cols-4">
         <div className="rounded-xl border border-white/10 bg-white/5 p-4">
           <p className="text-xs text-white/60">Manager</p>

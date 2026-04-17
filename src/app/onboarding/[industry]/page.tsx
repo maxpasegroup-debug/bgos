@@ -17,7 +17,7 @@ export default async function OnboardingIndustryPage({
   const token = (q.token ?? "").trim();
 
   if (industry !== "solar" && industry !== "custom") {
-    redirect("/onboarding");
+    redirect("/onboarding/nexa");
   }
 
   if (mode === "send_form" && token) {

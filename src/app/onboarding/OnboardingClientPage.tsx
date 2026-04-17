@@ -65,7 +65,7 @@ export function OnboardingClientPage() {
       user?: MeUser;
     };
     if (!data.authenticated || !data.user) {
-      router.replace("/login?from=/onboarding");
+      router.replace("/login?from=/onboarding/nexa");
       return false;
     }
     const u = data.user;
@@ -128,7 +128,7 @@ export function OnboardingClientPage() {
       try {
         if (!cancelled) await probeSession();
       } catch {
-        if (!cancelled) router.replace("/login?from=/onboarding");
+        if (!cancelled) router.replace("/login?from=/onboarding/nexa");
       } finally {
         if (!cancelled) setProbing(false);
       }

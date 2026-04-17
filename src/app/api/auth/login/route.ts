@@ -66,13 +66,13 @@ function internalPostLoginLocation(
     return MICRO_FRANCHISE_HOME_PATH;
   }
   if (isBossReady(role, companyId)) {
-    return "/bgos/dashboard";
+    return "/bgos/control/home";
   }
   if (companyId == null || companyId === "") {
-    return "/onboarding";
+    return "/onboarding/nexa";
   }
   if (!workspaceActivated) {
-    return "/onboarding";
+    return "/onboarding/nexa";
   }
   return postLoginDestination(String(role), from?.trim() ?? null);
 }
@@ -340,7 +340,7 @@ export async function POST(request: Request) {
       ? "/reset-password"
       : inProgressSession
         ? effectiveRole === UserRole.ADMIN
-          ? "/onboarding?resume=1"
+          ? "/onboarding/nexa?resume=1"
           : "/iceconnect/onboarding?resume=1"
         : nextPath;
 

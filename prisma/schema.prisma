@@ -299,6 +299,11 @@ model Company {
   /** Micro-franchise partner linked by referral phone (takes precedence over channel partner when matched). */
   microFranchisePartnerId String?
 
+  /** Acquisition channel for Nexa / CRM attribution: direct, sales, franchise. */
+  sourceType String? @map("source_type")
+  /** Stable id for attribution (e.g. internal lead id, franchise partner id). */
+  sourceId   String? @map("source_id")
+
   owner         User            @relation("OwnedCompany", fields: [ownerId], references: [id], onDelete: Restrict)
   memberships   UserCompany[]
   leads         Lead[]

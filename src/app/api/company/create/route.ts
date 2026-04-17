@@ -20,6 +20,7 @@ import { prisma } from "@/lib/prisma";
 import { setActiveCompanyCookie, setSessionCookie } from "@/lib/session-cookie";
 import { signAccessToken } from "@/lib/jwt";
 import { isSuperBossEmail } from "@/lib/super-boss";
+import { applyBossCompanyAttributionFromSession } from "@/lib/nexa-boss-company-attribution";
 import { runOnboardingLaunch } from "@/lib/onboarding-launch-engine";
 import { normalizeMicroFranchisePhone } from "@/lib/micro-franchise-phone";
 
@@ -256,6 +257,18 @@ export async function POST(request: NextRequest) {
         { status: launch.status ?? 400 },
       );
     }
+
+    const onboardingSid = request.cookies.get("bgos_onboarding_sid")?.value?.trim() ?? null;
+    try {
+      await applyBossCompanyAttributionFromSession({
+        onboardingSessionId: onboardingSid,
+        newCompanyId: launch.companyId,
+        bossUserId: user.sub,
+      });
+    } catch (e) {
+      console.error("[company/create] attribution failed (non-fatal)", e);
+    }
+
     if (microFranchisePartnerId) {
       await prisma.company.updateMany({
         where: { id: launch.companyId, microFranchisePartnerId: null },

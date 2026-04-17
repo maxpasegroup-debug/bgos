@@ -42,7 +42,7 @@ export default function SetupRetryPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
     });
-    router.replace("/onboarding?source=DIRECT");
+    router.replace("/onboarding/nexa");
   }
 
   if (!authenticated || checking) {
@@ -61,7 +61,7 @@ export default function SetupRetryPage() {
       </p>
       <div className="flex flex-col gap-3 sm:flex-row">
         <Link
-          href="/onboarding?source=DIRECT"
+          href="/onboarding/nexa"
           className="rounded-2xl bg-slate-900 px-6 py-3 text-white"
         >
           Retry Setup

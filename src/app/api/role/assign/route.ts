@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { parseJsonBodyZod } from "@/lib/api-response";
-import { requireAuthWithRoles } from "@/lib/auth";
+import { forbidden, requireActiveCompanyMembership } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 const bodySchema = z.object({
@@ -19,8 +19,10 @@ function mapRole(input: z.infer<typeof bodySchema>["role"]): UserRole {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await requireAuthWithRoles(request, [UserRole.ADMIN, UserRole.MANAGER]);
+  /** Allow immediately after company mint while `workspaceReady` is still false. */
+  const session = await requireActiveCompanyMembership(request);
   if (session instanceof NextResponse) return session;
+  if (session.role !== UserRole.ADMIN && session.role !== UserRole.MANAGER) return forbidden();
   const parsed = await parseJsonBodyZod(request, bodySchema);
   if (!parsed.ok) return parsed.response;
 

@@ -239,14 +239,18 @@ export function IceconnectSalesDashboard() {
   >([]);
   const [nexaBusy, setNexaBusy] = useState(false);
   const [revenueIntel, setRevenueIntel] = useState<RevenueIntel | null>(null);
+  const [sessionUserId, setSessionUserId] = useState("");
 
   useEffect(() => {
     let c = true;
     (async () => {
       try {
         const res = await apiFetch("/api/auth/me", { credentials: "include" });
-        const j = (await res.json()) as { user?: { name?: string; role?: string } };
+        const j = (await res.json()) as { user?: { id?: string; name?: string; role?: string } };
         if (!c) return;
+        if (typeof j.user?.id === "string" && j.user.id.trim()) {
+          setSessionUserId(j.user.id.trim());
+        }
         if (typeof j.user?.name === "string" && j.user.name.trim()) {
           setEmployeeName(j.user.name.trim());
         }
@@ -638,6 +642,11 @@ export function IceconnectSalesDashboard() {
     background: "linear-gradient(90deg, var(--ice-primary), var(--ice-secondary))",
   } as CSSProperties;
 
+  const onboardBossLeadId = useMemo(() => {
+    if (draggingLeadId && leads.some((l) => l.id === draggingLeadId)) return draggingLeadId;
+    return leads[0]?.id ?? "";
+  }, [draggingLeadId, leads]);
+
   return (
     <IceconnectWorkspaceView
       title={`${cName} Sales`}
@@ -648,7 +657,12 @@ export function IceconnectSalesDashboard() {
       hero={hero}
     >
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <OnboardBossButton />
+        <OnboardBossButton
+          source="sales"
+          leadId={onboardBossLeadId}
+          ownerId={sessionUserId}
+          referralSource="sales_dashboard"
+        />
         <button
           type="button"
           disabled={nexaBusy}
