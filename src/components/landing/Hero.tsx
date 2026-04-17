@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { Container } from "./Container";
 import { heroY } from "./spacing";
+import { OnboardBossButton } from "@/components/onboarding/OnboardBossButton";
 
 const outlineCta =
   "inline-flex min-h-[46px] w-full items-center justify-center rounded-xl border border-white/20 bg-white/[0.04] px-8 py-3.5 text-center text-sm font-semibold tracking-wide text-white/90 shadow-sm backdrop-blur-sm transition-all duration-300 hover:border-white/30 hover:bg-white/[0.08] hover:shadow-md sm:w-auto";
@@ -151,18 +152,7 @@ export function Hero() {
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.98 }}
               >
-                <Link
-                  href="/signup"
-                  className="relative inline-flex min-h-[46px] w-full items-center justify-center overflow-hidden rounded-xl bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] px-8 py-3.5 text-sm font-bold tracking-wide text-white shadow-lg shadow-indigo-500/25 transition-shadow duration-300 hover:shadow-xl hover:shadow-violet-500/30 sm:w-auto"
-                >
-                  <span
-                    className="pointer-events-none absolute inset-0 overflow-hidden"
-                    aria-hidden
-                  >
-                    <span className="animate-btn-shine absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/35 to-transparent" />
-                  </span>
-                  <span className="relative z-10">Start Free Trial</span>
-                </Link>
+                <OnboardBossButton className="relative min-h-[46px] w-full px-8 py-3.5 text-sm font-bold tracking-wide sm:w-auto" />
               </motion.div>
               <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.99 }}>
                 <Link href="#solution" className={outlineCta}>

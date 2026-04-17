@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "r
 import { useCompanyBranding } from "@/contexts/company-branding-context";
 import { forwardLeadStatuses, leadStatusLabel } from "@/lib/lead-pipeline";
 import { IncentivesFeedBanner } from "@/components/incentives/IncentivesFeedBanner";
+import { OnboardBossButton } from "@/components/onboarding/OnboardBossButton";
 import { IceconnectWorkspaceView } from "./IceconnectWorkspaceView";
 import { IcPanel } from "./IcPanel";
 
@@ -647,6 +648,7 @@ export function IceconnectSalesDashboard() {
       hero={hero}
     >
       <div className="flex flex-wrap items-center justify-end gap-2">
+        <OnboardBossButton />
         <button
           type="button"
           disabled={nexaBusy}

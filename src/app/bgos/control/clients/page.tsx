@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useBgosTheme } from "@/components/bgos/BgosThemeContext";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
+import { OnboardBossButton } from "@/components/onboarding/OnboardBossButton";
 import { apiFetch, formatFetchFailure, readApiJson } from "@/lib/api-fetch";
 
 type IndustryFilter = "ALL" | "SOLAR" | "ACADEMY" | "BUILDERS" | "CUSTOM";
@@ -111,16 +112,7 @@ export default function ControlClientsPage() {
             Client grid by industry and status. Open a card to control subscription, team, and performance.
           </p>
         </div>
-        <Link
-          href="/onboarding?addBusiness=1"
-          className={
-            light
-              ? "shrink-0 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-center text-sm font-semibold text-indigo-900 hover:bg-indigo-100"
-              : "shrink-0 rounded-xl border border-cyan-500/35 bg-cyan-500/10 px-4 py-2 text-center text-sm font-semibold text-cyan-100 hover:bg-cyan-500/15"
-          }
-        >
-          Create new company
-        </Link>
+        <OnboardBossButton />
       </div>
 
       {error ? (

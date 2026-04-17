@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch, formatFetchFailure, readApiJson } from "@/lib/api-fetch";
+import { OnboardBossButton } from "@/components/onboarding/OnboardBossButton";
 
 type ManagerData = {
   summary: {
@@ -95,6 +96,9 @@ export function IceconnectManagerDashboard() {
 
   return (
     <div className="space-y-5">
+      <div className="flex justify-end">
+        <OnboardBossButton />
+      </div>
       <section className="grid gap-3 sm:grid-cols-4">
         <div className="rounded-xl border border-white/10 bg-white/5 p-4">
           <p className="text-xs text-white/60">Manager</p>

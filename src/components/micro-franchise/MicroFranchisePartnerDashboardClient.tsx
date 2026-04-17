@@ -15,6 +15,7 @@ import {
   YAxis,
 } from "recharts";
 import { IncentivesFeedBanner } from "@/components/incentives/IncentivesFeedBanner";
+import { OnboardBossButton } from "@/components/onboarding/OnboardBossButton";
 import { apiFetch, formatFetchFailure, readApiJson } from "@/lib/api-fetch";
 import { publicBgosOrigin } from "@/lib/host-routing";
 
@@ -274,6 +275,7 @@ export function MicroFranchisePartnerDashboardClient() {
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <OnboardBossButton className="px-3 py-2 text-xs" />
             <button
               type="button"
               className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/10"

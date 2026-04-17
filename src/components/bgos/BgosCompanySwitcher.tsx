@@ -208,10 +208,10 @@ export function BgosCompanySwitcher({ light = false }: { light?: boolean }) {
               onClick={() => {
                 setOpen(false);
                 prepareAddBusinessNavigation();
-                router.replace("/onboarding?addBusiness=1");
+                router.replace("/onboarding/nexa");
               }}
             >
-              Add New Business
+              Onboard Boss
             </button>
           </div>
         </div>

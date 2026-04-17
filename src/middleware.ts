@@ -100,6 +100,8 @@ function skipsMiddlewareAuth(pathname: string, method: string): boolean {
   ) {
     return true;
   }
+  if (pathname === "/api/users/check" && method === "GET") return true;
+  if (pathname === "/api/categories" && method === "GET") return true;
   if (pathname.startsWith("/api/customer/")) return true;
   if (pathname === "/api/auth/refresh-session" && method === "POST") return true;
   if (pathname === "/api/payment/webhook" && method === "POST") return true;
