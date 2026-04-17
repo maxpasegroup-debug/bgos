@@ -97,7 +97,13 @@ export async function POST(request: NextRequest) {
 
     if (!launch.ok) {
       return NextResponse.json(
-        { ok: false as const, error: launch.error, code: launch.code },
+        {
+          ok: false as const,
+          success: false as const,
+          error: launch.error,
+          code: launch.code,
+          ...(launch.step_failed ? { step_failed: launch.step_failed } : {}),
+        },
         { status: launch.status ?? 400 },
       );
     }
@@ -105,7 +111,10 @@ export async function POST(request: NextRequest) {
     const res = NextResponse.json({
       ok: true as const,
       success: true as const,
+      user_id: actor.user.sub,
+      company_id: launch.companyId,
       companyId: launch.companyId,
+      session_ready: true as const,
       employeesCreated: launch.employeesCreated,
       dashboardsAssigned: launch.dashboardsAssigned,
       credentials: launch.credentials,
@@ -118,8 +127,22 @@ export async function POST(request: NextRequest) {
         : {}),
     });
 
-    await setSessionCookie(res, launch.sessionJwt);
-    await setActiveCompanyCookie(res, launch.activeCompanyId);
+    try {
+      await setSessionCookie(res, launch.sessionJwt);
+      await setActiveCompanyCookie(res, launch.activeCompanyId);
+    } catch (cookieErr) {
+      console.error("POST /api/onboarding/launch cookie attach failed", cookieErr);
+      return NextResponse.json(
+        {
+          ok: false as const,
+          success: false as const,
+          error: "Could not finalize your session. Please try again.",
+          code: "SERVER_ERROR" as const,
+          step_failed: "session_mint" as const,
+        },
+        { status: 500 },
+      );
+    }
 
     return res;
   } catch (error) {
@@ -130,6 +153,7 @@ export async function POST(request: NextRequest) {
         success: false as const,
         error: error instanceof Error ? error.message : "Internal server error",
         code: "SERVER_ERROR" as const,
+        step_failed: "unknown" as const,
       },
       { status: 500 },
     );

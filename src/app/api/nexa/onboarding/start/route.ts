@@ -43,13 +43,23 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ok: true as const,
+      success: true as const,
+      user_id: session.sub,
       sessionId: started.sessionId,
+      session_ready: true as const,
       resumed: started.resumed,
       intro,
     });
-  } catch {
+  } catch (error) {
+    console.error("POST /api/nexa/onboarding/start", error);
     return NextResponse.json(
-      { ok: false as const, error: "Could not start onboarding", code: "SERVER_ERROR" as const },
+      {
+        ok: false as const,
+        success: false as const,
+        error: "Could not start onboarding",
+        code: "SERVER_ERROR" as const,
+        step_failed: "nexa_init" as const,
+      },
       { status: 500 },
     );
   }

@@ -8,9 +8,12 @@ function solarTemplateJson(): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(SOLAR_TEMPLATE)) as Prisma.InputJsonValue;
 }
 
-/** Applies the Solar industry pack: company workspace config + default automations (idempotent on automations). */
-export async function applySolarTemplate(companyId: string): Promise<void> {
-  await prisma.company.update({
+/** Applies the Solar industry pack inside a transaction (same semantics as {@link applySolarTemplate}). */
+export async function applySolarTemplateWithClient(
+  tx: Prisma.TransactionClient,
+  companyId: string,
+): Promise<void> {
+  await tx.company.update({
     where: { id: companyId },
     data: {
       businessTemplate: SOLAR_TEMPLATE.id,
@@ -18,10 +21,10 @@ export async function applySolarTemplate(companyId: string): Promise<void> {
     },
   });
 
-  const existing = await prisma.automation.count({ where: { companyId } });
+  const existing = await tx.automation.count({ where: { companyId } });
   if (existing > 0) return;
 
-  await prisma.automation.createMany({
+  await tx.automation.createMany({
     data: SOLAR_TEMPLATE.automations.map((a) => ({
       name: a.name,
       trigger: a.trigger,
@@ -29,6 +32,26 @@ export async function applySolarTemplate(companyId: string): Promise<void> {
       config: JSON.parse(JSON.stringify(a.config)) as Prisma.InputJsonValue,
       companyId,
     })),
+  });
+}
+
+/** Extensible hook for future packs (real estate, coaching, clinics). */
+export async function applyIndustryTemplateWithClient(
+  tx: Prisma.TransactionClient,
+  companyId: string,
+  industry: string,
+): Promise<void> {
+  const key = industry.trim().toLowerCase();
+  if (key === "custom") return;
+  if (key === "solar" || key === "solar-company" || key === "energy") {
+    await applySolarTemplateWithClient(tx, companyId);
+  }
+}
+
+/** Applies the Solar industry pack: company workspace config + default automations (idempotent on automations). */
+export async function applySolarTemplate(companyId: string): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    await applySolarTemplateWithClient(tx, companyId);
   });
 }
 

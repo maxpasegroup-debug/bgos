@@ -129,6 +129,7 @@ function bgosAllowsPagePath(pathname: string): boolean {
   if (normalizePathname(pathname) === "/lead") return true;
   if (pathname === "/bgos" || pathname.startsWith("/bgos/")) return true;
   if (pathname === "/sales-booster" || pathname.startsWith("/sales-booster/")) return true;
+  if (normalizePathname(pathname) === "/setup-retry" || pathname.startsWith("/setup-retry/")) return true;
   if (isPublicRoute(pathname)) return true;
   return false;
 }
@@ -138,6 +139,7 @@ function iceAllowsPagePath(pathname: string): boolean {
   if (p === "/lead") return true;
   /** Onboarding runs on the same app; ICECONNECT host must not force login for these paths. */
   if (p === "/onboarding" || p.startsWith("/onboarding/")) return true;
+  if (p === "/setup-retry" || p.startsWith("/setup-retry/")) return true;
   return pathname === "/iceconnect" || pathname.startsWith("/iceconnect/");
 }
 
@@ -435,14 +437,26 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  const isNexaOnboardingStartPost =
+    normalizedPath === "/api/nexa/onboarding/start" && method === "POST";
+  const isNexaOnboardingAbandonPost =
+    normalizedPath === "/api/nexa/onboarding/abandon" && method === "POST";
+  const isNexaBossLookupPost =
+    normalizedPath === "/api/nexa/onboarding/boss-lookup" && method === "POST";
+
   if (needsCompany) {
     const allowed =
       normalizedPath === "/onboarding" ||
       normalizedPath.startsWith("/onboarding/") ||
+      normalizedPath === "/setup-retry" ||
+      normalizedPath.startsWith("/setup-retry/") ||
       normalizedPath === "/api/auth/me" ||
       normalizedPath === "/api/auth/logout" ||
       isCompanyCreatePost ||
       isOnboardingLaunchPost ||
+      isNexaOnboardingStartPost ||
+      isNexaOnboardingAbandonPost ||
+      isNexaBossLookupPost ||
       (normalizedPath === "/api/company/list" && request.method === "GET") ||
       (edgeSuperBoss &&
         (normalizedPath === "/bgos/control" ||
@@ -481,10 +495,15 @@ export async function middleware(request: NextRequest) {
       const allowedActivation =
         normalizedPath === "/onboarding" ||
         normalizedPath.startsWith("/onboarding/") ||
+        normalizedPath === "/setup-retry" ||
+        normalizedPath.startsWith("/setup-retry/") ||
         normalizedPath === "/api/auth/me" ||
         normalizedPath === "/api/auth/logout" ||
         (normalizedPath === "/api/auth/refresh-session" && request.method === "POST") ||
         (normalizedPath === "/api/company/list" && request.method === "GET") ||
+        isNexaOnboardingStartPost ||
+        isNexaOnboardingAbandonPost ||
+        isNexaBossLookupPost ||
         (edgeSuperBoss &&
           (normalizedPath === "/bgos/control" ||
             normalizedPath.startsWith("/bgos/control/"))) ||

@@ -5,6 +5,7 @@ import {
   CompanyIndustry,
   CompanyPlan,
   CompanySubscriptionStatus,
+  Prisma,
   UserRole,
 } from "@prisma/client";
 import {
@@ -15,7 +16,7 @@ import {
   type LaunchCredential,
   type LaunchIndustry,
 } from "@/lib/company-launch-engine";
-import { applyIndustryTemplate } from "@/lib/industry-templates";
+import { applyIndustryTemplateWithClient } from "@/lib/industry-templates";
 import { createLogger } from "@/lib/logger";
 import { loadMembershipsForJwt } from "@/lib/memberships-for-jwt";
 import { normalizeMicroFranchisePhone } from "@/lib/micro-franchise-phone";
@@ -81,14 +82,90 @@ export type OnboardingLaunchOk = {
   nextStep?: "/onboarding/custom/pay";
 };
 
+export type OnboardingLaunchStepFailed =
+  | "validation"
+  | "company_creation"
+  | "role_assignment"
+  | "industry_template"
+  | "nexa_session"
+  | "session_mint"
+  | "unknown";
+
 export type OnboardingLaunchFail = {
   ok: false;
   error: string;
   code: "VALIDATION_ERROR" | "FORBIDDEN" | "SERVER_ERROR";
   status?: number;
+  step_failed?: OnboardingLaunchStepFailed;
 };
 
 export type OnboardingLaunchResult = OnboardingLaunchOk | OnboardingLaunchFail;
+
+async function rollbackCommittedLaunch(
+  companyId: string,
+  newEmployeeUserIds: string[],
+  sessionId: string | null | undefined,
+): Promise<void> {
+  try {
+    await prisma.$transaction(async (tx) => {
+      if (sessionId) {
+        await tx.onboardingSession.updateMany({
+          where: { id: sessionId },
+          data: { status: "in_progress" },
+        });
+      }
+      await tx.company.delete({ where: { id: companyId } });
+    });
+    for (const uid of newEmployeeUserIds) {
+      const n = await prisma.userCompany.count({ where: { userId: uid } });
+      if (n === 0) {
+        await prisma.user.delete({ where: { id: uid } }).catch(() => undefined);
+      }
+    }
+  } catch (e) {
+    createLogger("onboarding-launch").error("rollbackCommittedLaunch failed", e, { companyId });
+  }
+}
+
+function failFromPrismaOrUnknown(e: unknown): OnboardingLaunchFail {
+  if (e instanceof Prisma.PrismaClientKnownRequestError) {
+    if (e.code === "P2002") {
+      return {
+        ok: false,
+        error: "A record already exists for this setup. Use Retry Setup to continue.",
+        code: "SERVER_ERROR",
+        status: 409,
+        step_failed: "role_assignment",
+      };
+    }
+    if (e.code === "P2021" || e.code === "P2022" || e.code === "P2010") {
+      return {
+        ok: false,
+        error: "System setup issue. Please retry in a moment.",
+        code: "SERVER_ERROR",
+        status: 503,
+        step_failed: "industry_template",
+      };
+    }
+  }
+  const msg = e instanceof Error ? e.message : "Launch failed";
+  if (/invalid enum|does not exist|IceconnectMetroStage|Unknown arg|column/i.test(msg)) {
+    return {
+      ok: false,
+      error: "System setup issue. Please retry in a moment.",
+      code: "SERVER_ERROR",
+      status: 503,
+      step_failed: "company_creation",
+    };
+  }
+  return {
+    ok: false,
+    error: msg,
+    code: "SERVER_ERROR",
+    status: 500,
+    step_failed: "company_creation",
+  };
+}
 
 function buildTempPassword(companyName: string, personName: string): string {
   const c = companyName.trim().replace(/\s+/g, "-").slice(0, 24) || "Company";
@@ -130,7 +207,13 @@ function dashboardsAssignedFor(employeeJobRoles: UserRole[]): string[] {
 export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Promise<OnboardingLaunchResult> {
   const name = input.companyName.trim();
   if (!name) {
-    return { ok: false, error: "Company name is required", code: "VALIDATION_ERROR", status: 400 };
+    return {
+      ok: false,
+      error: "Company name is required",
+      code: "VALIDATION_ERROR",
+      status: 400,
+      step_failed: "validation",
+    };
   }
 
   const existingByOwnerAndName = await prisma.company.findFirst({
@@ -186,7 +269,13 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
         businessType: industryToBusinessType(input.industry),
       };
     } catch {
-      return { ok: false, error: "Authentication is not configured", code: "SERVER_ERROR", status: 500 };
+      return {
+        ok: false,
+        error: "Authentication is not configured",
+        code: "SERVER_ERROR",
+        status: 500,
+        step_failed: "session_mint",
+      };
     }
   }
 
@@ -201,6 +290,7 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
         error: "Logo must be an https URL or a path starting with /",
         code: "VALIDATION_ERROR",
         status: 400,
+        step_failed: "validation",
       };
     }
   }
@@ -253,7 +343,13 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
       select: { name: true, email: true },
     });
     if (!owner) {
-      return { ok: false, error: "Owner user not found", code: "SERVER_ERROR", status: 500 };
+      return {
+        ok: false,
+        error: "Owner user not found",
+        code: "SERVER_ERROR",
+        status: 500,
+        step_failed: "unknown",
+      };
     }
 
     /** Empty team → minimal ICECONNECT-ready row (boss stays sole company ADMIN user). */
@@ -316,6 +412,7 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
     console.time("ONBOARDING_TX");
     const txResult = await prisma.$transaction(
       async (tx) => {
+      const createdEmployeeUserIds: string[] = [];
       const employeeCredentials: LaunchCredential[] = [];
       let employeesProvisioned = 0;
       const rolesForDashboards: UserRole[] = [];
@@ -458,6 +555,7 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
             },
             select: { id: true, name: true, email: true },
           });
+          createdEmployeeUserIds.push(user.id);
           const mapped = roleStatusByName.get(member.name.trim().toLowerCase());
           await tx.userCompany.create({
             data: {
@@ -497,6 +595,7 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
           },
           select: { id: true, name: true, email: true },
         });
+        createdEmployeeUserIds.push(user.id);
         const mapped = roleStatusByName.get(member.name.trim().toLowerCase());
         await tx.userCompany.create({
           data: {
@@ -546,18 +645,26 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
         });
       }
 
+      await applyIndustryTemplateWithClient(
+        tx,
+        co.id,
+        prismaIndustry === CompanyIndustry.SOLAR ? "SOLAR" : "CUSTOM",
+      );
+
       return {
         companyId: co.id,
         employeesProvisioned,
         rolesForDashboards,
         employeeCredentials,
+        createdEmployeeUserIds,
       };
       },
       { timeout: 20_000 },
     );
     console.timeEnd("ONBOARDING_TX");
 
-    const { companyId, employeesProvisioned, rolesForDashboards, employeeCredentials } = txResult;
+    const { companyId, employeesProvisioned, rolesForDashboards, employeeCredentials, createdEmployeeUserIds } =
+      txResult;
 
     const credentials: LaunchCredential[] = [...employeeCredentials];
     credentials.unshift({
@@ -567,12 +674,6 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
       password: "— (use your existing BGOS password)",
       loginUrl: loginUrlForRole(UserRole.ADMIN),
     });
-
-    try {
-      await applyIndustryTemplate(companyId, prismaIndustry === CompanyIndustry.SOLAR ? "SOLAR" : "CUSTOM");
-    } catch (e) {
-      createLogger("onboarding-launch").error("applyIndustryTemplate failed", e, { companyId });
-    }
 
     const employeesCreated = employeesProvisioned;
     const dashboardsAssigned = dashboardsAssignedFor(rolesForDashboards);
@@ -595,16 +696,29 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
     const jwtCompany = mems.find((m) => m.companyId === companyId) ?? primary;
     const workspaceReady = input.addingAnotherBusiness;
 
-    const sessionJwt = signAccessToken({
-      sub: input.ownerUserId,
-      email: input.ownerEmail,
-      role: jwtCompany.jobRole,
-      companyId: jwtCompany.companyId,
-      companyPlan: jwtCompany.plan,
-      workspaceReady,
-      memberships: mems,
-      ...(isSuperBossEmail(input.ownerEmail) ? { superBoss: true as const } : {}),
-    });
+    let sessionJwt: string;
+    try {
+      sessionJwt = signAccessToken({
+        sub: input.ownerUserId,
+        email: input.ownerEmail,
+        role: jwtCompany.jobRole,
+        companyId: jwtCompany.companyId,
+        companyPlan: jwtCompany.plan,
+        workspaceReady,
+        memberships: mems,
+        ...(isSuperBossEmail(input.ownerEmail) ? { superBoss: true as const } : {}),
+      });
+    } catch (e) {
+      createLogger("onboarding-launch").error("signAccessToken failed after launch tx", e, { companyId });
+      await rollbackCommittedLaunch(companyId, createdEmployeeUserIds, input.sessionId);
+      return {
+        ok: false,
+        error: "Authentication is not configured",
+        code: "SERVER_ERROR",
+        status: 500,
+        step_failed: "session_mint",
+      };
+    }
 
     const credentialsFile = {
       filename: `${name.replace(/\s+/g, "_")}_credentials.xlsx`,
@@ -635,11 +749,6 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
     return out;
   } catch (e) {
     console.error("[onboarding-launch-engine]", e);
-    return {
-      ok: false,
-      error: e instanceof Error ? e.message : "Launch failed",
-      code: "SERVER_ERROR",
-      status: 500,
-    };
+    return failFromPrismaOrUnknown(e);
   }
 }

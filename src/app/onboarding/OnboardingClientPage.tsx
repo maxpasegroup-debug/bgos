@@ -166,8 +166,18 @@ export function OnboardingClientPage() {
           credentials: "include",
           body: JSON.stringify({ source: "DIRECT" }),
         });
-        const startData = (await startRes.json()) as { ok?: boolean; sessionId?: string; error?: string };
-        if (!startRes.ok || startData.ok !== true || !startData.sessionId) {
+        const startData = (await startRes.json()) as {
+          ok?: boolean;
+          success?: boolean;
+          sessionId?: string;
+          error?: string;
+        };
+        if (
+          !startRes.ok ||
+          startData.ok !== true ||
+          startData.success !== true ||
+          !startData.sessionId
+        ) {
           setError(startData.error || "Could not start Nexa onboarding");
           return;
         }
@@ -205,9 +215,22 @@ export function OnboardingClientPage() {
         error?: string;
         message?: string;
         companyId?: string;
+        company_id?: string;
+        user_id?: string;
+        session_ready?: boolean;
+        step_failed?: string;
       };
 
-      if (!res.ok || !data.ok || data.success === false) {
+      if (
+        !res.ok ||
+        data.ok !== true ||
+        data.success !== true ||
+        typeof data.company_id !== "string" ||
+        !data.company_id ||
+        typeof data.user_id !== "string" ||
+        !data.user_id ||
+        data.session_ready !== true
+      ) {
         setError(
           typeof data.error === "string"
             ? data.error

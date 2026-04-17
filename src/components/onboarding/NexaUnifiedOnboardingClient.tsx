@@ -41,11 +41,35 @@ function subFor(source: Source) {
   return "I will set up your business system step by step.";
 }
 
+const DEV_ONBOARD = process.env.NODE_ENV === "development";
+
 function friendlyError(input: unknown, fallback: string) {
   const msg = formatFetchFailure(input, fallback).toLowerCase();
   if (msg.includes("email")) return "That email does not look right - let's try again.";
   if (msg.includes("not found")) return "I could not find that record - please check and try again.";
-  return "Something did not go through - let's try again.";
+  return "We couldn't finish setting up your business system. Let's fix it in one click.";
+}
+
+function isLaunchPayloadSuccess(
+  res: Response,
+  data: {
+    ok?: boolean;
+    success?: boolean;
+    company_id?: string;
+    user_id?: string;
+    session_ready?: boolean;
+  },
+): boolean {
+  return (
+    res.ok &&
+    data.ok === true &&
+    data.success === true &&
+    typeof data.company_id === "string" &&
+    data.company_id.length > 0 &&
+    typeof data.user_id === "string" &&
+    data.user_id.length > 0 &&
+    data.session_ready === true
+  );
 }
 
 function TypewriterText({
@@ -115,6 +139,8 @@ export function NexaUnifiedOnboardingClient({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [launchFatal, setLaunchFatal] = useState(false);
+  const [isLaunching, setIsLaunching] = useState(false);
   const [canInteract, setCanInteract] = useState(false);
   const [nexaReply, setNexaReply] = useState("");
   const [generationProgress, setGenerationProgress] = useState(0);
@@ -228,8 +254,18 @@ export function NexaUnifiedOnboardingClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ source }),
       });
-      const j = ((await readApiJson(res, "start-onboarding")) ?? {}) as { ok?: boolean; sessionId?: string; error?: string };
-      if (!res.ok || j.ok !== true || !j.sessionId) throw new Error(j.error || "Could not start onboarding");
+      const j = ((await readApiJson(res, "start-onboarding")) ?? {}) as {
+        ok?: boolean;
+        success?: boolean;
+        sessionId?: string;
+        error?: string;
+        step_failed?: string;
+      };
+      if (DEV_ONBOARD) console.log("Signup response / Nexa start:", { status: res.status, body: j });
+      if (!res.ok || j.ok !== true || j.success !== true || !j.sessionId) {
+        if (DEV_ONBOARD) console.error("Onboarding failed at step:", "nexa_init", j);
+        throw new Error(j.error || "Could not start onboarding");
+      }
       setSessionId(j.sessionId);
       moveTo(1);
     } catch (e) {
@@ -333,9 +369,11 @@ export function NexaUnifiedOnboardingClient({
   }
 
   async function runGeneration() {
+    let hardFailure = false;
     setBusy(true);
     setError(null);
-    moveTo(7);
+    setLaunchFatal(false);
+    setIsLaunching(true);
     try {
       if (source === "SALES") {
         const createRes = await apiFetch("/api/iceconnect/onboarding", {
@@ -344,8 +382,15 @@ export function NexaUnifiedOnboardingClient({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ leadId }),
         });
-        const createJson = ((await readApiJson(createRes, "create-onboarding")) ?? {}) as { ok?: boolean; id?: string; error?: string };
-        if (!createRes.ok || createJson.ok !== true || !createJson.id) throw new Error(createJson.error || "Could not start onboarding record");
+        const createJson = ((await readApiJson(createRes, "create-onboarding")) ?? {}) as {
+          ok?: boolean;
+          id?: string;
+          error?: string;
+        };
+        if (DEV_ONBOARD) console.log("Company created (sales record):", createJson);
+        if (!createRes.ok || createJson.ok !== true || !createJson.id) {
+          throw new Error(createJson.error || "Could not start onboarding record");
+        }
         const submitRes = await apiFetch(`/api/iceconnect/onboarding/${createJson.id}/submit`, {
           method: "POST",
           credentials: "include",
@@ -361,9 +406,15 @@ export function NexaUnifiedOnboardingClient({
           }),
         });
         const submitJson = ((await readApiJson(submitRes, "submit-onboarding")) ?? {}) as {
-          ok?: boolean; credentials?: Credential[]; credentialsFile?: { filename: string; base64: string; mimeType: string }; error?: string;
+          ok?: boolean;
+          credentials?: Credential[];
+          credentialsFile?: { filename: string; base64: string; mimeType: string };
+          error?: string;
         };
-        if (!submitRes.ok || submitJson.ok !== true) throw new Error(submitJson.error || "Generation failed");
+        if (DEV_ONBOARD) console.log("Nexa session (sales submit):", submitJson);
+        if (!submitRes.ok || submitJson.ok !== true) {
+          throw new Error(submitJson.error || "Generation failed");
+        }
         setCredentials(submitJson.credentials ?? []);
       } else {
         const launchRes = await apiFetch("/api/onboarding/launch", {
@@ -385,20 +436,77 @@ export function NexaUnifiedOnboardingClient({
           }),
         });
         const launchJson = ((await readApiJson(launchRes, "launch-direct")) ?? {}) as {
-          ok?: boolean; credentials?: Credential[]; credentialsFile?: { filename: string; base64: string; mimeType: string }; error?: string;
+          ok?: boolean;
+          success?: boolean;
+          company_id?: string;
+          user_id?: string;
+          session_ready?: boolean;
+          credentials?: Credential[];
+          credentialsFile?: { filename: string; base64: string; mimeType: string };
+          error?: string;
+          step_failed?: string;
         };
-        if (!launchRes.ok || launchJson.ok !== true) throw new Error(launchJson.error || "Generation failed");
+        if (DEV_ONBOARD) console.log("Signup response (launch):", launchJson);
+        if (!isLaunchPayloadSuccess(launchRes, launchJson)) {
+          if (DEV_ONBOARD) console.error("Onboarding failed at step:", launchJson.step_failed ?? "launch", launchJson);
+          hardFailure = true;
+          setLaunchFatal(true);
+          throw new Error(launchJson.error || "Generation failed");
+        }
+        const meRes = await apiFetch("/api/auth/me", { credentials: "include" });
+        const meJson = ((await readApiJson(meRes, "launch-me-guard")) ?? {}) as {
+          user?: { id?: string; companyId?: string | null; role?: string };
+        };
+        const u = meJson.user;
+        if (DEV_ONBOARD) console.log("Role assigned (me):", u);
+        if (
+          !meRes.ok ||
+          typeof u?.id !== "string" ||
+          typeof u?.companyId !== "string" ||
+          u.companyId.length === 0 ||
+          u.role !== "ADMIN"
+        ) {
+          if (DEV_ONBOARD) console.error("Onboarding failed at step:", "role_assignment", u);
+          hardFailure = true;
+          setLaunchFatal(true);
+          throw new Error("Session was not fully activated");
+        }
         setCredentials(launchJson.credentials ?? []);
         setCredentialsFile(launchJson.credentialsFile ?? null);
       }
       setGenerationProgress(4);
-      window.setTimeout(() => moveTo(8), 300);
+      setIsLaunching(false);
+      moveTo(8);
     } catch (e) {
+      if (DEV_ONBOARD) console.error("Onboarding failed at step:", "runGeneration", e);
       setError(friendlyError(e, "Something did not go through"));
-      moveTo(6);
+      if (!hardFailure) {
+        moveTo(6);
+      }
+    } finally {
+      setIsLaunching(false);
+      setBusy(false);
+    }
+  }
+
+  async function abandonAndRestart() {
+    setBusy(true);
+    try {
+      await apiFetch("/api/nexa/onboarding/abandon", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+    } catch {
+      /* non-fatal */
     } finally {
       setBusy(false);
     }
+    setSessionId(null);
+    setLaunchFatal(false);
+    setError(null);
+    moveTo(0);
   }
 
   function downloadCredentials() {
@@ -422,6 +530,38 @@ export function NexaUnifiedOnboardingClient({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeInOut" }}
     >
+      {launchFatal ? (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-50 px-6 text-center">
+          <h1 className="mb-3 text-2xl font-semibold text-slate-900">Setup failed</h1>
+          <p className="mb-8 max-w-md text-slate-600">
+            We couldn&apos;t complete your business setup. Please try again.
+          </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <PrimaryButton
+              onClick={() => {
+                setLaunchFatal(false);
+                setError(null);
+                void runGeneration();
+              }}
+            >
+              Retry Setup
+            </PrimaryButton>
+            <a
+              href="/contact"
+              className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-6 py-3 text-slate-900"
+            >
+              Contact Support
+            </a>
+            <PrimaryButton
+              className="border border-slate-300 bg-white text-slate-900"
+              onClick={() => void abandonAndRestart()}
+            >
+              Start Fresh
+            </PrimaryButton>
+          </div>
+        </div>
+      ) : null}
+
       <div className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center px-6 py-10 text-center">
         <motion.div
           className="mb-6 h-12 w-12 rounded-full bg-[radial-gradient(circle_at_35%_30%,#dbeafe_0%,#60a5fa_50%,#6366f1_100%)]"
@@ -435,7 +575,30 @@ export function NexaUnifiedOnboardingClient({
           transition={{ duration: 3.2, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
         />
 
-        {error ? <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">{error}</p> : null}
+        {error && !launchFatal ? (
+          <div className="mb-3 w-full max-w-lg space-y-3">
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 whitespace-pre-line">{error}</p>
+            {step === 6 && !isLaunching ? (
+              <div className="flex flex-wrap justify-center gap-2">
+                <PrimaryButton
+                  className="px-4 py-2 text-sm"
+                  onClick={() => {
+                    setError(null);
+                    void runGeneration();
+                  }}
+                >
+                  Retry Setup
+                </PrimaryButton>
+                <PrimaryButton
+                  className="border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900"
+                  onClick={() => void abandonAndRestart()}
+                >
+                  Start Fresh
+                </PrimaryButton>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         <AnimatePresence mode="wait">
           <motion.div
@@ -450,6 +613,9 @@ export function NexaUnifiedOnboardingClient({
               <div className="space-y-4">
                 <h1 className="text-3xl font-semibold">{introFor(source, employeeName)}</h1>
                 <TypewriterText text={subFor(source)} active onDone={() => setCanInteract(true)} />
+                {busy && step === 0 ? (
+                  <p className="text-sm text-slate-600">Setting up your business system...</p>
+                ) : null}
                 <PrimaryButton onClick={() => void start()} disabled={busy || !canInteract}>
                   Let&apos;s Start
                 </PrimaryButton>
@@ -573,7 +739,13 @@ export function NexaUnifiedOnboardingClient({
             ) : null}
 
             {step === 6 ? (
-              <div className="space-y-4">
+              <div className="relative space-y-4">
+                {isLaunching ? (
+                  <div className="absolute inset-0 z-10 flex min-h-[220px] flex-col items-center justify-center rounded-xl bg-white/95 px-4 py-8 shadow-sm">
+                    <p className="text-lg font-medium text-slate-800">Setting up your business system...</p>
+                    <p className="mt-2 text-sm text-slate-500">Hang tight — we&apos;re finishing your workspace.</p>
+                  </div>
+                ) : null}
                 <h2 className="text-2xl font-semibold">Here is your team structure</h2>
                 <TypewriterText text="Everything looks good. I can generate your business system now." active onDone={() => setCanInteract(true)} />
                 <div className="rounded-xl border bg-white p-4 text-left">
@@ -584,7 +756,12 @@ export function NexaUnifiedOnboardingClient({
                     </div>
                   ))}
                 </div>
-                <PrimaryButton onClick={() => void runGeneration()} disabled={!canInteract}>Activate</PrimaryButton>
+                <PrimaryButton
+                  onClick={() => void runGeneration()}
+                  disabled={!canInteract || busy || isLaunching}
+                >
+                  Activate
+                </PrimaryButton>
               </div>
             ) : null}
 
