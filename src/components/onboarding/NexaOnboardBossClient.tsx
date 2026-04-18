@@ -393,7 +393,8 @@ export function NexaOnboardBossClient({
       setState((s) => ({ ...s, step: 7, company: { ...s.company, id: companyId } }));
       window.localStorage.removeItem(STORAGE_KEY);
       window.setTimeout(() => {
-        window.location.assign("/bgos/control/home");
+        /** Readymade (solar) bosses land on the tenant BGOS dashboard — not the internal control plane. */
+        window.location.assign("/bgos/dashboard");
       }, 800);
     } finally {
       setBusy(false);
@@ -536,12 +537,26 @@ export function NexaOnboardBossClient({
                 <div className="space-y-3">
                   <p className="text-sm text-white/80">Now let’s connect BGOS with your business.</p>
                   <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Business name" className="w-full rounded-lg border border-white/20 bg-black/20 px-3 py-2" />
-                  <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full rounded-lg border border-white/20 bg-black/20 px-3 py-2">
-                    <option value="">Select industry</option>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>{c.label}</option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      className="w-full appearance-none rounded-[10px] border border-white/10 bg-[#0f172a] py-3 pl-3.5 pr-10 text-sm text-white outline-none [-moz-appearance:none] [-webkit-appearance:none] focus:border-indigo-400/50 focus:ring-2 focus:ring-indigo-500/40 [&>option]:bg-[#0f172a] [&>option]:text-white"
+                    >
+                      <option value="">Select industry</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.label}
+                        </option>
+                      ))}
+                    </select>
+                    <span
+                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400"
+                      aria-hidden
+                    >
+                      ▼
+                    </span>
+                  </div>
                   <button onClick={() => void chooseFlow()} className="rounded-xl bg-indigo-600 px-5 py-2.5 font-semibold">Continue</button>
                 </div>
               ) : null}
