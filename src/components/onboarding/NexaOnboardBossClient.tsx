@@ -362,16 +362,27 @@ export function NexaOnboardBossClient({
         const createRes = await apiFetch("/api/company/create", {
           method: "POST",
           credentials: "include",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(addBusiness ? { "x-bgos-add-business": "1" } : {}),
+          },
           body: JSON.stringify(body),
         });
         const created = ((await readApiJson(createRes, "company-create")) ?? {}) as {
           ok?: boolean;
           companyId?: string;
+          error?: string;
+          code?: string;
         };
         companyId = created.companyId;
         if (createRes.ok && created.ok === true && companyId) break;
-        console.error("[NexaOnboardBoss] company/create attempt failed", { attempt, status: createRes.ok });
+        console.error("[NexaOnboardBoss] company/create attempt failed", {
+          attempt,
+          status: createRes.status,
+          ok: createRes.ok,
+          code: created.code,
+          error: created.error,
+        });
         if (attempt < 2) await new Promise((r) => setTimeout(r, 2000));
       }
       if (!companyId) {
@@ -417,12 +428,17 @@ export function NexaOnboardBossClient({
         const createRes = await apiFetch("/api/company/create", {
           method: "POST",
           credentials: "include",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(addBusiness ? { "x-bgos-add-business": "1" } : {}),
+          },
           body: JSON.stringify(createBody),
         });
         const created = ((await readApiJson(createRes, "company-create-custom")) ?? {}) as {
           ok?: boolean;
           companyId?: string;
+          error?: string;
+          code?: string;
         };
         if (createRes.ok && created.ok === true && created.companyId) {
           newCompanyId = created.companyId;

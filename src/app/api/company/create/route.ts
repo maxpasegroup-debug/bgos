@@ -23,6 +23,7 @@ import { isSuperBossEmail } from "@/lib/super-boss";
 import { applyBossCompanyAttributionFromSession } from "@/lib/nexa-boss-company-attribution";
 import { runOnboardingLaunch } from "@/lib/onboarding-launch-engine";
 import { normalizeMicroFranchisePhone } from "@/lib/micro-franchise-phone";
+import type { LaunchIndustry } from "@/lib/company-launch-engine";
 
 const bodySchema = z
   .object({
@@ -31,8 +32,24 @@ const bodySchema = z
       .trim()
       .min(1, "Company name is required")
       .max(200, "Company name is too long"),
-    industry: z.nativeEnum(CompanyIndustry),
-    businessType: z.nativeEnum(CompanyBusinessType).optional().default(CompanyBusinessType.SOLAR),
+    industry: z.preprocess((v) => {
+      if (v === CompanyIndustry.SOLAR || v === CompanyIndustry.CUSTOM) return v;
+      if (typeof v === "string") {
+        const u = v.trim().toUpperCase();
+        if (u === "SOLAR") return CompanyIndustry.SOLAR;
+        if (u === "CUSTOM") return CompanyIndustry.CUSTOM;
+      }
+      return v;
+    }, z.nativeEnum(CompanyIndustry)),
+    businessType: z.preprocess((v) => {
+      if (v === CompanyBusinessType.SOLAR || v === CompanyBusinessType.CUSTOM) return v;
+      if (typeof v === "string" && v.trim() !== "") {
+        const u = v.trim().toUpperCase();
+        if (u === "SOLAR") return CompanyBusinessType.SOLAR;
+        if (u === "CUSTOM") return CompanyBusinessType.CUSTOM;
+      }
+      return CompanyBusinessType.SOLAR;
+    }, z.nativeEnum(CompanyBusinessType)),
     plan: z.nativeEnum(CompanyPlan).optional(),
     logoUrl: z.string().max(2048).optional(),
     primaryColor: z.string().max(32).optional(),
@@ -47,7 +64,9 @@ const bodySchema = z
     source: z.string().trim().optional(),
   })
   .superRefine((data, ctx) => {
-    if (data.businessType === CompanyBusinessType.CUSTOM) {
+    const businessType = data.businessType;
+    const industry = data.industry;
+    if (businessType === CompanyBusinessType.CUSTOM) {
       if (!data.plan) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -55,25 +74,25 @@ const bodySchema = z
           path: ["plan"],
         });
       }
-      if (data.industry !== CompanyIndustry.CUSTOM) {
+      if (industry !== CompanyIndustry.CUSTOM) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Custom workspaces use the Custom industry.",
+          message: "Custom workspaces use the Custom industry (CUSTOM).",
           path: ["industry"],
         });
       }
     } else {
-      if (data.industry === CompanyIndustry.CUSTOM) {
+      if (industry === CompanyIndustry.CUSTOM) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "Solar workspaces cannot use the Custom industry.",
           path: ["industry"],
         });
       }
-      if (data.industry !== CompanyIndustry.SOLAR) {
+      if (industry !== CompanyIndustry.SOLAR) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Solar workspaces use the Solar industry.",
+          message: "Solar workspaces must use industry SOLAR.",
           path: ["industry"],
         });
       }
@@ -84,29 +103,136 @@ function jwtHasCompanyContext(u: NonNullable<ReturnType<typeof getAuthUserFromTo
   return Boolean(u.companyId) || (u.memberships?.length ?? 0) > 0;
 }
 
+async function respondIdempotentExistingWorkspace(
+  userSub: string,
+  userEmail: string,
+  companyId: string,
+): Promise<NextResponse> {
+  const u = await prisma.user.findUnique({
+    where: { id: userSub },
+    select: { workspaceActivatedAt: true, name: true, email: true },
+  });
+  const mems = await loadMembershipsForJwt(userSub);
+  const jwtCompany = mems.find((m) => m.companyId === companyId) ?? mems[0];
+  if (!jwtCompany) {
+    console.error("[company/create] idempotent: no memberships for user", userSub);
+    return NextResponse.json(
+      {
+        ok: false as const,
+        error: "Workspace exists but memberships could not be loaded. Try /api/auth/refresh-session.",
+        code: "MEMBERSHIP_LOAD_FAILED" as const,
+      },
+      { status: 500 },
+    );
+  }
+  let newToken: string;
+  try {
+    newToken = signAccessToken({
+      sub: userSub,
+      email: userEmail,
+      role: jwtCompany.jobRole,
+      companyId: jwtCompany.companyId,
+      companyPlan: jwtCompany.plan,
+      workspaceReady: Boolean(u?.workspaceActivatedAt),
+      memberships: mems,
+      ...(isSuperBossEmail(userEmail) ? { superBoss: true as const } : {}),
+    });
+  } catch (e) {
+    console.error("[company/create] idempotent signAccessToken failed", e);
+    return NextResponse.json(
+      {
+        ok: false as const,
+        error: "Authentication is not configured",
+        code: "SERVER_ERROR" as const,
+        details: e instanceof Error ? e.message : String(e),
+      },
+      { status: 500 },
+    );
+  }
+
+  const res = NextResponse.json({
+    ok: true as const,
+    companyId,
+    idempotent: true as const,
+    message: "Workspace already exists — refreshed your session.",
+    employeesCreated: 0,
+    dashboardsAssigned: ["/bgos/dashboard"] as const,
+    businessType: CompanyBusinessType.SOLAR,
+    deprecated: true as const,
+    migrateTo: "/api/onboarding/launch" as const,
+    user: {
+      id: userSub,
+      email: userEmail,
+      role: UserRole.ADMIN,
+      companyId,
+      companyPlan: jwtCompany.plan,
+    },
+  });
+  await setSessionCookie(res, newToken);
+  await setActiveCompanyCookie(res, companyId);
+  return res;
+}
+
 /**
  * @deprecated Use {@link POST /api/onboarding/launch}. This handler delegates to the shared launch engine.
  */
 export async function POST(request: NextRequest) {
   try {
     const raw = await parseJsonBody(request);
-    if (!raw.ok) return raw.response;
+    if (!raw.ok) {
+      console.error("[company/create] invalid JSON body", raw.response.status);
+      return raw.response;
+    }
 
     const user = requireAuth(request);
-    if (user instanceof NextResponse) return user;
+    if (user instanceof NextResponse) {
+      console.error("[company/create] requireAuth failed", user.status);
+      return user;
+    }
 
     const parsed = bodySchema.safeParse(raw.data);
     if (!parsed.success) {
+      console.error("[company/create] validation failed", parsed.error.flatten());
       return zodValidationErrorResponse(parsed.error);
     }
+
+    const addBusinessIntent = request.headers.get("x-bgos-add-business") === "1";
 
     const token = getTokenFromRequest(request);
     const jwtOnly = token ? getAuthUserFromToken(token) : null;
     if (!jwtOnly) {
+      console.error("[company/create] no valid JWT after requireAuth");
       return NextResponse.json(
         { ok: false as const, error: "Invalid session", code: "UNAUTHORIZED" },
         { status: 401 },
       );
+    }
+
+    const data = parsed.data;
+    const source = data.source?.trim() ?? "";
+
+    if (source !== "NEXA_ENGINE") {
+      return NextResponse.json(
+        {
+          ok: false as const,
+          error: "Company creation is only allowed via Nexa onboarding (source: NEXA_ENGINE).",
+          code: "NEXA_REQUIRED" as const,
+        },
+        { status: 403 },
+      );
+    }
+
+    /** Idempotent: user already has a workspace and this is not “add another business”. */
+    if (!addBusinessIntent) {
+      const existingMembership = await prisma.userCompany.findFirst({
+        where: { userId: user.sub },
+        orderBy: { createdAt: "asc" },
+        select: { companyId: true },
+      });
+      if (existingMembership) {
+        console.warn("[company/create] idempotent return — user already has company", user.sub, existingMembership.companyId);
+        return respondIdempotentExistingWorkspace(user.sub, user.email, existingMembership.companyId);
+      }
     }
 
     if (!jwtHasCompanyContext(jwtOnly)) {
@@ -116,40 +242,8 @@ export async function POST(request: NextRequest) {
         include: { company: { select: { id: true, plan: true } } },
       });
       if (stale) {
-        const u = await prisma.user.findUnique({
-          where: { id: user.sub },
-          select: { workspaceActivatedAt: true },
-        });
-        const mems = await loadMembershipsForJwt(user.sub);
-        const primary = mems[0]!;
-        let newToken: string;
-        try {
-          newToken = signAccessToken({
-            sub: user.sub,
-            email: user.email,
-            role: primary.jobRole,
-            companyId: primary.companyId,
-            companyPlan: primary.plan,
-            workspaceReady: Boolean(u?.workspaceActivatedAt),
-            memberships: mems,
-            ...(isSuperBossEmail(user.email) ? { superBoss: true as const } : {}),
-          });
-        } catch {
-          return NextResponse.json(
-            { ok: false as const, error: "Authentication is not configured", code: "SERVER_ERROR" },
-            { status: 500 },
-          );
-        }
-        const res = NextResponse.json({
-          ok: true as const,
-          companyId: stale.companyId,
-          recovered: true as const,
-          deprecated: true as const,
-          migrateTo: "/api/onboarding/launch" as const,
-        });
-        await setSessionCookie(res, newToken);
-        await setActiveCompanyCookie(res, primary.companyId);
-        return res;
+        console.warn("[company/create] recovering stale JWT vs DB memberships", user.sub);
+        return respondIdempotentExistingWorkspace(user.sub, user.email, stale.companyId);
       }
     }
 
@@ -168,47 +262,8 @@ export async function POST(request: NextRequest) {
       bankDetails,
       referralPhone,
       microFranchisePartnerId: mfPartnerIdFromBody,
-      source,
-    } = parsed.data;
-
-    if (source !== "NEXA_ENGINE") {
-      return NextResponse.json(
-        {
-          ok: false as const,
-          error: "Company creation is only allowed via Nexa onboarding.",
-          code: "NEXA_REQUIRED" as const,
-        },
-        { status: 403 },
-      );
-    }
-
-    const industry =
-      businessType === CompanyBusinessType.CUSTOM ? CompanyIndustry.CUSTOM : industryRaw;
-
-    // get referral from request and pre-resolve MF partner for explicit link safety
-    const referralPhoneRaw = referralPhone?.trim() || null;
-    let microFranchisePartnerId: string | null = null;
-    let referralPhoneForLaunch: string | null = referralPhoneRaw;
-    if (mfPartnerIdFromBody?.trim()) {
-      microFranchisePartnerId = mfPartnerIdFromBody.trim();
-    }
-    if (referralPhoneRaw && !microFranchisePartnerId) {
-      const normalized = normalizeMicroFranchisePhone(referralPhoneRaw);
-      if (normalized) {
-        referralPhoneForLaunch = normalized;
-        const phoneCandidates =
-          normalized.length === 10
-            ? [normalized, `91${normalized}`]
-            : [normalized];
-        const partner = await prisma.microFranchisePartner.findFirst({
-          where: { phone: { in: phoneCandidates } },
-          select: { id: true },
-        });
-        if (partner) {
-          microFranchisePartnerId = partner.id;
-        }
-      }
-    }
+      source: _src,
+    } = data;
 
     const addingAnotherBusiness = jwtHasCompanyContext(jwtOnly);
 
@@ -223,19 +278,48 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const industry =
+      businessType === CompanyBusinessType.CUSTOM ? CompanyIndustry.CUSTOM : industryRaw;
+
+    const referralPhoneRaw = referralPhone?.trim() || null;
+    let microFranchisePartnerId: string | null = null;
+    let referralPhoneForLaunch: string | null = referralPhoneRaw;
+    if (mfPartnerIdFromBody?.trim()) {
+      microFranchisePartnerId = mfPartnerIdFromBody.trim();
+    }
+    if (referralPhoneRaw && !microFranchisePartnerId) {
+      const normalized = normalizeMicroFranchisePhone(referralPhoneRaw);
+      if (normalized) {
+        referralPhoneForLaunch = normalized;
+        const phoneCandidates =
+          normalized.length === 10 ? [normalized, `91${normalized}`] : [normalized];
+        const partner = await prisma.microFranchisePartner.findFirst({
+          where: { phone: { in: phoneCandidates } },
+          select: { id: true },
+        });
+        if (partner) {
+          microFranchisePartnerId = partner.id;
+        }
+      }
+    }
+
     const actor = await requireOnboardingLaunchSession(request, [UserRole.ADMIN, UserRole.MANAGER]);
-    if (actor instanceof NextResponse) return actor;
+    if (actor instanceof NextResponse) {
+      console.error("[company/create] requireOnboardingLaunchSession rejected", actor.status);
+      return actor;
+    }
 
-    const launchIndustry = industry === CompanyIndustry.CUSTOM ? "CUSTOM" : "SOLAR";
+    const launchIndustry: LaunchIndustry =
+      industry === CompanyIndustry.CUSTOM ? "CUSTOM" : "SOLAR";
 
-    const launch = await runOnboardingLaunch({
+    const launchInput = {
       ownerUserId: user.sub,
       ownerEmail: user.email,
       companyName: name,
       industry: launchIndustry,
-      team: [],
+      team: [] as [],
       referralPhone: referralPhoneForLaunch,
-      sessionId: null,
+      sessionId: null as null,
       addingAnotherBusiness: actor.addingAnotherBusiness,
       customWorkspacePlan:
         launchIndustry === "CUSTOM" ? (customPlan ?? CompanyPlan.PRO) : null,
@@ -249,11 +333,37 @@ export async function POST(request: NextRequest) {
         gstNumber,
         bankDetails,
       },
-    });
+    };
+
+    let launch = await runOnboardingLaunch(launchInput);
+    if (!launch.ok) {
+      console.error("[company/create] runOnboardingLaunch failed (attempt 1)", {
+        code: launch.code,
+        error: launch.error,
+        step: launch.step_failed,
+      });
+      /** Only retry transient engine failures; validation/forbidden are not retried. */
+      const retryable = launch.code === "SERVER_ERROR";
+      if (retryable) {
+        await new Promise((r) => setTimeout(r, 400));
+        launch = await runOnboardingLaunch(launchInput);
+        if (!launch.ok) {
+          console.error("[company/create] runOnboardingLaunch failed (attempt 2)", {
+            code: launch.code,
+            error: launch.error,
+          });
+        }
+      }
+    }
 
     if (!launch.ok) {
       return NextResponse.json(
-        { ok: false as const, error: launch.error, code: launch.code },
+        {
+          ok: false as const,
+          error: launch.error ?? "Company creation failed",
+          code: launch.code ?? "LAUNCH_FAILED",
+          step: launch.step_failed,
+        },
         { status: launch.status ?? 400 },
       );
     }
@@ -301,6 +411,22 @@ export async function POST(request: NextRequest) {
 
     return res;
   } catch (error) {
-    return handleApiError("POST /api/company/create", error);
+    console.error("[company/create] unhandled error", error);
+    const message = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : undefined;
+    console.error("[company/create] stack", stack);
+    const inner = handleApiError("POST /api/company/create", error);
+    /** Ensure JSON body with message when handleApiError returns generic 503 */
+    if (inner.status === 503) {
+      return NextResponse.json(
+        {
+          ok: false as const,
+          error: message || "Could not complete the request",
+          code: "SERVER_ERROR" as const,
+        },
+        { status: 500 },
+      );
+    }
+    return inner;
   }
 }

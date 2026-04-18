@@ -60,9 +60,16 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("POST /api/system/init", error);
+    const message = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : undefined;
+    console.error("POST /api/system/init failed", message, error);
+    if (stack) console.error("POST /api/system/init stack", stack);
     return NextResponse.json(
-      { success: false as const, message: "System initialization failed" },
+      {
+        success: false as const,
+        message: message || "System initialization failed",
+        error: message || "System initialization failed",
+      },
       { status: 500 },
     );
   }
