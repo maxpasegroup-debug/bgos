@@ -1,5 +1,3 @@
-import { redirect } from "next/navigation";
-import { getAuthUserFromHeaders } from "@/lib/auth";
 import { NexaOnboardBossClient } from "@/components/onboarding/NexaOnboardBossClient";
 
 type Search = {
@@ -17,8 +15,6 @@ export default async function NexaOnboardingPage({
 }: {
   searchParams: Promise<Search> | Search;
 }) {
-  const user = await getAuthUserFromHeaders();
-  if (!user) redirect("/login?from=/onboarding/nexa");
   const sp = await Promise.resolve(searchParams);
   return (
     <NexaOnboardBossClient

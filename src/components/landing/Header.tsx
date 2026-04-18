@@ -1,8 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { motion } from "framer-motion";
+import Link from "next/link";
 import { Container } from "./Container";
+
+const MotionLink = motion(Link);
 
 export function Header() {
   return (
@@ -35,20 +37,21 @@ export function Header() {
           >
             Login
           </Link>
-          <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
-            <Link
-              href="/onboarding/nexa"
-              className="relative inline-flex min-h-[40px] items-center justify-center overflow-hidden rounded-xl bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] px-5 py-2 text-sm font-bold tracking-wide text-white shadow-md shadow-indigo-500/25 transition-shadow duration-300 hover:shadow-lg hover:shadow-violet-500/30"
+          <MotionLink
+            href="/onboarding/nexa"
+            prefetch
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.98 }}
+            className="relative z-30 inline-flex min-h-[40px] cursor-pointer items-center justify-center overflow-hidden rounded-xl bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] px-5 py-2 text-sm font-bold tracking-wide text-white shadow-md shadow-indigo-500/25 transition-shadow duration-300 hover:shadow-lg hover:shadow-violet-500/30"
+          >
+            <span
+              className="pointer-events-none absolute inset-0 overflow-hidden"
+              aria-hidden
             >
-              <span
-                className="pointer-events-none absolute inset-0 overflow-hidden"
-                aria-hidden
-              >
-                <span className="animate-btn-shine absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-              </span>
-              <span className="relative z-10">Start Free</span>
-            </Link>
-          </motion.div>
+              <span className="animate-btn-shine absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+            </span>
+            <span className="relative z-10">Start Free</span>
+          </MotionLink>
         </nav>
       </Container>
     </motion.header>

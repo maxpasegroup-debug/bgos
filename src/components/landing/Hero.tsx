@@ -147,13 +147,9 @@ export function Hero() {
               BGOS brings your leads, follow-ups, team, and revenue into one simple system - so nothing gets missed.
             </p>
             <div className="mt-9 flex w-full max-w-md flex-col gap-3 sm:max-w-none sm:flex-row sm:items-center lg:mx-0">
-              <motion.div
-                className="w-full sm:w-auto"
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.98 }}
-              >
+              <div className="relative z-30 w-full sm:w-auto">
                 <OnboardBossButton className="relative min-h-[46px] w-full px-8 py-3.5 text-sm font-bold tracking-wide sm:w-auto" />
-              </motion.div>
+              </div>
               <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.99 }}>
                 <Link href="#solution" className={outlineCta}>
                   See How It Works

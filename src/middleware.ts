@@ -59,6 +59,8 @@ const PUBLIC_ROUTES = ["/login", "/signup", "/iceconnect/customer-login"] as con
 /** Boss activation wizard + public client onboarding fill — not `/onboarding/manage` (auth required). */
 function isOnboardingPublicPath(p: string): boolean {
   if (p === "/onboarding") return true;
+  /** Primary boss funnel — must be reachable without auth (signup/login happens in-page). */
+  if (p === "/onboarding/nexa" || p.startsWith("/onboarding/nexa/")) return true;
   if (p === "/onboarding/basic" || p === "/onboarding/pro" || p === "/onboarding/enterprise") return true;
   if (p.startsWith("/onboarding/fill/")) return true;
   return false;

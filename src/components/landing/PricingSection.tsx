@@ -99,7 +99,7 @@ function PlanCard({
           {ctaLabel}
         </a>
       ) : (
-        <Link href={ctaHref} className={ctaClass}>
+        <Link href={ctaHref} prefetch className={`${ctaClass} relative z-20 cursor-pointer`}>
           {ctaLabel}
         </Link>
       )}

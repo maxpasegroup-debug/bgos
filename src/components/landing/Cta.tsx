@@ -1,11 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { motion } from "framer-motion";
+import Link from "next/link";
 import { SectionReveal } from "./SectionReveal";
 import { Container } from "./Container";
 import { staggerContainer, staggerItem } from "./motionPresets";
 import { sectionDivider, sectionY } from "./spacing";
+
+const MotionLink = motion(Link);
 
 export function Cta() {
   return (
@@ -37,24 +39,22 @@ export function Cta() {
             variants={staggerItem}
             className="relative mt-9 flex flex-col justify-center gap-3 sm:mt-10 sm:flex-row"
           >
-            <motion.div
+            <MotionLink
+              href="/onboarding/nexa"
+              prefetch
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.98 }}
               transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+              className="relative z-30 inline-flex min-h-[52px] cursor-pointer items-center justify-center overflow-hidden rounded-xl bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] px-12 py-4 text-base font-bold tracking-wide text-white shadow-[0_0_0_1px_rgba(255,255,255,0.12)_inset,0_12px_40px_-8px_rgba(99,102,241,0.5)] transition-shadow duration-300 hover:shadow-[0_0_0_1px_rgba(255,255,255,0.2)_inset,0_16px_48px_-6px_rgba(139,92,246,0.5)]"
             >
-              <Link
-                href="/onboarding/nexa"
-                className="relative inline-flex min-h-[52px] items-center justify-center overflow-hidden rounded-xl bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] px-12 py-4 text-base font-bold tracking-wide text-white shadow-[0_0_0_1px_rgba(255,255,255,0.12)_inset,0_12px_40px_-8px_rgba(99,102,241,0.5)] transition-shadow duration-300 hover:shadow-[0_0_0_1px_rgba(255,255,255,0.2)_inset,0_16px_48px_-6px_rgba(139,92,246,0.5)]"
+              <span
+                className="pointer-events-none absolute inset-0 overflow-hidden"
+                aria-hidden
               >
-                <span
-                  className="pointer-events-none absolute inset-0 overflow-hidden"
-                  aria-hidden
-                >
-                  <span className="animate-btn-shine absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/35 to-transparent" />
-                </span>
-                <span className="relative z-10">Start Free Trial</span>
-              </Link>
-            </motion.div>
+                <span className="animate-btn-shine absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/35 to-transparent" />
+              </span>
+              <span className="relative z-10">Start Free Trial</span>
+            </MotionLink>
             <motion.div
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.98 }}
