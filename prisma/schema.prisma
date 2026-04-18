@@ -14,11 +14,17 @@ enum UserRole {
   MANAGER
   SALES_HEAD
   SALES_EXECUTIVE
-  /** Field sales / dialling — same workspace capabilities as sales executive. */
+  /**
+   * Field sales / dialling — same workspace capabilities as sales executive.
+   */
   TELECALLER
-  /** BGOS Internal tech lead (delivery pipeline). */
+  /**
+   * BGOS Internal tech lead (delivery pipeline).
+   */
   TECH_HEAD
-  /** BGOS Internal tech execution (delivery pipeline). */
+  /**
+   * BGOS Internal tech execution (delivery pipeline).
+   */
   TECH_EXECUTIVE
   CHANNEL_PARTNER
   OPERATIONS_HEAD
@@ -30,7 +36,9 @@ enum UserRole {
   ACCOUNTANT
   LCO
   HR_MANAGER
-  /** Online micro-franchise partner (ICECONNECT workspace, referral + wallet). */
+  /**
+   * Online micro-franchise partner (ICECONNECT workspace, referral + wallet).
+   */
   MICRO_FRANCHISE
 }
 
@@ -40,12 +48,16 @@ enum CompanyPlan {
   ENTERPRISE
 }
 
-/** Derived billing/trial state; kept in sync on writes and subscription reads. */
+/**
+ * Derived billing/trial state; kept in sync on writes and subscription reads.
+ */
 enum CompanySubscriptionStatus {
   TRIAL
   ACTIVE
   EXPIRED
-  /** Custom-build workspaces: selected plan but initial subscription payment not completed yet. */
+  /**
+   * Custom-build workspaces: selected plan but initial subscription payment not completed yet.
+   */
   PAYMENT_PENDING
 }
 
@@ -54,7 +66,9 @@ enum CompanyIndustry {
   CUSTOM
 }
 
-/** Product line: solar CRM vs paid custom dashboard build. */
+/**
+ * Product line: solar CRM vs paid custom dashboard build.
+ */
 enum CompanyBusinessType {
   SOLAR
   CUSTOM
@@ -68,7 +82,9 @@ enum LeadStatus {
   SITE_VISIT_COMPLETED
   PROPOSAL_SENT
   NEGOTIATION
-  /** Quotation approved — booked, awaiting payment. */
+  /**
+   * Quotation approved — booked, awaiting payment.
+   */
   PROPOSAL_WON
   WON
   LOST
@@ -80,7 +96,9 @@ enum LeadResponseStatus {
   COOLING
 }
 
-/** BGOS Internal sales metro pipeline (company with `internalSalesOrg`). Linear order — no skips. */
+/**
+ * BGOS Internal sales metro pipeline (company with `internalSalesOrg`). Linear order — no skips.
+ */
 enum InternalSalesStage {
   LEAD_ADDED
   INTRO_CALL
@@ -96,7 +114,9 @@ enum InternalSalesStage {
   CLOSED_LOST
 }
 
-/** Tech delivery metro (after Sent to Tech). */
+/**
+ * Tech delivery metro (after Sent to Tech).
+ */
 enum InternalTechStage {
   ONBOARDING_RECEIVED
   DATA_VERIFIED
@@ -120,7 +140,9 @@ enum InternalCallStatus {
   NOT_INTERESTED
 }
 
-/** ICECONNECT sales executive metro pipeline (internal org). SUBSCRIPTION = converted customer. */
+/**
+ * ICECONNECT sales executive metro pipeline (internal org). SUBSCRIPTION = converted customer.
+ */
 enum IceconnectMetroStage {
   LEAD_CREATED
   INTRO_CALL
@@ -136,7 +158,9 @@ enum OnboardingStatus {
   COMPLETED
 }
 
-/** Plan tier for executive targets and converted ICECONNECT customers. */
+/**
+ * Plan tier for executive targets and converted ICECONNECT customers.
+ */
 enum IceconnectCustomerPlan {
   FREE
   BASIC
@@ -144,7 +168,9 @@ enum IceconnectCustomerPlan {
   ENTERPRISE
 }
 
-/** Category for a single active user manual PDF per company. */
+/**
+ * Category for a single active user manual PDF per company.
+ */
 enum UserManualCategory {
   SALES
   OPERATIONS
@@ -153,14 +179,18 @@ enum UserManualCategory {
   SALES_BOOSTER
 }
 
-/** Internal CRM: onboarding tier chosen by sales before the client form opens. */
+/**
+ * Internal CRM: onboarding tier chosen by sales before the client form opens.
+ */
 enum LeadOnboardingType {
   BASIC
   PRO
   ENTERPRISE
 }
 
-/** Tech queue sort: Enterprise first, then Pro, then Basic. */
+/**
+ * Tech queue sort: Enterprise first, then Pro, then Basic.
+ */
 enum TechQueuePriority {
   CRITICAL
   HIGH
@@ -179,7 +209,9 @@ enum TechPipelineStage {
   READY
 }
 
-/** Tech onboarding queue for internal sales → delivery. */
+/**
+ * Tech onboarding queue for internal sales → delivery.
+ */
 enum OnboardingTaskStatus {
   NEW
   DATA_RECEIVED
@@ -208,7 +240,9 @@ enum ServiceTicketStatus {
   RESOLVED
 }
 
-/** BGOS onboarding workflow templates (category + tier). */
+/**
+ * BGOS onboarding workflow templates (category + tier).
+ */
 enum OnboardingWorkflowPlanTier {
   BASIC
   PRO
@@ -233,19 +267,27 @@ enum OnboardingTechTaskStatus {
 }
 
 model Company {
-  id         String          @id @default(cuid())
-  name       String
-  industry   CompanyIndustry @default(SOLAR)
-  /** Solar (default trial path) vs custom paid build — see {@link CompanyBusinessType}. */
+  id           String              @id @default(cuid())
+  name         String
+  industry     CompanyIndustry     @default(SOLAR)
+  /**
+   * Solar (default trial path) vs custom paid build — see {@link CompanyBusinessType}.
+   */
   businessType CompanyBusinessType @default(SOLAR)
-  /** Subscription tier; remains {@link CompanyPlan} in DB (not a free-form string). */
-  plan       CompanyPlan     @default(BASIC)
-  ownerId    String
-  createdAt  DateTime        @default(now())
+  /**
+   * Subscription tier; remains {@link CompanyPlan} in DB (not a free-form string).
+   */
+  plan         CompanyPlan         @default(BASIC)
+  ownerId      String
+  createdAt    DateTime            @default(now())
 
-  /** Clock start for the 15-day BASIC trial; null = pre-trial schema / grandfathered. */
+  /**
+   * Clock start for the 15-day BASIC trial; null = pre-trial schema / grandfathered.
+   */
   trialStartDate DateTime?
-  /** Exclusive wall-clock end: expired when `now >= trialEndDate` for BASIC. */
+  /**
+   * Exclusive wall-clock end: expired when `now >= trialEndDate` for BASIC.
+   */
   trialEndDate   DateTime?
   isTrialActive  Boolean   @default(true)
 
@@ -254,102 +296,128 @@ model Company {
    * Canonical plan tier remains {@link CompanyPlan} in `plan`. Trial end instant remains `trialEndDate`
    * (APIs may expose it as `trialEndsAt`).
    */
-  subscriptionStatus CompanySubscriptionStatus @default(TRIAL)
-  /** Wall-clock start of the current paid Razorpay/Stripe period (optional). */
+  subscriptionStatus      CompanySubscriptionStatus @default(TRIAL)
+  /**
+   * Wall-clock start of the current paid Razorpay/Stripe period (optional).
+   */
   subscriptionPeriodStart DateTime?
-  /** Paid access valid strictly before this instant (Razorpay monthly renewals extend this). */
+  /**
+   * Paid access valid strictly before this instant (Razorpay monthly renewals extend this).
+   */
   subscriptionPeriodEnd   DateTime?
 
-  logoUrl         String?
-  primaryColor    String?
-  secondaryColor  String?
+  logoUrl        String?
+  primaryColor   String?
+  secondaryColor String?
 
-  /** Public / document-facing profile (quotations, invoices, PDFs). */
-  companyEmail    String?
-  companyPhone    String?
-  billingAddress  String? @db.Text
-  gstNumber       String?
-  bankDetails     String? @db.Text
+  /**
+   * Public / document-facing profile (quotations, invoices, PDFs).
+   */
+  companyEmail   String?
+  companyPhone   String?
+  billingAddress String? @db.Text
+  gstNumber      String?
+  bankDetails    String? @db.Text
 
   businessTemplate String?
   dashboardConfig  Json?
 
-  /** True for the dedicated BGOS internal sales tenant (“BGOS Internal”). */
-  internalSalesOrg Boolean @default(false)
-  /** Optional default assignee for public / anonymous lead capture. */
+  /**
+   * True for the dedicated BGOS internal sales tenant (“BGOS Internal”).
+   */
+  internalSalesOrg               Boolean @default(false)
+  /**
+   * Optional default assignee for public / anonymous lead capture.
+   */
   internalSalesDefaultAssigneeId String?
-  /** Round-robin: last tech user id assigned to an onboarding workflow submission. */
+  /**
+   * Round-robin: last tech user id assigned to an onboarding workflow submission.
+   */
   internalWorkflowLastTechUserId String?
 
-  /** Set when the customer completes the custom requirements form (custom businessType only). */
-  customOnboardingSubmittedAt DateTime?
+  /**
+   * Set when the customer completes the custom requirements form (custom businessType only).
+   */
+  customOnboardingSubmittedAt     DateTime?
   /**
    * After internal sales confirms final payment, tech may contact the client and start build.
    * Until then: internal planning only (no client comms).
    */
-  customBuildClientContactAllowed Boolean @default(false)
+  customBuildClientContactAllowed Boolean   @default(false)
   customFinalPaymentConfirmedAt   DateTime?
 
-  /** Platform (super boss): hide archived tenants from the client directory. */
-  archivedAt DateTime?
-  /** Optional referral phone captured at launch. */
-  referralPhone String?
-  /** Sales-launch channel partner (cross-company referral tracking). */
-  launchChannelPartnerId String?
-  /** Micro-franchise partner linked by referral phone (takes precedence over channel partner when matched). */
+  /**
+   * Platform (super boss): hide archived tenants from the client directory.
+   */
+  archivedAt              DateTime?
+  /**
+   * Optional referral phone captured at launch.
+   */
+  referralPhone           String?
+  /**
+   * Sales-launch channel partner (cross-company referral tracking).
+   */
+  launchChannelPartnerId  String?
+  /**
+   * Micro-franchise partner linked by referral phone (takes precedence over channel partner when matched).
+   */
   microFranchisePartnerId String?
 
-  /** Acquisition channel for Nexa / CRM attribution: direct, sales, franchise. */
+  /**
+   * Acquisition channel for Nexa / CRM attribution: direct, sales, franchise.
+   */
   sourceType String? @map("source_type")
-  /** Stable id for attribution (e.g. internal lead id, franchise partner id). */
+  /**
+   * Stable id for attribution (e.g. internal lead id, franchise partner id).
+   */
   sourceId   String? @map("source_id")
 
-  owner         User            @relation("OwnedCompany", fields: [ownerId], references: [id], onDelete: Restrict)
-  memberships   UserCompany[]
-  leads         Lead[]
-  deals         Deal[]
-  tasks         Task[]
-  installations Installation[]
-  payments        Payment[]
-  quotations      Quotation[]
-  moneyInvoices   Invoice[]
-  expenses        Expense[]
-  invoicePayments InvoicePayment[]
-  activityLogs    ActivityLog[]
-  serviceTickets ServiceTicket[]
-  automations   Automation[]
-  nexaActions   NexaAction[]
-  documents     Document[]
-  leaveRequests LeaveRequest[]
-  attendances   Attendance[]
-  salaries      Salary[]
-  products      Product[]
-  stocks        Stock[]
-  stockLogs     StockLog[]
-  channelPartners ChannelPartner[]
-  commissions    Commission[]
-  siteVisits     SiteVisit[]
-  approvals      Approval[]
-  growthPlan     CompanyGrowthPlan?
-  employeePips   EmployeePip[]
-  lcoLoans       LcoLoan[]
-  customerUsers  CustomerPortalUser[]
-  complaints     CustomerComplaint[]
-  razorpayPayments RazorpayPayment[]
-  onboardingTasks           OnboardingTask[]
-  internalLeadActivities    InternalLeadActivity[]
-  internalInAppNotifications InternalInAppNotification[]
+  owner                        User                              @relation("OwnedCompany", fields: [ownerId], references: [id], onDelete: Restrict)
+  memberships                  UserCompany[]
+  leads                        Lead[]
+  deals                        Deal[]
+  tasks                        Task[]
+  installations                Installation[]
+  payments                     Payment[]
+  quotations                   Quotation[]
+  moneyInvoices                Invoice[]
+  expenses                     Expense[]
+  invoicePayments              InvoicePayment[]
+  activityLogs                 ActivityLog[]
+  serviceTickets               ServiceTicket[]
+  automations                  Automation[]
+  nexaActions                  NexaAction[]
+  documents                    Document[]
+  leaveRequests                LeaveRequest[]
+  attendances                  Attendance[]
+  salaries                     Salary[]
+  products                     Product[]
+  stocks                       Stock[]
+  stockLogs                    StockLog[]
+  channelPartners              ChannelPartner[]
+  commissions                  Commission[]
+  siteVisits                   SiteVisit[]
+  approvals                    Approval[]
+  growthPlan                   CompanyGrowthPlan?
+  employeePips                 EmployeePip[]
+  lcoLoans                     LcoLoan[]
+  customerUsers                CustomerPortalUser[]
+  complaints                   CustomerComplaint[]
+  razorpayPayments             RazorpayPayment[]
+  onboardingTasks              OnboardingTask[]
+  internalLeadActivities       InternalLeadActivity[]
+  internalInAppNotifications   InternalInAppNotification[]
   internalEmployeeDailyTargets InternalEmployeeDailyTarget[]
-  internalNexaSupportTickets InternalNexaSupportTicket[]
-  userManuals                UserManual[]
+  internalNexaSupportTickets   InternalNexaSupportTicket[]
+  userManuals                  UserManual[]
   salesExecutiveMonthlyTargets SalesExecutiveMonthlyTarget[]
   onboardingFormTemplates      OnboardingFormTemplate[]
   onboardingSubmissions        OnboardingSubmission[]
   onboardingSessions           OnboardingSession[]
   onboardingRecords            Onboarding[]
-  launchChannelPartner         LaunchChannelPartner? @relation("LaunchPartnerCompany", fields: [launchChannelPartnerId], references: [id], onDelete: SetNull)
-  microFranchisePartner        MicroFranchisePartner? @relation(fields: [microFranchisePartnerId], references: [id], onDelete: SetNull)
-  microFranchiseCommissionTxs    CommissionTransaction[]
+  launchChannelPartner         LaunchChannelPartner?             @relation("LaunchPartnerCompany", fields: [launchChannelPartnerId], references: [id], onDelete: SetNull)
+  microFranchisePartner        MicroFranchisePartner?            @relation(fields: [microFranchisePartnerId], references: [id], onDelete: SetNull)
+  microFranchiseCommissionTxs  CommissionTransaction[]
   techRequests                 TechRequest[]
   salesBoosterMessages         SalesBoosterOmnichannelMessage[]
   salesBoosterCampaigns        SalesBoosterOmnichannelCampaign[]
@@ -362,7 +430,9 @@ model Company {
   @@index([microFranchisePartnerId])
 }
 
-/** Omnichannel Sales Booster — channel identifiers (UI + API). */
+/**
+ * Omnichannel Sales Booster — channel identifiers (UI + API).
+ */
 enum SalesBoosterOmnichannel {
   WHATSAPP
   INSTAGRAM
@@ -384,7 +454,9 @@ enum SalesBoosterCampaignState {
   PAUSED
 }
 
-/** In-app omnichannel thread messages (company-scoped). Mapped to `sales_booster_messages`. */
+/**
+ * In-app omnichannel thread messages (company-scoped). Mapped to `sales_booster_messages`.
+ */
 model SalesBoosterOmnichannelMessage {
   id        String                  @id @default(cuid())
   companyId String
@@ -402,16 +474,16 @@ model SalesBoosterOmnichannelMessage {
 }
 
 model SalesBoosterOmnichannelCampaign {
-  id              String                   @id @default(cuid())
-  companyId       String
-  channel         SalesBoosterOmnichannel
-  status          SalesBoosterCampaignState @default(DRAFT)
-  name            String?
-  sentCount       Int                      @default(0)
-  deliveredCount  Int                      @default(0)
-  responseCount   Int                      @default(0)
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
+  id             String                    @id @default(cuid())
+  companyId      String
+  channel        SalesBoosterOmnichannel
+  status         SalesBoosterCampaignState @default(DRAFT)
+  name           String?
+  sentCount      Int                       @default(0)
+  deliveredCount Int                       @default(0)
+  responseCount  Int                       @default(0)
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
@@ -420,13 +492,13 @@ model SalesBoosterOmnichannelCampaign {
 }
 
 model SalesBoosterChannelConnection {
-  id          String                     @id @default(cuid())
+  id          String                      @id @default(cuid())
   companyId   String
   channel     SalesBoosterOmnichannel
   status      SalesBoosterConnectionState @default(DISCONNECTED)
   credentials Json?
-  createdAt   DateTime                   @default(now())
-  updatedAt   DateTime                   @updatedAt
+  createdAt   DateTime                    @default(now())
+  updatedAt   DateTime                    @updatedAt
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
@@ -434,7 +506,9 @@ model SalesBoosterChannelConnection {
   @@map("sales_booster_connections")
 }
 
-/** Single automation flow JSON per company (chatbot builder). */
+/**
+ * Single automation flow JSON per company (chatbot builder).
+ */
 model SalesBoosterAutomationFlow {
   id               String   @id @default(cuid())
   companyId        String   @unique
@@ -447,7 +521,9 @@ model SalesBoosterAutomationFlow {
   @@map("sales_booster_automation_flows")
 }
 
-/** Boss monthly targets on Home — drives projections (1Y / multi-year copy). */
+/**
+ * Boss monthly targets on Home — drives projections (1Y / multi-year copy).
+ */
 model CompanyGrowthPlan {
   id                    String   @id @default(cuid())
   companyId             String   @unique
@@ -458,26 +534,30 @@ model CompanyGrowthPlan {
   company               Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 }
 
-/** Performance improvement plan for an employee. */
+/**
+ * Performance improvement plan for an employee.
+ */
 model EmployeePip {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   companyId   String
   userId      String
-  goal        String   @db.Text
-  progress    Int      @default(0)
-  isCompleted Boolean  @default(false)
+  goal        String    @db.Text
+  progress    Int       @default(0)
+  isCompleted Boolean   @default(false)
   dueDate     DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
   @@index([userId])
   @@index([companyId, userId, isCompleted])
 }
 
-/** Loan compliance tracker linked to customer lead. */
+/**
+ * Loan compliance tracker linked to customer lead.
+ */
 model LcoLoan {
   id         String   @id @default(cuid())
   companyId  String
@@ -496,7 +576,9 @@ model LcoLoan {
   @@index([status])
 }
 
-/** Customer login account for ICECONNECT customer portal (one per customer lead). */
+/**
+ * Customer login account for ICECONNECT customer portal (one per customer lead).
+ */
 model CustomerPortalUser {
   id           String   @id @default(cuid())
   companyId    String
@@ -508,12 +590,14 @@ model CustomerPortalUser {
   company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   lead         Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
+  @@unique([companyId, mobile])
   @@index([companyId])
   @@index([mobile])
-  @@unique([companyId, mobile])
 }
 
-/** Customer complaints linked to a customer lead. */
+/**
+ * Customer complaints linked to a customer lead.
+ */
 model CustomerComplaint {
   id          String   @id @default(cuid())
   companyId   String
@@ -565,15 +649,15 @@ model RazorpayPayment {
 
 /// Membership: `role` is company-level (ADMIN vs EMPLOYEE); `jobRole` is operational RBAC (solar CRM role enum).
 model UserCompany {
-  id        String   @id @default(cuid())
-  userId    String
-  companyId String
-  role      String
-  jobRole   UserRole
+  id                String   @id @default(cuid())
+  userId            String
+  companyId         String
+  role              String
+  jobRole           UserRole
   dashboardAssigned String?
   /// READY | PENDING_BUILD | IN_PROGRESS | LIVE
-  status    String   @default("READY")
-  createdAt DateTime @default(now())
+  status            String   @default("READY")
+  createdAt         DateTime @default(now())
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -584,69 +668,83 @@ model UserCompany {
 }
 
 model User {
-  id        String    @id @default(cuid())
-  name      String
-  /** Globally unique login identity (boss, employees, ICECONNECT). */
-  email     String    @unique
-  password  String
-  mobile    String?   @unique
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  /** Set when the boss completes onboarding step 2 (NEXA activation). Invited employees get this on create. */
+  id                   String    @id @default(cuid())
+  name                 String
+  /**
+   * Globally unique login identity (boss, employees, ICECONNECT).
+   */
+  email                String    @unique
+  password             String
+  mobile               String?   @unique
+  isActive             Boolean   @default(true)
+  createdAt            DateTime  @default(now())
+  /**
+   * Set when the boss completes onboarding step 2 (NEXA activation). Invited employees get this on create.
+   */
   workspaceActivatedAt DateTime?
-  /** Force one-time password reset on first successful login. */
-  firstLogin Boolean @default(false)
-  /** Hard gate for credentials minted during onboarding/import. */
-  forcePasswordReset Boolean @default(false)
-  /** Updated on every successful authentication. */
-  lastLogin DateTime?
+  /**
+   * Force one-time password reset on first successful login.
+   */
+  firstLogin           Boolean   @default(false)
+  /**
+   * Hard gate for credentials minted during onboarding/import.
+   */
+  forcePasswordReset   Boolean   @default(false)
+  /**
+   * Updated on every successful authentication.
+   */
+  lastLogin            DateTime?
 
-  companiesOwned       Company[]        @relation("OwnedCompany")
-  memberships          UserCompany[]
-  assignedLeads        Lead[]         @relation("LeadAssignee")
-  leadsCreated         Lead[]         @relation("LeadCreator")
-  tasks                Task[]
-  activityLogs         ActivityLog[]
-  assignedInstallations Installation[] @relation("InstallationAssignee")
-  assignedServiceTickets ServiceTicket[] @relation("TicketAssignee")
-  leaveRequests          LeaveRequest[]
-  attendances            Attendance[]
-  salaries               Salary[]
-  pips                   EmployeePip[]
-  createdChannelPartners ChannelPartner[] @relation("PartnerCreator")
-  assignedSiteVisits     SiteVisit[] @relation("SiteVisitAssignee")
-  documentsUploaded      Document[]
-  razorpayPayments       RazorpayPayment[]
-  onboardingTasksCreated OnboardingTask[] @relation("OnboardingTaskCreator")
-  internalLeadActivities InternalLeadActivity[]
-  internalInAppNotifications InternalInAppNotification[]
-  internalNexaSupportTicketsCreated InternalNexaSupportTicket[] @relation("NexaSupportCreator")
-  salesExecutiveMonthlyTargets SalesExecutiveMonthlyTarget[]
-  onboardingSubmissionsFilled  OnboardingSubmission[] @relation("OnboardingFilledBy")
-  onboardingSubmissionsTech    OnboardingSubmission[] @relation("OnboardingTechAssignee")
-  onboardingWorkflowMessages   OnboardingMessage[]
-  onboardingSessionsCreated    OnboardingSession[] @relation("OnboardingSessionCreator")
-  onboardingRecordsCreated     Onboarding[] @relation("OnboardingCreator")
-  nexaActions                  NexaAction[] @relation("NexaActionActor")
-  microFranchiseReferrals        MicroFranchiseApplication[] @relation("MicroFranchiseReferrer")
-  microFranchiseAssignments      MicroFranchiseApplication[] @relation("MicroFranchiseAssignee")
-  microFranchisePartner          MicroFranchisePartner?
+  companiesOwned                    Company[]                     @relation("OwnedCompany")
+  memberships                       UserCompany[]
+  assignedLeads                     Lead[]                        @relation("LeadAssignee")
+  leadsCreated                      Lead[]                        @relation("LeadCreator")
+  tasks                             Task[]
+  activityLogs                      ActivityLog[]
+  assignedInstallations             Installation[]                @relation("InstallationAssignee")
+  assignedServiceTickets            ServiceTicket[]               @relation("TicketAssignee")
+  leaveRequests                     LeaveRequest[]
+  attendances                       Attendance[]
+  salaries                          Salary[]
+  pips                              EmployeePip[]
+  createdChannelPartners            ChannelPartner[]              @relation("PartnerCreator")
+  assignedSiteVisits                SiteVisit[]                   @relation("SiteVisitAssignee")
+  documentsUploaded                 Document[]
+  razorpayPayments                  RazorpayPayment[]
+  onboardingTasksCreated            OnboardingTask[]              @relation("OnboardingTaskCreator")
+  internalLeadActivities            InternalLeadActivity[]
+  internalInAppNotifications        InternalInAppNotification[]
+  internalNexaSupportTicketsCreated InternalNexaSupportTicket[]   @relation("NexaSupportCreator")
+  salesExecutiveMonthlyTargets      SalesExecutiveMonthlyTarget[]
+  onboardingSubmissionsFilled       OnboardingSubmission[]        @relation("OnboardingFilledBy")
+  onboardingSubmissionsTech         OnboardingSubmission[]        @relation("OnboardingTechAssignee")
+  onboardingWorkflowMessages        OnboardingMessage[]
+  onboardingSessionsCreated         OnboardingSession[]           @relation("OnboardingSessionCreator")
+  onboardingRecordsCreated          Onboarding[]                  @relation("OnboardingCreator")
+  nexaActions                       NexaAction[]                  @relation("NexaActionActor")
+  microFranchiseReferrals           MicroFranchiseApplication[]   @relation("MicroFranchiseReferrer")
+  microFranchiseAssignments         MicroFranchiseApplication[]   @relation("MicroFranchiseAssignee")
+  microFranchisePartner             MicroFranchisePartner?
 
   @@index([email])
 }
 
-/** Sales-launch referral partner registry (cross-company). */
+/**
+ * Sales-launch referral partner registry (cross-company).
+ */
 model LaunchChannelPartner {
-  id           String   @id @default(cuid())
-  phone        String   @unique
+  id           String    @id @default(cuid())
+  phone        String    @unique
   name         String?
-  totalRevenue Float    @default(0)
-  conversions  Int      @default(0)
-  createdAt    DateTime @default(now())
+  totalRevenue Float     @default(0)
+  conversions  Int       @default(0)
+  createdAt    DateTime  @default(now())
   companies    Company[] @relation("LaunchPartnerCompany")
 }
 
-/** Sales launch session used by Nexa chat onboarding flow. */
+/**
+ * Sales launch session used by Nexa chat onboarding flow.
+ */
 model OnboardingSession {
   id              String   @id @default(cuid())
   source          String?
@@ -664,8 +762,8 @@ model OnboardingSession {
   createdByUserId String
   createdAt       DateTime @default(now())
 
-  creator User @relation("OnboardingSessionCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
-  lead    Lead? @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  creator User     @relation("OnboardingSessionCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  lead    Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
   company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
 
   @@index([createdByUserId, createdAt])
@@ -674,7 +772,9 @@ model OnboardingSession {
   @@index([companyId])
 }
 
-/** Tech exception queue created from launch unknown roles. */
+/**
+ * Tech exception queue created from launch unknown roles.
+ */
 model TechRequest {
   id          String   @id @default(cuid())
   roleName    String
@@ -691,25 +791,27 @@ model TechRequest {
   @@index([companyId])
 }
 
-/** Online micro-franchise applicant pipeline (APPLICATION → … → APPROVED). */
+/**
+ * Online micro-franchise applicant pipeline (APPLICATION → … → APPROVED).
+ */
 model MicroFranchiseApplication {
-  id             String   @id @default(cuid())
-  name           String
-  phone          String
-  email          String?
-  location       String?
-  experience     String?
+  id           String   @id @default(cuid())
+  name         String
+  phone        String
+  email        String?
+  location     String?
+  experience   String?
   /// APPLICATION | REVIEW | TRAINING | MOU | APPROVED | REJECTED
-  status         String   @default("APPLICATION")
-  referredById   String?
-  assignedToId   String?
+  status       String   @default("APPLICATION")
+  referredById String?
+  assignedToId String?
   /// JSON array: { at: ISO string, body: string, authorEmail?: string }
-  notes          Json     @default("[]")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  notes        Json     @default("[]")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  referredBy User? @relation("MicroFranchiseReferrer", fields: [referredById], references: [id], onDelete: SetNull)
-  assignedTo User? @relation("MicroFranchiseAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  referredBy User?                  @relation("MicroFranchiseReferrer", fields: [referredById], references: [id], onDelete: SetNull)
+  assignedTo User?                  @relation("MicroFranchiseAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   partner    MicroFranchisePartner?
 
   @@index([status, createdAt])
@@ -717,7 +819,9 @@ model MicroFranchiseApplication {
   @@index([phone])
 }
 
-/** Commission template for micro-franchise offers (boss-managed). */
+/**
+ * Commission template for micro-franchise offers (boss-managed).
+ */
 model CommissionPlan {
   id           String   @id @default(cuid())
   name         String
@@ -731,27 +835,29 @@ model CommissionPlan {
   partners MicroFranchisePartner[]
 }
 
-/** Activated micro-franchise partner (ICECONNECT login + referral phone as ID). */
+/**
+ * Activated micro-franchise partner (ICECONNECT login + referral phone as ID).
+ */
 model MicroFranchisePartner {
-  id               String   @id @default(cuid())
-  applicationId    String?  @unique
+  id               String    @id @default(cuid())
+  applicationId    String?   @unique
   name             String
-  phone            String   @unique
+  phone            String    @unique
   email            String?
-  userId           String   @unique
+  userId           String    @unique
   commissionPlanId String?
-  performanceScore Float    @default(0)
-  tier             String   @default("BRONZE")
+  performanceScore Float     @default(0)
+  tier             String    @default("BRONZE")
   lastScoredAt     DateTime?
-  createdAt        DateTime @default(now())
+  createdAt        DateTime  @default(now())
 
-  application      MicroFranchiseApplication? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
-  user             User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  commissionPlan   CommissionPlan?            @relation(fields: [commissionPlanId], references: [id], onDelete: SetNull)
-  wallet           Wallet?
-  companies        Company[]
+  application            MicroFranchiseApplication? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  user                   User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commissionPlan         CommissionPlan?            @relation(fields: [commissionPlanId], references: [id], onDelete: SetNull)
+  wallet                 Wallet?
+  companies              Company[]
   commissionTransactions CommissionTransaction[]
-  alerts           MicroFranchiseAlert[]
+  alerts                 MicroFranchiseAlert[]
 
   @@index([commissionPlanId])
 }
@@ -807,19 +913,23 @@ model CommissionTransaction {
   @@index([status])
 }
 
-/** Monthly sales target + salary for ICECONNECT executives (internal org). */
+/**
+ * Monthly sales target + salary for ICECONNECT executives (internal org).
+ */
 model SalesExecutiveMonthlyTarget {
-  id           String   @id @default(cuid())
+  id           String                 @id @default(cuid())
   companyId    String
   userId       String
   periodYear   Int
   periodMonth  Int
   targetCount  Int
   targetPlan   IceconnectCustomerPlan
-  /** Monthly salary in INR (eligible portion scales with target progress). */
-  salaryRupees Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  /**
+   * Monthly salary in INR (eligible portion scales with target progress).
+   */
+  salaryRupees Int                    @default(0)
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -830,78 +940,90 @@ model SalesExecutiveMonthlyTarget {
 }
 
 model Lead {
-  id         String      @id @default(cuid())
-  name       String
-  phone      String
-  email      String?
-  source     String?
-  status     LeadStatus  @default(NEW)
-  value      Float?
+  id              String     @id @default(cuid())
+  name            String
+  phone           String
+  email           String?
+  source          String?
+  status          LeadStatus @default(NEW)
+  value           Float?
   companyId       String
   assignedTo      String?
-  /** User who created the lead in BGOS (audit / “boss vs team” views). */
+  /**
+   * User who created the lead in BGOS (audit / “boss vs team” views).
+   */
   createdByUserId String?
   partnerId       String?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
-  company  Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  assignee User?   @relation("LeadAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
-  creator  User?   @relation("LeadCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  partner  ChannelPartner? @relation(fields: [partnerId], references: [id], onDelete: SetNull)
-  deals       Deal[]
-  tasks       Task[]
-  quotations  Quotation[]
-  invoices    Invoice[]
-  documents   Document[]
-  commissions Commission[]
-  siteVisits  SiteVisit[]
-  approvals   Approval[]
-  lcoLoans    LcoLoan[]
-  customerUser CustomerPortalUser?
-  complaints   CustomerComplaint[]
-  installations Installation[]
+  company        Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  assignee       User?               @relation("LeadAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+  creator        User?               @relation("LeadCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  partner        ChannelPartner?     @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  deals          Deal[]
+  tasks          Task[]
+  quotations     Quotation[]
+  invoices       Invoice[]
+  documents      Document[]
+  commissions    Commission[]
+  siteVisits     SiteVisit[]
+  approvals      Approval[]
+  lcoLoans       LcoLoan[]
+  customerUser   CustomerPortalUser?
+  complaints     CustomerComplaint[]
+  installations  Installation[]
   serviceTickets ServiceTicket[]
-  siteReport  String? @db.Text
+  siteReport     String?             @db.Text
 
-  /** Customer / prospect company name (internal sales). */
-  leadCompanyName    String?
-  businessType       String?
-  internalSalesNotes String?              @db.Text
-  internalSalesStage InternalSalesStage?
-  internalCallStatus InternalCallStatus?
-  lastContactedAt    DateTime?
-  nextFollowUpAt     DateTime?
-  internalTechStage                 InternalTechStage?
-  internalOnboardingApprovalStatus  InternalOnboardingApprovalStatus?
-  /** SLA / escalation: last time sales or tech stage moved. */
-  internalStageUpdatedAt            DateTime?
+  /**
+   * Customer / prospect company name (internal sales).
+   */
+  leadCompanyName                  String?
+  businessType                     String?
+  internalSalesNotes               String?                           @db.Text
+  internalSalesStage               InternalSalesStage?
+  internalCallStatus               InternalCallStatus?
+  lastContactedAt                  DateTime?
+  nextFollowUpAt                   DateTime?
+  internalTechStage                InternalTechStage?
+  internalOnboardingApprovalStatus InternalOnboardingApprovalStatus?
+  /**
+   * SLA / escalation: last time sales or tech stage moved.
+   */
+  internalStageUpdatedAt           DateTime?
 
-  /** Sales-selected tier before onboarding form is opened (internal org). */
+  /**
+   * Sales-selected tier before onboarding form is opened (internal org).
+   */
   onboardingType LeadOnboardingType?
 
-  /** ICECONNECT executive metro (internal org). */
-  iceconnectLocation         String?
-  iceconnectMetroStage      IceconnectMetroStage?
-  iceconnectCustomerPlan    IceconnectCustomerPlan?
-  iceconnectSubscribedAt    DateTime?
-  /** Nexa intelligence state for metro pipeline automation. */
-  currentStage              String?
-  lastActivityAt            DateTime?
-  nextActionDue             DateTime?
-  activityCount             Int                 @default(0)
-  responseStatus            LeadResponseStatus  @default(RESPONSIVE)
-  confidenceScore           Int                 @default(50)
-  nexaPriority              Boolean             @default(false)
-  nexaMovedAt               DateTime?
-  nexaMovedReason           String?
+  /**
+   * ICECONNECT executive metro (internal org).
+   */
+  iceconnectLocation     String?
+  iceconnectMetroStage   IceconnectMetroStage?
+  iceconnectCustomerPlan IceconnectCustomerPlan?
+  iceconnectSubscribedAt DateTime?
+  /**
+   * Nexa intelligence state for metro pipeline automation.
+   */
+  currentStage           String?
+  lastActivityAt         DateTime?
+  nextActionDue          DateTime?
+  activityCount          Int                     @default(0)
+  responseStatus         LeadResponseStatus      @default(RESPONSIVE)
+  confidenceScore        Int                     @default(50)
+  nexaPriority           Boolean                 @default(false)
+  nexaMovedAt            DateTime?
+  nexaMovedReason        String?
 
-  onboardingTasks                 OnboardingTask[]
-  onboardingWorkflowSubmission    OnboardingSubmission?
-  onboardingSessions              OnboardingSession[]
-  onboardingRecords              Onboarding[]
-  internalLeadActivities InternalLeadActivity[]
-  nexaSupportTickets     InternalNexaSupportTicket[]
+  onboardingTasks              OnboardingTask[]
+  onboardingWorkflowSubmission OnboardingSubmission?
+  onboardingSessions           OnboardingSession[]
+  onboardingRecords            Onboarding[]
+  internalLeadActivities       InternalLeadActivity[]
+  nexaSupportTickets           InternalNexaSupportTicket[]
 
   @@index([companyId])
   @@index([status])
@@ -914,18 +1036,18 @@ model Lead {
 }
 
 model Onboarding {
-  id         String           @id @default(cuid())
-  leadId     String
-  companyId  String?
-  status     OnboardingStatus @default(IN_PROGRESS)
-  createdBy  String
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
-  meta       Json?
+  id        String           @id @default(cuid())
+  leadId    String
+  companyId String?
+  status    OnboardingStatus @default(IN_PROGRESS)
+  createdBy String
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  meta      Json?
 
-  lead     Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  company  Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  creator  User     @relation("OnboardingCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  lead    Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  creator User     @relation("OnboardingCreator", fields: [createdBy], references: [id], onDelete: Cascade)
 
   @@index([leadId, status])
   @@index([createdBy, createdAt])
@@ -961,9 +1083,9 @@ model Task {
   dueDate     DateTime?
   createdAt   DateTime   @default(now())
 
-  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  lead    Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  company Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  lead    Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([leadId])
@@ -987,15 +1109,15 @@ model Automation {
 }
 
 model NexaAction {
-  id         String   @id @default(cuid())
-  type       String
-  event      String
-  target     String
-  status     String
-  message    String
-  metadata   Json?
-  executedAt DateTime @default(now())
-  companyId  String
+  id          String   @id @default(cuid())
+  type        String
+  event       String
+  target      String
+  status      String
+  message     String
+  metadata    Json?
+  executedAt  DateTime @default(now())
+  companyId   String
   actorUserId String?
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -1021,8 +1143,8 @@ model Installation {
   lead     Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
   assignee User?   @relation("InstallationAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
 
-  @@index([companyId])
   @@unique([companyId, leadId])
+  @@index([companyId])
   @@index([status])
   @@index([leadId])
   @@index([assignedTo])
@@ -1043,21 +1165,23 @@ model Payment {
 
 /// Customer quotation (money layer). Numbers are per-company unique (e.g. Q-0001).
 model Quotation {
-  id               String   @id @default(cuid())
-  companyId        String
-  leadId           String?
-  /** Snapshot / override when not using a lead or for PDF display. */
-  customerName     String?
-  customerPhone    String?
-  quotationNumber  String
-  status           String
-  totalAmount      Float
-  items            Json
-  notes            String?  @db.Text
-  createdAt        DateTime @default(now())
+  id              String   @id @default(cuid())
+  companyId       String
+  leadId          String?
+  /**
+   * Snapshot / override when not using a lead or for PDF display.
+   */
+  customerName    String?
+  customerPhone   String?
+  quotationNumber String
+  status          String
+  totalAmount     Float
+  items           Json
+  notes           String?  @db.Text
+  createdAt       DateTime @default(now())
 
-  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  lead     Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead     Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
   invoices Invoice[]
 
   @@unique([companyId, quotationNumber])
@@ -1068,23 +1192,23 @@ model Quotation {
 
 /// Invoice linked optionally to quotation + lead.
 model Invoice {
-  id            String    @id @default(cuid())
-  companyId     String
-  quotationId   String?
-  leadId        String?
-  invoiceNumber String
-  status        String
-  totalAmount   Float
-  paidAmount    Float     @default(0)
-  dueDate       DateTime?
-  items         Json
-  pricingVersion String   @default("v1.0")
-  createdAt     DateTime  @default(now())
+  id             String    @id @default(cuid())
+  companyId      String
+  quotationId    String?
+  leadId         String?
+  invoiceNumber  String
+  status         String
+  totalAmount    Float
+  paidAmount     Float     @default(0)
+  dueDate        DateTime?
+  items          Json
+  pricingVersion String    @default("v1.0")
+  createdAt      DateTime  @default(now())
 
-  company     Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  quotation   Quotation?       @relation(fields: [quotationId], references: [id], onDelete: SetNull)
-  lead        Lead?            @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  payments    InvoicePayment[]
+  company   Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  quotation Quotation?       @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+  lead      Lead?            @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  payments  InvoicePayment[]
 
   @@unique([companyId, invoiceNumber])
   @@index([companyId])
@@ -1159,9 +1283,9 @@ model SiteVisit {
   report     Json?
   createdAt  DateTime @default(now())
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  lead    Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  assignee User   @relation("SiteVisitAssignee", fields: [assignedTo], references: [id], onDelete: Restrict)
+  company  Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead     Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  assignee User    @relation("SiteVisitAssignee", fields: [assignedTo], references: [id], onDelete: Restrict)
 
   @@unique([companyId, leadId])
   @@index([companyId])
@@ -1188,24 +1312,24 @@ model Approval {
 
 /// Company file storage: agreements, approvals, site reports, customer docs.
 model Document {
-  id        String   @id @default(cuid())
-  companyId String
-  leadId    String?
-  customerId String?
+  id               String   @id @default(cuid())
+  companyId        String
+  leadId           String?
+  customerId       String?
   /// AGREEMENT | APPROVAL | REPORT | OTHER
-  type      String
+  type             String
   /// Storage key: `{companyId}/documents/{yyyy}/{mm}/{unique}-{safeName}` (local disk or S3 object key).
-  fileUrl   String
-  fileName  String
-  createdAt DateTime @default(now())
+  fileUrl          String
+  fileName         String
+  createdAt        DateTime @default(now())
   /// Who uploaded (nullable for legacy rows before audit columns).
   uploadedByUserId String?
   /// `UserRole` at upload time (membership can change later).
   uploadedByRole   String?
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  lead    Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  uploader User?  @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  company  Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead     Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  uploader User?   @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
 
   @@index([companyId])
   @@index([companyId, type])
@@ -1234,7 +1358,7 @@ model LeaveRequest {
 }
 
 model Attendance {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   companyId String
   userId    String
   date      DateTime
@@ -1250,7 +1374,7 @@ model Attendance {
 }
 
 model Salary {
-  id        String   @id @default(cuid())
+  id        String @id @default(cuid())
   companyId String
   userId    String
   amount    Float
@@ -1265,16 +1389,16 @@ model Salary {
 }
 
 model Product {
-  id        String   @id @default(cuid())
-  companyId String
-  name      String
+  id            String   @id @default(cuid())
+  companyId     String
+  name          String
   /// Panel | Inverter | Battery | Accessories
-  category  String
-  unit      String
-  minStockLevel Float @default(5)
-  createdAt DateTime @default(now())
+  category      String
+  unit          String
+  minStockLevel Float    @default(5)
+  createdAt     DateTime @default(now())
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   stocks  Stock[]
   logs    StockLog[]
 
@@ -1322,9 +1446,9 @@ model ChannelPartner {
   createdByUserId String
   createdAt       DateTime @default(now())
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  creator User @relation("PartnerCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  leads   Lead[]
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  creator     User         @relation("PartnerCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  leads       Lead[]
   commissions Commission[]
 
   @@index([companyId])
@@ -1343,9 +1467,9 @@ model Commission {
   status    String
   createdAt DateTime @default(now())
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   partner ChannelPartner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  lead    Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lead    Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   @@unique([companyId, leadId])
   @@index([companyId])
@@ -1388,11 +1512,15 @@ model OnboardingTask {
   snapshotRequirements String?              @db.Text
   snapshotPlan         String?
   snapshotWhatsApp     String?
-  /** Tier at submit time; drives tech queue priority. */
+  /**
+   * Tier at submit time; drives tech queue priority.
+   */
   leadOnboardingType   LeadOnboardingType?
   techQueuePriority    TechQueuePriority    @default(LOW)
   pipelineStage        TechPipelineStage    @default(RECEIVED)
-  /** Extra onboarding fields (team counts, social, enterprise, etc.). */
+  /**
+   * Extra onboarding fields (team counts, social, enterprise, etc.).
+   */
   formPayload          Json?
   createdByUserId      String
   createdAt            DateTime             @default(now())
@@ -1430,9 +1558,13 @@ model InternalNexaSupportTicket {
   companyId        String
   leadId           String?
   createdByUserId  String
-  /** CALLBACK | MEETING | ISSUE */
+  /**
+   * CALLBACK | MEETING | ISSUE
+   */
   option           String
-  /** TECHNICAL | TRAINING | PAYMENT | OTHER */
+  /**
+   * TECHNICAL | TRAINING | PAYMENT | OTHER
+   */
   category         String
   message          String   @db.Text
   assignedToUserId String?
@@ -1504,17 +1636,17 @@ model InternalEmployeeDailyTarget {
 
 /// Dynamic sections JSON — rendered by form engine (category + plan tier).
 model OnboardingFormTemplate {
-  id        String                   @id @default(cuid())
+  id        String                     @id @default(cuid())
   companyId String
   category  String
   planTier  OnboardingWorkflowPlanTier
   sections  Json
-  isActive  Boolean                  @default(true)
-  createdAt DateTime                 @default(now())
-  updatedAt DateTime                 @updatedAt
+  isActive  Boolean                    @default(true)
+  createdAt DateTime                   @default(now())
+  updatedAt DateTime                   @updatedAt
 
-  company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  submissions  OnboardingSubmission[]
+  company     Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  submissions OnboardingSubmission[]
 
   @@unique([companyId, category, planTier])
   @@index([companyId])
@@ -1540,13 +1672,13 @@ model OnboardingSubmission {
   createdAt          DateTime                   @default(now())
   updatedAt          DateTime                   @updatedAt
 
-  company    Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  template   OnboardingFormTemplate  @relation(fields: [templateId], references: [id], onDelete: Restrict)
-  lead       Lead?                   @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  filledBy   User?                   @relation("OnboardingFilledBy", fields: [filledByUserId], references: [id], onDelete: SetNull)
-  techAssignee User?                 @relation("OnboardingTechAssignee", fields: [assignedTechUserId], references: [id], onDelete: SetNull)
-  messages   OnboardingMessage[]
-  techTask   OnboardingSubmissionTechTask?
+  company      Company                       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  template     OnboardingFormTemplate        @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  lead         Lead?                         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  filledBy     User?                         @relation("OnboardingFilledBy", fields: [filledByUserId], references: [id], onDelete: SetNull)
+  techAssignee User?                         @relation("OnboardingTechAssignee", fields: [assignedTechUserId], references: [id], onDelete: SetNull)
+  messages     OnboardingMessage[]
+  techTask     OnboardingSubmissionTechTask?
 
   @@index([companyId])
   @@index([status])
@@ -1571,7 +1703,7 @@ model OnboardingMessage {
 model OnboardingSubmissionTechTask {
   id           String                   @id @default(cuid())
   submissionId String                   @unique
-  status       OnboardingTechTaskStatus   @default(NEW)
+  status       OnboardingTechTaskStatus @default(NEW)
   createdAt    DateTime                 @default(now())
   updatedAt    DateTime                 @updatedAt
 
@@ -1643,83 +1775,83 @@ enum IncentiveCampaignLifecycle {
 }
 
 model TargetCampaign {
-  id               String               @id @default(cuid())
-  title            String
-  roleCategory     TargetRoleCategory
-  durationPreset   TargetDurationPreset
-  metricType       TargetMetricType
-  targetNumber     Float
-  startDate        DateTime
-  endDate          DateTime
-  assignScope      TargetAssignScope
-  assigneeUserId   String?
-  departmentLabel  String?
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
+  id              String               @id @default(cuid())
+  title           String
+  roleCategory    TargetRoleCategory
+  durationPreset  TargetDurationPreset
+  metricType      TargetMetricType
+  targetNumber    Float
+  startDate       DateTime
+  endDate         DateTime
+  assignScope     TargetAssignScope
+  assigneeUserId  String?
+  departmentLabel String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
 
   @@index([startDate, endDate])
   @@index([roleCategory])
 }
 
 model BonusCampaign {
-  id                String                      @id @default(cuid())
-  title             String
-  eligibleAudience  IncentiveAudience
-  conditionType     BonusConditionType
-  bonusType         BonusValueType
-  bonusValue        Float?
-  notes             String?                     @db.Text
-  validMonth        String
-  poolAmount        Float?
-  lifecycle         IncentiveCampaignLifecycle  @default(ACTIVE)
-  createdAt         DateTime                    @default(now())
-  updatedAt         DateTime                    @updatedAt
+  id               String                     @id @default(cuid())
+  title            String
+  eligibleAudience IncentiveAudience
+  conditionType    BonusConditionType
+  bonusType        BonusValueType
+  bonusValue       Float?
+  notes            String?                    @db.Text
+  validMonth       String
+  poolAmount       Float?
+  lifecycle        IncentiveCampaignLifecycle @default(ACTIVE)
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
 
   @@index([validMonth])
   @@index([eligibleAudience])
 }
 
 model MegaPrizeCampaign {
-  id                 String                      @id @default(cuid())
-  name               String
-  audience           IncentiveAudience
-  eligibilityRules   String                      @db.Text
-  prizeDescription   String                      @db.Text
-  winnerRule         String                      @db.Text
-  startDate          DateTime
-  endDate            DateTime
-  lifecycle          IncentiveCampaignLifecycle  @default(ACTIVE)
-  createdAt          DateTime                    @default(now())
-  updatedAt          DateTime                    @updatedAt
+  id               String                     @id @default(cuid())
+  name             String
+  audience         IncentiveAudience
+  eligibilityRules String                     @db.Text
+  prizeDescription String                     @db.Text
+  winnerRule       String                     @db.Text
+  startDate        DateTime
+  endDate          DateTime
+  lifecycle        IncentiveCampaignLifecycle @default(ACTIVE)
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
 
   @@index([startDate, endDate])
 }
 
 model CommissionRule {
-  id                 String                      @id @default(cuid())
-  planName           String
-  planTier           IncentiveCommissionPlanTier
-  commissionType     String
-  value              Float
-  recurring          Boolean                     @default(true)
-  instantSaleBonus   Float                     @default(0)
-  isActive           Boolean                     @default(true)
-  createdAt          DateTime                    @default(now())
-  updatedAt          DateTime                    @updatedAt
+  id               String                      @id @default(cuid())
+  planName         String
+  planTier         IncentiveCommissionPlanTier
+  commissionType   String
+  value            Float
+  recurring        Boolean                     @default(true)
+  instantSaleBonus Float                       @default(0)
+  isActive         Boolean                     @default(true)
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
 
   @@index([planTier, isActive])
 }
 
 model OfferAnnouncement {
-  id         String             @id @default(cuid())
-  title      String
-  body       String             @db.Text
-  audience   IncentiveAudience  @default(BOTH)
-  startsAt   DateTime?
-  endsAt     DateTime?
-  isActive   Boolean            @default(true)
-  createdAt  DateTime           @default(now())
-  updatedAt  DateTime           @updatedAt
+  id        String            @id @default(cuid())
+  title     String
+  body      String            @db.Text
+  audience  IncentiveAudience @default(BOTH)
+  startsAt  DateTime?
+  endsAt    DateTime?
+  isActive  Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
 
   @@index([audience, isActive])
 }

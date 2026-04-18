@@ -10,10 +10,10 @@ import {
   TaskStatus,
   UserRole,
 } from "@prisma/client";
-import { applySolarTemplate } from "../src/lib/industry-templates";
-import { hashPassword } from "../src/lib/password";
+import { applySolarTemplateWithClient } from "../src/lib/industry-templates-core";
+import { hashPassword } from "../src/lib/password-core";
 import { prisma } from "../src/lib/prisma";
-import { companyMembershipClass } from "../src/lib/user-company";
+import { companyMembershipClass } from "../src/lib/user-company-core";
 
 async function main() {
   if (process.env.NODE_ENV === "production") {
@@ -40,8 +40,9 @@ async function main() {
   await prisma.installation.deleteMany();
   await prisma.automation.deleteMany();
   await prisma.userCompany.deleteMany();
-  await prisma.user.deleteMany();
+  // Company.ownerId → User (onDelete: Restrict): must remove companies before users.
   await prisma.company.deleteMany();
+  await prisma.user.deleteMany();
 
   const passwordHash = await hashPassword("demo-password-change-me");
 
@@ -76,7 +77,9 @@ async function main() {
     },
   });
 
-  await applySolarTemplate(company.id);
+  await prisma.$transaction(async (tx) => {
+    await applySolarTemplateWithClient(tx, company.id);
+  });
 
   async function member(
     name: string,

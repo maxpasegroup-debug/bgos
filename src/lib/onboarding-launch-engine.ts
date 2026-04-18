@@ -16,7 +16,7 @@ import {
   type LaunchCredential,
   type LaunchIndustry,
 } from "@/lib/company-launch-engine";
-import { applyIndustryTemplateWithClient } from "@/lib/industry-templates";
+import { applyIndustryTemplateWithClient } from "@/lib/industry-templates-core";
 import { createLogger } from "@/lib/logger";
 import { loadMembershipsForJwt } from "@/lib/memberships-for-jwt";
 import { normalizeMicroFranchisePhone } from "@/lib/micro-franchise-phone";
