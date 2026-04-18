@@ -162,6 +162,7 @@ export function useBgosData(
   const bossLandingPath =
     pathname === "/bgos/dashboard" ||
     pathname === "/bgos" ||
+    pathname.startsWith("/bgos/dashboard/") ||
     pathname === "/bgos/control/home" ||
     pathname.startsWith("/bgos/control/");
   const sbLandingMeChecked = useRef(false);

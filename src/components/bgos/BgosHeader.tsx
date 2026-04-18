@@ -64,7 +64,7 @@ export function BgosHeader() {
     billing: null,
   });
   const logoHref =
-    controlShell || isSuperBoss ? SUPER_BOSS_HOME_PATH : "/bgos/control/home";
+    controlShell || isSuperBoss ? SUPER_BOSS_HOME_PATH : "/bgos/dashboard";
   const profileRef = useRef<HTMLDivElement | null>(null);
   const notifRef = useRef<HTMLDivElement | null>(null);
 

@@ -9,7 +9,8 @@ export const TECH_EXEC_HOME_PATH = "/iceconnect/tech";
 export const MICRO_FRANCHISE_HOME_PATH = "/iceconnect/micro-franchise";
 
 export const ROLE_HOME: Readonly<Record<string, string>> = {
-  ADMIN: "/bgos/control/home",
+  /** Company boss — tenant BGOS app (`/bgos/dashboard`). Platform owner uses {@link SUPER_BOSS_HOME_PATH} only. */
+  ADMIN: "/bgos/dashboard",
   MANAGER: "/iceconnect/manager",
   SALES_EXECUTIVE: "/iceconnect/sales",
   TELECALLER: "/iceconnect/leads",
@@ -391,8 +392,8 @@ export function roleCanAccessPath(
     return false;
   }
 
+  /** Internal control plane: only the configured platform owner (`superBoss` + BGOS_BOSS_EMAIL). */
   if (p === "/bgos/control" || p.startsWith("/bgos/control/")) {
-    if (role === "ADMIN" && !opts?.superBoss) return true;
     return false;
   }
 

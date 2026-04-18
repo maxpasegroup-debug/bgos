@@ -197,7 +197,7 @@ function loginUrlForRole(role: UserRole): string {
  * BGOS for company ADMIN; ICECONNECT (and partner) homes for employee job roles — see {@link ROLE_HOME}.
  */
 function dashboardsAssignedFor(employeeJobRoles: UserRole[]): string[] {
-  const set = new Set<string>(["/bgos/control/home"]);
+  const set = new Set<string>(["/bgos/dashboard"]);
   for (const r of employeeJobRoles) {
     set.add(getRoleHome(r));
   }
@@ -256,7 +256,7 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
         ok: true,
         companyId: existingByOwnerAndName.id,
         employeesCreated: 0,
-        dashboardsAssigned: ["/bgos/control/home"],
+        dashboardsAssigned: ["/bgos/dashboard"],
         credentials: dupCreds,
         credentialsFile: {
           filename: `${name.replace(/\s+/g, "_")}_credentials.xlsx`,

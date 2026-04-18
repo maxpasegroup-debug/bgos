@@ -18,5 +18,6 @@ export function isSystemReadyFromJwtPayload(
   return role.length > 0;
 }
 
-export const BGOS_BOSS_READY_HOME = "/bgos/control/home" as const;
+/** Tenant company boss (solar dashboard) — not the platform control plane. */
+export const BGOS_BOSS_READY_HOME = "/bgos/dashboard" as const;
 export const BGOS_ONBOARDING_ENTRY = "/onboarding/nexa" as const;

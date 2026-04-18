@@ -107,7 +107,7 @@ export async function switchActiveCompanyPost(
     ? SUPER_BOSS_HOME_PATH
     : co?.internalSalesOrg === true
       ? "/iceconnect/my-journey"
-      : "/bgos/control/home";
+      : "/bgos/dashboard";
 
   const res = NextResponse.json({
     ok: true as const,

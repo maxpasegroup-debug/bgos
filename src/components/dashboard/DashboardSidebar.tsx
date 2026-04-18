@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
 
 const navItems = [
-  { id: "home", label: "Home", href: "/bgos/control/home", icon: HomeIcon },
+  { id: "home", label: "Home", href: "/bgos/dashboard", icon: HomeIcon },
   { id: "sales", label: "Sales", href: "/bgos/sales", icon: SalesIcon },
   {
     id: "operations",
@@ -35,7 +35,7 @@ export function DashboardSidebar() {
           const base = item.href.split("#")[0] ?? item.href;
           const active =
             item.id === "home"
-              ? pathname === base || pathname === "/bgos"
+              ? pathname === base || pathname === "/bgos" || pathname.startsWith("/bgos/dashboard/")
               : pathname === base || pathname.startsWith(`${base}/`);
           return (
             <SidebarLink

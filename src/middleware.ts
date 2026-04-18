@@ -650,11 +650,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(SUPER_BOSS_HOME_PATH, publicBgosOrigin()));
   }
 
+  /** `/bgos/control/*` is only for the platform owner (JWT superBoss + BGOS_BOSS_EMAIL). Tenant bosses use `/bgos/dashboard`. */
   if (
     normalizedPath === "/bgos/control" ||
     normalizedPath.startsWith("/bgos/control/")
   ) {
-    if (!edgeSuperBoss && role !== "ADMIN") {
+    if (!edgeSuperBoss) {
       if (pathname.startsWith("/api")) {
         return NextResponse.json(
           { ok: false, error: "Forbidden", code: "FORBIDDEN" },
