@@ -5,12 +5,11 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { apiFetch, readApiJson } from "@/lib/api-fetch";
 import { useEffect, useState } from "react";
-import { BgosDashboardGrid } from "./BgosDashboardGrid";
 import { BgosDashboardSkeletons, BgosIntelligenceHomeSkeleton } from "./BgosDashboardSkeletons";
 import { BgosIntelligenceHome } from "./BgosIntelligenceHome";
+import { SolarBossDashboard } from "./solar/SolarBossDashboard";
 import { useBgosDashboardContext } from "./BgosDataProvider";
 import { BGOS_MAIN_PAD } from "./layoutTokens";
-import { DASHBOARD_RANGE_LABELS } from "@/lib/dashboard-range";
 
 const routeToSection: Record<string, string> = {
   home: "overview",
@@ -39,6 +38,7 @@ export function BgosDashboardView({ section }: { section?: string }) {
     sessionRole === UserRole.ADMIN || isSuperBoss === true;
   const scrollKey = section ? routeToSection[section] ?? section : undefined;
   const [userName, setUserName] = useState("Boss");
+  const [companyName, setCompanyName] = useState<string | null>(null);
   const [showBuildingPanel, setShowBuildingPanel] = useState(false);
 
   useEffect(() => {
@@ -46,9 +46,11 @@ export function BgosDashboardView({ section }: { section?: string }) {
     (async () => {
       try {
         const res = await apiFetch("/api/auth/me");
-        const j = (await res.json()) as { user?: { name?: string } };
+        const j = (await res.json()) as { user?: { name?: string; companyName?: string | null } };
         const name = j.user?.name?.trim();
+        const co = j.user?.companyName?.trim();
         if (!cancelled && name) setUserName(name);
+        if (!cancelled && co) setCompanyName(co);
       } catch {
         /* ignore */
       }
@@ -144,26 +146,10 @@ export function BgosDashboardView({ section }: { section?: string }) {
           </div>
         </section>
       ) : null}
-      <section className={`${BGOS_MAIN_PAD} pb-2 pt-5`}>
-        <div className="rounded-2xl border border-white/[0.10] bg-gradient-to-br from-white/[0.07] via-white/[0.03] to-transparent px-5 py-5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] backdrop-blur-xl sm:px-6 sm:py-5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
-            Business overview
-          </p>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight text-white sm:text-2xl">
-            Welcome back, {userName}
-          </h1>
-          <p className="mt-2 text-sm text-white/55">
-            Period:{" "}
-            <span className="font-medium text-white/85">
-              {dashboard?.analyticsRange?.label ??
-                DASHBOARD_RANGE_LABELS[analyticsRangePreset] ??
-                "This Month"}
-            </span>
-          </p>
-        </div>
-      </section>
-      <BgosDashboardGrid
+      <SolarBossDashboard
         dashboard={dashboard}
+        userName={userName}
+        companyName={companyName}
         metricsUnavailable={error !== null && dashboard === null}
       />
     </>

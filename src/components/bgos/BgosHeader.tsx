@@ -48,7 +48,8 @@ function roleLabel(role: string): string {
 
 export function BgosHeader() {
   const pathname = usePathname() ?? "";
-  const { trialReadOnly, isSuperBoss, bossBillingBypass, controlShell } = useBgosDashboardContext();
+  const { trialReadOnly, isSuperBoss, bossBillingBypass, controlShell, dashboard } =
+    useBgosDashboardContext();
   const { theme, toggleTheme } = useBgosTheme();
   const light = theme === "light";
   const reduceMotion = useReducedMotion();
@@ -67,6 +68,14 @@ export function BgosHeader() {
     controlShell || isSuperBoss ? SUPER_BOSS_HOME_PATH : "/bgos/dashboard";
   const profileRef = useRef<HTMLDivElement | null>(null);
   const notifRef = useRef<HTMLDivElement | null>(null);
+
+  const onBossDashboard = pathname === "/bgos/dashboard" || pathname === "/bgos";
+  const nexaActionCount =
+    dashboard != null
+      ? (dashboard.nexa?.pendingFollowUps ?? 0) +
+        (dashboard.nexa?.overdueFollowUps ?? 0) +
+        (Array.isArray(dashboard.insights) ? dashboard.insights.length : 0)
+      : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -155,8 +164,8 @@ export function BgosHeader() {
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
       className={
         light
-          ? "sticky top-0 z-50 shrink-0 border-b border-slate-200/90 bg-white/75 backdrop-blur-xl"
-          : "sticky top-0 z-50 shrink-0 border-b border-[var(--bgos-border)]/80 bg-[#121821]/75 backdrop-blur-xl"
+          ? "sticky top-0 z-50 shrink-0 border-b border-slate-200/90 bg-white/80 backdrop-blur-2xl"
+          : "sticky top-0 z-50 shrink-0 border-b border-white/10 bg-[#0f172a]/70 backdrop-blur-2xl"
       }
     >
       <div
@@ -182,13 +191,16 @@ export function BgosHeader() {
         <h1
           className={
             light
-              ? "min-w-0 flex-1 truncate text-center text-xs font-semibold tracking-wide text-slate-700 sm:text-sm"
-              : "min-w-0 flex-1 truncate text-center text-xs font-semibold tracking-wide text-white/90 sm:text-sm"
+              ? "min-w-0 flex-1 truncate text-center text-xs font-semibold tracking-wide text-slate-800 sm:text-sm"
+              : "min-w-0 flex-1 truncate text-center text-xs font-semibold tracking-wide text-white sm:text-sm"
           }
         >
-          {controlShell ? "BGOS Control" : "Business overview"}
+          {controlShell
+            ? "BGOS Control"
+            : sessionUser.companyName?.trim() || "Command Center"}
         </h1>
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
+          {controlShell || isSuperBoss || !onBossDashboard ? (
           <motion.button
             type="button"
             disabled={trialReadOnly}
@@ -217,6 +229,7 @@ export function BgosHeader() {
           >
             Add Lead
           </motion.button>
+          ) : null}
           <motion.button
             type="button"
             onClick={toggleTheme}
@@ -516,6 +529,20 @@ export function BgosHeader() {
           </div>
         </div>
       </div>
+      {!controlShell && onBossDashboard && nexaActionCount !== null ? (
+        <div className="border-t border-white/[0.07] bg-gradient-to-r from-indigo-500/10 via-transparent to-violet-500/10 px-4 py-2 text-center">
+          <Link
+            href="/bgos/nexa"
+            className={
+              light
+                ? "text-xs font-medium text-indigo-800 hover:text-indigo-950"
+                : "text-xs font-medium text-indigo-200/95 hover:text-white"
+            }
+          >
+            You have {nexaActionCount} {nexaActionCount === 1 ? "action" : "actions"} pending — Nexa
+          </Link>
+        </div>
+      ) : null}
       <BgosAddLeadModal open={addLeadOpen} onClose={() => setAddLeadOpen(false)} />
     </motion.header>
   );

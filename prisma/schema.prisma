@@ -351,11 +351,100 @@ model Company {
   microFranchisePartner        MicroFranchisePartner? @relation(fields: [microFranchisePartnerId], references: [id], onDelete: SetNull)
   microFranchiseCommissionTxs    CommissionTransaction[]
   techRequests                 TechRequest[]
+  salesBoosterMessages         SalesBoosterOmnichannelMessage[]
+  salesBoosterCampaigns        SalesBoosterOmnichannelCampaign[]
+  salesBoosterConnections      SalesBoosterChannelConnection[]
+  salesBoosterAutomationFlow   SalesBoosterAutomationFlow?
 
   @@index([name])
   @@index([ownerId])
   @@index([launchChannelPartnerId])
   @@index([microFranchisePartnerId])
+}
+
+/** Omnichannel Sales Booster — channel identifiers (UI + API). */
+enum SalesBoosterOmnichannel {
+  WHATSAPP
+  INSTAGRAM
+  FACEBOOK
+  EMAIL
+  SMS
+}
+
+enum SalesBoosterConnectionState {
+  DISCONNECTED
+  PENDING
+  CONNECTED
+}
+
+enum SalesBoosterCampaignState {
+  DRAFT
+  SCHEDULED
+  SENT
+  PAUSED
+}
+
+/** In-app omnichannel thread messages (company-scoped). Mapped to `sales_booster_messages`. */
+model SalesBoosterOmnichannelMessage {
+  id        String                  @id @default(cuid())
+  companyId String
+  channel   SalesBoosterOmnichannel
+  sender    String
+  content   String                  @db.Text
+  leadId    String?
+  createdAt DateTime                @default(now())
+  readAt    DateTime?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, createdAt(sort: Desc)])
+  @@map("sales_booster_messages")
+}
+
+model SalesBoosterOmnichannelCampaign {
+  id              String                   @id @default(cuid())
+  companyId       String
+  channel         SalesBoosterOmnichannel
+  status          SalesBoosterCampaignState @default(DRAFT)
+  name            String?
+  sentCount       Int                      @default(0)
+  deliveredCount  Int                      @default(0)
+  responseCount   Int                      @default(0)
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("sales_booster_campaigns")
+}
+
+model SalesBoosterChannelConnection {
+  id          String                     @id @default(cuid())
+  companyId   String
+  channel     SalesBoosterOmnichannel
+  status      SalesBoosterConnectionState @default(DISCONNECTED)
+  credentials Json?
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, channel])
+  @@map("sales_booster_connections")
+}
+
+/** Single automation flow JSON per company (chatbot builder). */
+model SalesBoosterAutomationFlow {
+  id               String   @id @default(cuid())
+  companyId        String   @unique
+  jsonFlow         Json
+  autoReplyEnabled Boolean  @default(false)
+  updatedAt        DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("sales_booster_automation_flows")
 }
 
 /** Boss monthly targets on Home — drives projections (1Y / multi-year copy). */

@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, type ComponentType } from "react";
+import { type ComponentType } from "react";
 import { useBgosDashboardContext } from "./BgosDataProvider";
 import { useBgosTheme } from "./BgosThemeContext";
 
@@ -15,57 +15,46 @@ type NavDef = {
   booster?: boolean;
 };
 
-const primaryNav: NavDef[] = [
-  { id: "home", label: "Home", href: "/bgos/dashboard", icon: HomeIcon },
-  { id: "sales", label: "Sales", href: "/bgos/sales", icon: SalesIcon },
-  { id: "operations", label: "Operations", href: "/bgos/operations", icon: OpsIcon },
-  { id: "team", label: "Team", href: "/bgos/hr", icon: TeamIcon },
-  { id: "accounts", label: "Accounts", href: "/bgos/accounts", icon: RevenueIcon },
-  { id: "inventory", label: "Inventory", href: "/bgos/inventory", icon: InventoryIcon },
-  { id: "customer", label: "Customer", href: "/bgos/customer", icon: CustomerIcon },
-  { id: "documents", label: "Documents", href: "/bgos/documents", icon: DocsIcon },
-  { id: "sales-booster", label: "Sales Booster", href: "/sales-booster", icon: LightningIcon, booster: true },
-  { id: "settings", label: "Settings", href: "/bgos/settings", icon: SettingsIcon },
-];
-
-const moreNav: NavDef[] = [
-  { id: "billing", label: "Billing", href: "/bgos/billing", icon: BillingIcon },
-  { id: "subscription", label: "Plans", href: "/bgos/subscription", icon: PricingIcon },
-  { id: "automation", label: "Automation", href: "/bgos/automation", icon: NexaIcon },
-  { id: "revenue", label: "Revenue", href: "/bgos/revenue", icon: RevenueIcon },
-  { id: "risks", label: "Risks", href: "/bgos/risks", icon: RisksIcon },
-  { id: "nexa", label: "Nexa", href: "/bgos/nexa", icon: NexaIcon },
-];
+function ChartReportIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" aria-hidden>
+      <path
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.75}
+        d="M9 19v-6m4 6V8m4 11v-8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+      />
+    </svg>
+  );
+}
 
 export function BgosSidebar() {
   const pathname = usePathname() ?? "";
-  const { hasProPlan, planLockedToBasic, bossBillingBypass, controlShell } =
-    useBgosDashboardContext();
+  const { hasProPlan, planLockedToBasic, controlShell } = useBgosDashboardContext();
   const { theme } = useBgosTheme();
   const light = theme === "light";
-  const [moreOpen, setMoreOpen] = useState(false);
-  const moreRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    function onDoc(e: MouseEvent) {
-      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false);
-    }
-    if (moreOpen) document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [moreOpen]);
+  const salesBoosterHref =
+    hasProPlan && !planLockedToBasic ? "/sales-booster" : "/bgos/pricing";
 
-  function resolveHref(item: NavDef): string {
-    if (
-      item.id === "sales-booster" &&
-      (bossBillingBypass || (!planLockedToBasic && hasProPlan))
-    ) {
-      return "/sales-booster/dashboard";
-    }
-    return item.href;
-  }
+  const solarBossNav: NavDef[] = [
+    { id: "home", label: "Home", href: "/bgos/dashboard", icon: HomeIcon },
+    { id: "sales-booster", label: "Sales Booster", href: salesBoosterHref, icon: LightningIcon, booster: true },
+    { id: "pipeline", label: "Pipeline", href: "/bgos/sales", icon: SalesIcon },
+    { id: "installations", label: "Installations", href: "/bgos/operations", icon: OpsIcon },
+    { id: "inventory", label: "Inventory", href: "/bgos/inventory", icon: InventoryIcon },
+    { id: "team", label: "Team", href: "/bgos/team", icon: TeamIcon },
+    { id: "finance", label: "Finance", href: "/bgos/money", icon: RevenueIcon },
+    { id: "reports", label: "Reports", href: "/bgos/revenue", icon: ChartReportIcon },
+    { id: "settings", label: "Settings", href: "/bgos/settings", icon: SettingsIcon },
+  ];
 
   function isActive(item: NavDef): boolean {
     if (item.id === "sales-booster") {
+      if (salesBoosterHref === "/bgos/pricing") {
+        return pathname === "/bgos/pricing" || pathname.startsWith("/bgos/pricing/");
+      }
       return pathname === "/sales-booster" || pathname.startsWith("/sales-booster/");
     }
     if (item.href.startsWith("/bgos/control#")) {
@@ -110,10 +99,10 @@ export function BgosSidebar() {
       className={`fixed bottom-0 left-0 top-0 z-40 flex w-16 flex-col border-r border-white/10 bg-white/5 backdrop-blur-xl md:w-[240px] ${shell}`}
     >
       <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-1.5 py-3 md:px-2">
-        {primaryNav.map((item) => (
+        {solarBossNav.map((item) => (
           <SidebarLink
             key={item.id}
-            href={resolveHref(item)}
+            href={item.href}
             label={item.label}
             icon={item.icon}
             active={isActive(item)}
@@ -122,40 +111,7 @@ export function BgosSidebar() {
           />
         ))}
       </nav>
-
-      <div ref={moreRef} className="border-t border-inherit px-1.5 py-2 md:px-2">
-        <button
-          type="button"
-          onClick={() => setMoreOpen((v) => !v)}
-          className={
-            light
-              ? "flex w-full items-center justify-center gap-2 rounded-xl px-2 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-100 md:justify-start"
-              : "flex w-full items-center justify-center gap-2 rounded-xl px-2 py-2 text-xs font-medium text-white/55 transition hover:bg-white/[0.06] md:justify-start"
-          }
-          aria-expanded={moreOpen}
-        >
-          <MoreIcon className="h-[1.15rem] w-[1.15rem] shrink-0" />
-          <span className="hidden group-hover:inline">More</span>
-        </button>
-        {moreOpen ? (
-          <div className="mt-1 space-y-0.5 pb-1">
-            {(bossBillingBypass
-              ? moreNav.filter((item) => item.id !== "billing" && item.id !== "subscription")
-              : moreNav
-            ).map((item) => (
-              <SidebarLink
-                key={item.id}
-                href={item.href}
-                label={item.label}
-                icon={item.icon}
-                active={isActive(item)}
-                light={light}
-                compact
-              />
-            ))}
-          </div>
-        ) : null}
-      </div>
+      <div className="border-t border-inherit px-1.5 py-2 md:px-2" />
     </aside>
   );
 }
@@ -475,20 +431,6 @@ function SettingsIcon({ className }: { className?: string }) {
         strokeLinejoin="round"
         strokeWidth={1.75}
         d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-      />
-    </svg>
-  );
-}
-
-function MoreIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" aria-hidden>
-      <path
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={1.75}
-        d="M4 6h16M4 12h16M4 18h16"
       />
     </svg>
   );

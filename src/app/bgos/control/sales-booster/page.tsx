@@ -42,7 +42,7 @@ export default function ControlSalesBoosterPage() {
           <>
             <p className={muted}>Your workspace has Pro access.</p>
             <Link
-              href="/sales-booster/dashboard"
+              href="/sales-booster"
               className="mt-4 inline-flex rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
             >
               Open Sales Booster
