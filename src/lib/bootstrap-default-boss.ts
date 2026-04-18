@@ -5,8 +5,9 @@ import { withDbRetry } from "@/lib/db-retry";
 import { hashPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
 import { companyMembershipClass } from "@/lib/user-company";
+import { BGOS_PLATFORM_BOSS_EMAIL } from "@/lib/super-boss";
 
-export const DEFAULT_BOSS_EMAIL = "boss@bgos.online";
+export const DEFAULT_BOSS_EMAIL = BGOS_PLATFORM_BOSS_EMAIL;
 const DEFAULT_BOSS_PASSWORD_PLAIN = "123456";
 
 /**

@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { type AuthUser, getAuthUser, getAuthUserFromToken, getTokenFromRequest } from "@/lib/auth";
 import { verifyAccessTokenResult } from "@/lib/jwt";
-import { getBgosBossEmail, isSuperBossEmail } from "@/lib/super-boss";
+import { isSuperBossEmail } from "@/lib/super-boss";
 
 /**
  * Route handler guard: session must match `BGOS_BOSS_EMAIL` (verified JWT email).
@@ -32,17 +32,6 @@ export function requireSuperBossApi(
     );
   }
   const payload = vr.payload as Record<string, unknown>;
-  const bossEmailConfigured = getBgosBossEmail().length > 0;
-  if (!bossEmailConfigured) {
-    return NextResponse.json(
-      {
-        ok: false as const,
-        error: "Platform boss email is not configured (set BGOS_BOSS_EMAIL).",
-        code: "MISCONFIGURED" as const,
-      },
-      { status: 503 },
-    );
-  }
   if (!isSuperBossEmail(user.email)) {
     return NextResponse.json(
       {
