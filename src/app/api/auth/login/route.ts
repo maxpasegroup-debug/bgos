@@ -2,7 +2,7 @@ import { CompanyPlan, UserRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { parseJsonBody, zodValidationErrorResponse } from "@/lib/api-response";
-import { AUTH_ERROR_CODES } from "@/lib/auth-api";
+import { AUTH_ERROR_CODES, getAuthErrorMessage } from "@/lib/auth-api";
 import { ensureDefaultBossUser } from "@/lib/bootstrap-default-boss";
 import { checkLoginRateLimit, getClientIpForRateLimit } from "@/lib/login-rate-limit";
 import { withDbRetry } from "@/lib/db-retry";
@@ -132,18 +132,26 @@ export async function POST(request: Request) {
       }),
     );
 
-    const authError = NextResponse.json(
+    const invalidPasswordResponse = NextResponse.json(
       {
         success: false as const,
         ok: false as const,
-        error: "Invalid email or password",
-        code: AUTH_ERROR_CODES.INVALID_CREDENTIALS,
+        error: getAuthErrorMessage(AUTH_ERROR_CODES.INVALID_PASSWORD),
+        code: AUTH_ERROR_CODES.INVALID_PASSWORD,
       },
       { status: 401 },
     );
 
     if (!user) {
-      return authError;
+      return NextResponse.json(
+        {
+          success: false as const,
+          ok: false as const,
+          error: getAuthErrorMessage(AUTH_ERROR_CODES.ACCOUNT_NOT_FOUND),
+          code: AUTH_ERROR_CODES.ACCOUNT_NOT_FOUND,
+        },
+        { status: 401 },
+      );
     }
 
     if (!user.isActive) {
@@ -164,7 +172,7 @@ export async function POST(request: Request) {
     });
     const valid = await verifyPassword(password, user.password);
     if (!valid) {
-      return authError;
+      return invalidPasswordResponse;
     }
 
     const membership = user.memberships[0];

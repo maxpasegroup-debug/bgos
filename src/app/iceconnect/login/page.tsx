@@ -115,7 +115,13 @@ function IceconnectLoginForm() {
         }
         if (typeof data.error === "string" && data.error.trim()) {
           setFormError(data.error);
-          if (data.code === "INVALID_CREDENTIALS") setCredentialsMismatch(true);
+          if (
+            data.code === "INVALID_CREDENTIALS" ||
+            data.code === "INVALID_PASSWORD" ||
+            data.code === "ACCOUNT_NOT_FOUND"
+          ) {
+            setCredentialsMismatch(true);
+          }
         } else {
           setFormError("Sign-in failed");
         }

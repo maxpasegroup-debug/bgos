@@ -243,6 +243,43 @@ export function NexaOnboardBossClient({
     return j.data;
   }
 
+  /** User-visible text from API JSON; includes Zod field errors when present. */
+  function messageFromApiFailure(
+    j: {
+      error?: string;
+      message?: string;
+      code?: string;
+      details?: unknown;
+    },
+    status: number,
+  ): string {
+    if (typeof j.error === "string" && j.error.trim()) return j.error.trim();
+    if (typeof j.message === "string" && j.message.trim()) return j.message.trim();
+    if (j.code === "VALIDATION_ERROR" && j.details && typeof j.details === "object") {
+      const d = j.details as { fieldErrors?: Record<string, string[]>; formErrors?: string[] };
+      const fe = d.fieldErrors;
+      if (fe) {
+        const first =
+          fe.password?.[0] ?? fe.email?.[0] ?? fe.name?.[0] ?? Object.values(fe).flat()[0];
+        if (first) return first;
+      }
+      const formErr = d.formErrors?.[0];
+      if (formErr) return formErr;
+    }
+    if (status === 401) return "Unable to sign in. Check your email and password.";
+    if (status === 403) return "Access denied.";
+    if (status === 409) return "This email is already registered.";
+    if (status === 429) return "Too many attempts. Please wait and try again.";
+    return "Something went wrong. Please try again.";
+  }
+
+  function shouldOfferRetryForAuthFailure(status: number, code?: string): boolean {
+    if (status >= 500) return true;
+    if (status === 429) return true;
+    if (code === "SERVER_ERROR") return true;
+    return false;
+  }
+
   async function submitAccount() {
     if (!password.trim()) {
       setBanner({ text: "I need a secure password to protect your account.", showRetry: false });
@@ -267,21 +304,28 @@ export function NexaOnboardBossClient({
         success?: boolean;
         user?: { id?: string };
         error?: string;
+        message?: string;
+        code?: string;
+        details?: unknown;
       };
       if (!res.ok || (j.ok !== true && j.success !== true)) {
-        console.error("[NexaOnboardBoss] auth failed", j);
+        const text = messageFromApiFailure(j, res.status);
+        console.error("[NexaOnboardBoss] auth failed", { status: res.status, ...j });
         setBanner({
-          text: "I’m fixing a system issue. Let’s retry together.",
-          showRetry: true,
-          onRetry: () => void submitAccount(),
+          text,
+          showRetry: shouldOfferRetryForAuthFailure(res.status, j.code),
+          ...(shouldOfferRetryForAuthFailure(res.status, j.code)
+            ? { onRetry: () => void submitAccount() }
+            : {}),
         });
         return;
       }
       const authedUserId =
         typeof j.user?.id === "string" && j.user.id.trim() ? j.user.id.trim() : undefined;
       if (!authedUserId) {
+        console.error("[NexaOnboardBoss] auth ok but missing user id", j);
         setBanner({
-          text: "I’m fixing a system issue. Let’s retry together.",
+          text: "Signed in, but the server response was incomplete. Please try again or contact support.",
           showRetry: true,
           onRetry: () => void submitAccount(),
         });
@@ -298,8 +342,12 @@ export function NexaOnboardBossClient({
           }));
           return;
         }
+        const initMsg =
+          initResult.message?.trim() ||
+          "Could not start onboarding. Check your connection and try again.";
+        console.error("[NexaOnboardBoss] onboarding/init failed after recovery", initMsg);
         setBanner({
-          text: "I’m fixing a system issue. Let’s retry together.",
+          text: initMsg,
           showRetry: true,
           onRetry: () => void submitAccount(),
         });
