@@ -1,4 +1,4 @@
-import { Prisma, UserRole } from "@prisma/client";
+import { Prisma, SalesNetworkRole, UserRole } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -17,11 +17,29 @@ import {
 } from "@/lib/user-email-availability";
 import { EMAIL_ALREADY_IN_USE_MESSAGE } from "@/lib/user-identity-messages";
 
+function jobRoleFromSalesNetwork(r: SalesNetworkRole): UserRole {
+  switch (r) {
+    case SalesNetworkRole.RSM:
+      return UserRole.MANAGER;
+    case SalesNetworkRole.BDE:
+      return UserRole.SALES_EXECUTIVE;
+    case SalesNetworkRole.TECH_EXEC:
+      return UserRole.TECH_EXECUTIVE;
+    case SalesNetworkRole.BDM:
+      return UserRole.MANAGER;
+    default:
+      return UserRole.SALES_EXECUTIVE;
+  }
+}
+
 const bodySchema = z.object({
   name: z.string().trim().min(1).max(200),
   email: z.string().trim().email().max(320),
   password: z.string().min(8, "Password must be at least 8 characters"),
   role: z.nativeEnum(UserRole),
+  salesNetworkRole: z.nativeEnum(SalesNetworkRole).optional(),
+  parentUserId: z.string().trim().min(1).optional(),
+  region: z.string().trim().max(120).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -30,10 +48,6 @@ export async function POST(request: NextRequest) {
 
   const parsed = await parseJsonBodyZod(request, bodySchema);
   if (!parsed.ok) return parsed.response;
-
-  if (!INTERNAL_ORG_EMPLOYEE_ROLES.includes(parsed.data.role)) {
-    return jsonError(400, "VALIDATION_ERROR", "Choose MANAGER, SALES_EXECUTIVE, TECH_HEAD, or TECH_EXECUTIVE");
-  }
 
   const org = await getOrCreateInternalSalesCompanyId();
   if ("error" in org) {
@@ -51,10 +65,40 @@ export async function POST(request: NextRequest) {
     return jsonError(500, "INTERNAL_ORG", "Internal company is misconfigured");
   }
 
+  let jobRole = parsed.data.role;
+  let networkRole: SalesNetworkRole | null = parsed.data.salesNetworkRole ?? null;
+
+  if (networkRole) {
+    if (networkRole === SalesNetworkRole.BDM) {
+      return jsonError(
+        400,
+        "VALIDATION_ERROR",
+        "BDM is earned via Nexa promotion (3 consecutive months on target) — not created manually.",
+      );
+    }
+    if (networkRole === SalesNetworkRole.BOSS) {
+      return jsonError(400, "VALIDATION_ERROR", "BOSS is the workspace owner — not created here.");
+    }
+    jobRole = jobRoleFromSalesNetwork(networkRole);
+  }
+
+  if (!INTERNAL_ORG_EMPLOYEE_ROLES.includes(jobRole)) {
+    return jsonError(400, "VALIDATION_ERROR", "Choose MANAGER, SALES_EXECUTIVE, TECH_HEAD, or TECH_EXECUTIVE");
+  }
+
   const email = parsed.data.email.trim().toLowerCase();
 
   if (await isUserEmailAlreadyRegistered(email)) {
     return jsonError(409, "EMAIL_IN_USE", EMAIL_ALREADY_IN_USE_MESSAGE);
+  }
+
+  if (parsed.data.parentUserId) {
+    const parent = await prisma.userCompany.findFirst({
+      where: { companyId: org.companyId, userId: parsed.data.parentUserId },
+    });
+    if (!parent) {
+      return jsonError(400, "VALIDATION_ERROR", "Parent must be a user in this workspace.");
+    }
   }
 
   const passwordHash = await hashPassword(parsed.data.password);
@@ -74,10 +118,24 @@ export async function POST(request: NextRequest) {
         data: {
           userId: u.id,
           companyId: org.companyId,
-          role: companyMembershipClass(parsed.data.role),
-          jobRole: parsed.data.role,
+          role: companyMembershipClass(jobRole),
+          jobRole,
+          salesNetworkRole: networkRole,
+          parentUserId: parsed.data.parentUserId ?? null,
+          region: networkRole === SalesNetworkRole.RSM ? (parsed.data.region ?? null) : null,
         },
       });
+      if (networkRole === SalesNetworkRole.BDE) {
+        await tx.promotionTracker.create({
+          data: {
+            companyId: org.companyId,
+            userId: u.id,
+            currentStreak: 0,
+            targetMet: false,
+            eligibleForPromotion: false,
+          },
+        });
+      }
       return { user: u, membership: mem };
     });
 

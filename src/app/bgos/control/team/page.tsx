@@ -1,8 +1,8 @@
 "use client";
 
-import { IceconnectCustomerPlan, UserRole } from "@prisma/client";
+import { IceconnectCustomerPlan, SalesNetworkRole, UserRole } from "@prisma/client";
 import { createPortal } from "react-dom";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { z } from "zod";
 import { useBgosTheme } from "@/components/bgos/BgosThemeContext";
 import { BGOS_MAIN_PAD } from "@/components/bgos/layoutTokens";
@@ -27,10 +27,15 @@ type Member = {
   isActive?: boolean;
   assignedClients?: number;
   pendingTasks?: number;
+  salesNetworkRole?: SalesNetworkRole | null;
+  parentUserId?: string | null;
+  region?: string | null;
+  archivedAt?: string | null;
 };
 
 type TeamJson = {
   ok?: boolean;
+  bdeMonthlyTargetInr?: number;
   departments?: { sales: Member[]; tech: Member[] };
 };
 
@@ -136,6 +141,23 @@ export default function ControlTeamPage() {
   const [kycPanDoc, setKycPanDoc] = useState("");
   const [kycIdDoc, setKycIdDoc] = useState("");
 
+  const [workspaceTab, setWorkspaceTab] = useState<"classic" | "hierarchy" | "performance" | "nexa">("classic");
+  const [bdeTargetInr, setBdeTargetInr] = useState(30_000);
+  const [nexaTasks, setNexaTasks] = useState<
+    Array<{
+      id: string;
+      assigneeName: string;
+      task: string;
+      status: string;
+      priority: string;
+      dueDate: string | null;
+    }>
+  >([]);
+  const [nexaLoading, setNexaLoading] = useState(false);
+  const [networkRolePick, setNetworkRolePick] = useState<SalesNetworkRole | "">("");
+  const [regionInput, setRegionInput] = useState("");
+  const [parentUserIdInput, setParentUserIdInput] = useState("");
+
   const load = useCallback(async () => {
     setError(null);
     try {
@@ -157,6 +179,9 @@ export default function ControlTeamPage() {
         return;
       }
       setData(j.departments);
+      if (typeof j.bdeMonthlyTargetInr === "number") {
+        setBdeTargetInr(j.bdeMonthlyTargetInr);
+      }
     } catch (e) {
       console.error("API ERROR:", e);
       setError(formatFetchFailure(e, "Could not reach team API"));
@@ -172,7 +197,71 @@ export default function ControlTeamPage() {
     if (!data || !dept) return [];
     return dept === "sales" ? data.sales : data.tech;
   }, [data, dept]);
+
+  const allNetworkMembers = useMemo(() => {
+    if (!data) return [];
+    return [...data.sales, ...data.tech];
+  }, [data]);
+
   const recycleBin = useMemo(() => members.filter((m) => m.isActive === false), [members]);
+
+  const loadNexaTasks = useCallback(async () => {
+    setNexaLoading(true);
+    try {
+      const res = await apiFetch("/api/bgos/control/network/nexa-tasks", { credentials: "include" });
+      const j = (await res.json()) as {
+        ok?: boolean;
+        data?: { tasks?: typeof nexaTasks };
+        tasks?: typeof nexaTasks;
+      };
+      const rows = j.data?.tasks ?? j.tasks ?? [];
+      setNexaTasks(rows);
+    } catch {
+      setNexaTasks([]);
+    } finally {
+      setNexaLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (workspaceTab === "nexa") void loadNexaTasks();
+  }, [workspaceTab, loadNexaTasks]);
+
+  function HierarchyNodes({
+    parentId,
+    depth,
+  }: {
+    parentId: string | null;
+    depth: number;
+  }): ReactNode {
+    const kids = allNetworkMembers.filter((m) => (m.parentUserId ?? null) === parentId);
+    if (kids.length === 0 && depth === 0) {
+      return <p className={muted}>Set parent IDs on members to build the tree (RSM → BDM → BDE).</p>;
+    }
+    if (kids.length === 0) return null;
+    return (
+      <ul className={depth === 0 ? "space-y-2" : "ml-4 mt-2 space-y-2 border-l border-white/10 pl-4"}>
+        {kids.map((m) => (
+          <li key={m.userId}>
+            <div
+              className={
+                light
+                  ? "rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800"
+                  : "rounded-xl border border-white/10 bg-[#0f172a]/80 px-3 py-2 text-sm text-white/90"
+              }
+            >
+              <span className="font-semibold">{m.name}</span>
+              <span className={muted + " ml-2"}>
+                {m.salesNetworkRole ?? m.role}
+                {m.region ? ` · ${m.region}` : ""}
+              </span>
+            </div>
+            <HierarchyNodes parentId={m.userId} depth={depth + 1} />
+          </li>
+        ))}
+      </ul>
+    );
+  }
 
   const cardShell = light
     ? "rounded-2xl border border-slate-200/90 bg-white/90 p-6 shadow-sm"
@@ -194,11 +283,21 @@ export default function ControlTeamPage() {
     }
     setSaving(true);
     try {
+      const payload: Record<string, unknown> = { ...fields.data, role };
+      if (networkRolePick) {
+        payload.salesNetworkRole = networkRolePick;
+      }
+      if (regionInput.trim()) {
+        payload.region = regionInput.trim();
+      }
+      if (parentUserIdInput.trim()) {
+        payload.parentUserId = parentUserIdInput.trim();
+      }
       const res = await apiFetch("/api/bgos/control/team/employees", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...fields.data, role }),
+        body: JSON.stringify(payload),
       });
       const j = ((await readApiJson(res, "control/team/employees")) ?? {}) as {
         ok?: boolean;
@@ -524,11 +623,15 @@ export default function ControlTeamPage() {
   }
 
   return (
-    <div className={`mx-auto max-w-5xl pb-16 pt-6 ${BGOS_MAIN_PAD}`}>
+    <div id="bgos_control_v3_sales_hr_engine" className={`mx-auto max-w-5xl pb-16 pt-6 ${BGOS_MAIN_PAD}`}>
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className={light ? "text-2xl font-bold text-slate-900" : "text-2xl font-bold text-white"}>People &amp; HR</h1>
-          <p className={muted + " mt-1"}>Full HR + Performance + Payroll control for internal ICECONNECT employees.</p>
+          <h1 className={light ? "text-2xl font-bold text-slate-900" : "text-2xl font-bold text-white"}>
+            People &amp; Network
+          </h1>
+          <p className={muted + " mt-1"}>
+            Hybrid HR + sales network + Nexa control — boss → RSM → BDM → BDE, tech round-robin, promotions.
+          </p>
         </div>
         <button
           type="button"
@@ -547,7 +650,108 @@ export default function ControlTeamPage() {
         </button>
       </div>
 
+      <div className="mb-6 flex flex-wrap gap-2">
+        {(
+          [
+            ["classic", "Team & HR"],
+            ["hierarchy", "Hierarchy"],
+            ["performance", "Performance"],
+            ["nexa", "Nexa Work Board"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setWorkspaceTab(id)}
+            className={
+              workspaceTab === id
+                ? light
+                  ? "rounded-full bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white"
+                  : "rounded-full bg-cyan-500/90 px-4 py-1.5 text-xs font-semibold text-slate-950"
+                : light
+                  ? "rounded-full border border-slate-200 bg-white px-4 py-1.5 text-xs font-medium text-slate-700"
+                  : "rounded-full border border-white/10 bg-white/[0.04] px-4 py-1.5 text-xs font-medium text-white/75"
+            }
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {error ? <p className="mb-4 text-sm text-amber-500">{error}</p> : null}
+
+      {workspaceTab === "hierarchy" ? (
+        <div className={cardShell + " mb-8"}>
+          <p className={light ? "text-sm font-semibold text-slate-900" : "text-sm font-semibold text-white"}>
+            Network tree
+          </p>
+          <p className={muted + " mt-1"}>RSM → BDM → BDE. BDM is promoted by Nexa (not added here).</p>
+          <div className="mt-4">
+            <HierarchyNodes parentId={null} depth={0} />
+          </div>
+        </div>
+      ) : null}
+
+      {workspaceTab === "performance" ? (
+        <div className="mb-8 grid gap-4 sm:grid-cols-2">
+          <div className={cardShell}>
+            <p className={light ? "text-sm font-semibold text-slate-900" : "text-sm font-semibold text-white"}>
+              BDE monthly target
+            </p>
+            <p className="mt-2 text-2xl font-bold text-cyan-300">₹{bdeTargetInr.toLocaleString("en-IN")}</p>
+            <p className={muted + " mt-1"}>Promotion to BDM requires 3 consecutive months on target (Nexa).</p>
+          </div>
+          <div className={cardShell}>
+            <p className={light ? "text-sm font-semibold text-slate-900" : "text-sm font-semibold text-white"}>
+              Regions &amp; revenue
+            </p>
+            <p className={muted + " mt-2"}>
+              Region-wise revenue and RSM comparisons will aggregate from{" "}
+              <code className="text-[11px]">performance_metrics</code> as data is recorded.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {workspaceTab === "nexa" ? (
+        <div className={cardShell + " mb-8"}>
+          <div className="flex items-center justify-between gap-2">
+            <p className={light ? "text-sm font-semibold text-slate-900" : "text-sm font-semibold text-white"}>
+              Nexa tasks
+            </p>
+            <button
+              type="button"
+              onClick={() => void loadNexaTasks()}
+              className="text-xs font-medium text-cyan-300 hover:underline"
+            >
+              Refresh
+            </button>
+          </div>
+          {nexaLoading ? (
+            <p className={muted + " mt-3"}>Loading…</p>
+          ) : nexaTasks.length === 0 ? (
+            <p className={muted + " mt-3"}>No tasks yet — use the API to assign Nexa work items.</p>
+          ) : (
+            <ul className="mt-4 space-y-2">
+              {nexaTasks.map((t) => (
+                <li
+                  key={t.id}
+                  className={
+                    light
+                      ? "rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800"
+                      : "rounded-xl border border-white/10 bg-[#0f172a]/80 px-3 py-2 text-sm text-white/90"
+                  }
+                >
+                  <span className="text-[10px] uppercase text-white/35">{t.status}</span> ·{" "}
+                  <span className="font-medium text-cyan-200">{t.assigneeName}</span>
+                  <p className="mt-1 text-white/80">{t.task}</p>
+                  <p className="text-[11px] text-white/40">{t.priority}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
 
       {formOpen ? (
         <form onSubmit={onCreate} className={cardShell + " mb-8 space-y-3"}>
@@ -608,6 +812,48 @@ export default function ControlTeamPage() {
               </option>
             ))}
           </select>
+          <div>
+            <label className={muted + " block text-xs"}>Sales network role (optional)</label>
+            <select
+              className={
+                light
+                  ? "mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                  : "mt-1 w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white"
+              }
+              value={networkRolePick}
+              onChange={(e) => setNetworkRolePick(e.target.value as SalesNetworkRole | "")}
+            >
+              <option value="">— Legacy job role only —</option>
+              <option value={SalesNetworkRole.RSM}>RSM (Regional Sales Manager)</option>
+              <option value={SalesNetworkRole.BDE}>BDE (Business Development Executive)</option>
+              <option value={SalesNetworkRole.TECH_EXEC}>Tech Executive</option>
+            </select>
+            <p className={muted + " mt-1 text-[11px]"}>BDM cannot be created — only Nexa promotion.</p>
+          </div>
+          {networkRolePick === SalesNetworkRole.RSM ? (
+            <input
+              className={
+                light
+                  ? "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                  : "w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-white/40"
+              }
+              placeholder="Region (e.g. South India)"
+              value={regionInput}
+              onChange={(e) => setRegionInput(e.target.value)}
+            />
+          ) : null}
+          {networkRolePick === SalesNetworkRole.BDE ? (
+            <input
+              className={
+                light
+                  ? "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                  : "w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-white/40"
+              }
+              placeholder="Parent user id (RSM / BDM user id)"
+              value={parentUserIdInput}
+              onChange={(e) => setParentUserIdInput(e.target.value)}
+            />
+          ) : null}
           <button
             type="submit"
             disabled={saving}
@@ -633,7 +879,7 @@ export default function ControlTeamPage() {
         </form>
       ) : null}
 
-      {!dept ? (
+      {workspaceTab === "classic" && !dept ? (
         <div className="grid gap-4 sm:grid-cols-2">
           <button type="button" onClick={() => setDept("sales")} className={cardShell + " text-left"}>
             <p className={light ? "text-lg font-bold text-slate-900" : "text-lg font-bold text-white"}>Sales</p>
@@ -644,7 +890,7 @@ export default function ControlTeamPage() {
             <p className={muted + " mt-2"}>{data?.tech.length ?? 0} people</p>
           </button>
         </div>
-      ) : (
+      ) : workspaceTab === "classic" ? (
         <div>
           <button
             type="button"
@@ -684,7 +930,9 @@ export default function ControlTeamPage() {
                     <p className={light ? "truncate text-sm font-semibold text-slate-900" : "truncate text-sm font-semibold text-white"}>
                       {m.name}
                     </p>
-                    <p className={light ? "text-xs text-slate-500" : "text-xs text-white/50"}>{m.role}</p>
+                    <p className={light ? "text-xs text-slate-500" : "text-xs text-white/50"}>
+                      {(m.salesNetworkRole as string | undefined) ?? m.role}
+                    </p>
                     <p className={light ? "text-[11px] text-slate-500" : "text-[11px] text-white/55"}>
                       Clients: {m.assignedClients ?? 0} · Pending: {m.pendingTasks ?? 0}
                     </p>
@@ -715,7 +963,7 @@ export default function ControlTeamPage() {
             </div>
           ) : null}
         </div>
-      )}
+      ) : null}
       {selected ? (
         createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-md">

@@ -453,7 +453,7 @@ function GiftIcon({ className }: { className?: string }) {
 const superBossControlNav: NavDef[] = [
   { id: "sb-home", label: "Home", href: "/bgos/control/home", icon: HomeIcon },
   { id: "sb-clients", label: "Clients", href: "/bgos/control/clients", icon: BuildingIcon },
-  { id: "sb-team", label: "My Team", href: "/bgos/control/team", icon: TeamIcon },
+  { id: "sb-team", label: "People & Network", href: "/bgos/control/team", icon: TeamIcon },
   { id: "sb-sales", label: "Sales", href: "/bgos/control/sales", icon: SalesIcon },
   { id: "sb-tech", label: "Technical Dept", href: "/bgos/control/technical", icon: OpsIcon },
   { id: "sb-accounts", label: "Accounts", href: "/bgos/control/accounts", icon: BillingIcon },
