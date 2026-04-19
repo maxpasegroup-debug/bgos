@@ -1,5 +1,8 @@
 import { NexaOnboardBossClient } from "@/components/onboarding/NexaOnboardBossClient";
 
+/** Fresh RSC payload each visit — pairs with `Cache-Control: no-store` in next.config. */
+export const dynamic = "force-dynamic";
+
 type Search = {
   source?: string;
   resume?: string;

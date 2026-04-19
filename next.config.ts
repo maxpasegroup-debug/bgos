@@ -22,6 +22,28 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      /**
+       * Avoid serving stale HTML from CDNs/browser after a deploy — mismatched HTML vs
+       * `/_next/static` chunks causes “Failed to find Server Action” until a hard refresh.
+       */
+      {
+        source: "/onboarding/nexa",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "private, no-cache, no-store, must-revalidate",
+          },
+        ],
+      },
+      {
+        source: "/login",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "private, no-cache, no-store, must-revalidate",
+          },
+        ],
+      },
     ];
   },
 };
