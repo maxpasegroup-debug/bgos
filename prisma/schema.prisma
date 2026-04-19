@@ -702,6 +702,8 @@ model UserCompany {
   @@index([parentUserId])
   @@index([companyId, salesNetworkRole])
   @@index([createdByUserId])
+  /// Compound index for paginated team roster queries ordered by join date.
+  @@index([companyId, createdAt])
 }
 
 /** BGOS Control hybrid sales network role (orthogonal to {@link UserRole} jobRole). */
@@ -737,6 +739,22 @@ enum NetworkCommissionType {
   DIRECT
   OVERRIDE
   RECURRING
+}
+
+/**
+ * Payout lifecycle for each SalesHierarchyEarning row.
+ *
+ * PENDING  — earning written; not yet in a payout cycle.
+ * APPROVED — monthly cycle has approved this batch; wallet approval pending.
+ * PAID     — wallet transaction moved to withdrawable; cycle complete.
+ *
+ * Transition: PENDING → APPROVED → PAID (only via runMonthlyPayoutCycle).
+ * Direct wallet manipulation is not permitted by the rules.
+ */
+enum EarningPayoutStatus {
+  PENDING
+  APPROVED
+  PAID
 }
 
 enum TechQueueStatus {
@@ -836,6 +854,8 @@ model PromotionTracker {
 
   @@unique([companyId, userId])
   @@index([companyId])
+  /// Standalone user index — for per-user promotion checks without a companyId filter.
+  @@index([userId])
   @@map("promotion_tracker")
 }
 
@@ -850,12 +870,26 @@ model SalesHierarchySubscription {
   startedAt   DateTime                       @default(now())
   expiresAt   DateTime
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  owner   User    @relation("SalesHierarchySubscriptionOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
-  earnings SalesHierarchyEarning[]
+  /// Optional client-side identifiers supplied at sale time — used for duplicate detection.
+  clientEmail String?
+  clientPhone String?
+
+  /// Fraud guard (bgos_fraud_guard_v1): true when a duplicate-contact/email check fires.
+  fraudFlagged  Boolean @default(false)
+  /// Human-readable reason for the flag (e.g. "Duplicate email: a@b.com already sold by user X").
+  fraudReason   String?
+
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  owner     User     @relation("SalesHierarchySubscriptionOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  earnings  SalesHierarchyEarning[]
+  fraudLogs InternalFraudLog[]
 
   @@index([companyId, ownerUserId])
+  /// Standalone owner index — used by per-BDE subscription lookups and batch counts.
+  @@index([ownerUserId])
   @@index([status, expiresAt])
+  @@index([clientEmail])
+  @@index([clientPhone])
   @@map("sales_subscriptions")
 }
 
@@ -867,6 +901,12 @@ model SalesHierarchyEarning {
   subscriptionId String?
   amount         Float
   type           NetworkCommissionType
+  /// Payout lifecycle: PENDING → APPROVED → PAID via monthly payout cycle.
+  payoutStatus   EarningPayoutStatus   @default(PENDING)
+  /// When this earning was moved to APPROVED in the payout cycle.
+  approvedAt     DateTime?
+  /// When this earning was fully paid out (wallet moved to withdrawable).
+  paidAt         DateTime?
   createdAt      DateTime              @default(now())
 
   company      Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -875,6 +915,9 @@ model SalesHierarchyEarning {
   subscription SalesHierarchySubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
 
   @@index([companyId, userId])
+  /// Standalone user index — used by wallet/payout per-user earnings queries.
+  @@index([userId])
+  @@index([payoutStatus, createdAt])
   @@index([createdAt])
   @@map("sales_hierarchy_earnings")
 }
@@ -1000,6 +1043,19 @@ model User {
   nexaEmployeeWelfare               NexaEmployeeWelfare[]
   nexaAnnouncementsCreated          NexaAnnouncement[]            @relation("NexaAnnouncementCreator")
   nexaPersuasionStates              NexaPersuasionState[]
+  internalWallet                    InternalWallet?
+  internalRewardClaims              InternalRewardClaim[]
+  internalCompetitionProgress       InternalCompetitionProgress[]
+  internalCompetitionsCreated       InternalCompetition[]         @relation("InternalCompetitionCreator")
+  internalWithdrawals               InternalWithdrawal[]          @relation("WithdrawalOwner")
+  internalWithdrawalsProcessed      InternalWithdrawal[]          @relation("WithdrawalProcessor")
+  internalRecurringState            InternalRecurringState?
+  internalNexaState                 InternalNexaState?
+  internalTrainingMaterials         InternalTrainingMaterial[]    @relation("TrainingUploader")
+  internalLeaderboard               InternalLeaderboard?
+  internalTechTasksAssigned         InternalTechTask[]            @relation("TechTaskAssignee")
+  internalTechTasksCreated          InternalTechTask[]            @relation("TechTaskCreator")
+  internalFraudLogsTriggered        InternalFraudLog[]            @relation("FraudLogTrigger")
 
   @@index([email])
 }
@@ -2275,4 +2331,446 @@ model NexaPersuasionState {
 
   @@unique([companyId, userId])
   @@map("nexa_persuasion_state")
+}
+
+// =============================================================================
+// INTERNAL WALLET — BGOS staff earnings ledger (id: bgos_wallet_core_v1)
+//
+// Entirely separate from the MicroFranchisePartner Wallet.
+// All internal-staff earnings flow through InternalWalletTransaction.
+// Commission breakdowns are stored in SalesHierarchyEarning (never surfaced
+// to the wallet UI); the wallet only surfaces aggregated balances + type labels.
+// =============================================================================
+
+enum InternalWalletTxType {
+  DIRECT
+  RECURRING
+  BONUS
+  REWARD
+  ADJUSTMENT
+  WITHDRAWAL
+}
+
+enum InternalWalletTxStatus {
+  PENDING
+  APPROVED
+  CREDITED
+  REJECTED
+}
+
+/// Per-user balance ledger for internal BGOS sales staff.
+model InternalWallet {
+  userId              String    @id
+  /// Sum of all credited + bonus amounts (lifetime).
+  totalBalance        Float     @default(0)
+  /// Available for withdrawal (approved + credited, excluding bonuses).
+  withdrawableBalance Float     @default(0)
+  /// Bonuses and rewards credited separately.
+  bonusBalance        Float     @default(0)
+  /// Earnings awaiting approval validation.
+  pendingBalance      Float     @default(0)
+  /// Timestamp of BDE-agreement acceptance — required before any withdrawal.
+  agreementAcceptedAt DateTime?
+  updatedAt           DateTime  @updatedAt
+
+  user         User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions InternalWalletTransaction[]
+
+  @@map("internal_wallet")
+}
+
+
+/// Individual credit/debit events on an InternalWallet.
+model InternalWalletTransaction {
+  id          String                 @id @default(cuid())
+  userId      String
+  type        InternalWalletTxType
+  amount      Float
+  status      InternalWalletTxStatus @default(PENDING)
+  /// Links back to SalesHierarchyEarning.id or another source record.
+  referenceId String?
+  note        String?
+  createdAt   DateTime               @default(now())
+
+  wallet InternalWallet @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, status])
+  @@map("internal_wallet_transaction")
+}
+
+// =============================================================================
+// INTERNAL REWARDS & GAMIFICATION  (id: bgos_rewards_gamification_v1)
+//
+// Scratch cards, milestones, competitions — all backend-value-controlled.
+// Values are pre-generated at unlock time; never client-determined.
+// =============================================================================
+
+enum InternalRewardType {
+  SCRATCH
+  MILESTONE
+  COMPETITION
+}
+
+enum InternalRewardTriggerType {
+  POINTS
+  SALES
+  STREAK
+}
+
+enum InternalRewardClaimStatus {
+  UNLOCKED   // generated, not yet scratched
+  REVEALED   // scratched, value shown
+  CREDITED   // credited to wallet bonus_balance
+}
+
+enum InternalCompetitionRewardType {
+  CASH
+  GIFT
+  POINTS_BONUS
+}
+
+enum InternalCompetitionTargetType {
+  POINTS
+  SALES
+  REVENUE
+}
+
+/// Reward template — created by BOSS; defines what scratch cards / milestones get unlocked.
+model InternalReward {
+  id          String                    @id @default(cuid())
+  title       String
+  type        InternalRewardType
+  triggerType InternalRewardTriggerType
+  /// The trigger threshold (e.g., 10 = 10 points, 5 = 5 sales).
+  triggerValue Float
+  minValue    Float
+  maxValue    Float
+  active      Boolean                   @default(true)
+  createdAt   DateTime                  @default(now())
+
+  claims InternalRewardClaim[]
+
+  @@index([active, triggerType])
+  @@map("internal_reward")
+}
+
+/// Per-user reward instance — value is pre-generated, hidden until reveal.
+model InternalRewardClaim {
+  id        String                    @id @default(cuid())
+  userId    String
+  rewardId  String
+  /// Backend-generated value within [reward.minValue, reward.maxValue]. Never client-controlled.
+  value     Float
+  status    InternalRewardClaimStatus @default(UNLOCKED)
+  createdAt DateTime                  @default(now())
+
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reward InternalReward @relation(fields: [rewardId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@map("internal_reward_claim")
+}
+
+/// Internal-staff-only competition (separate from NexaCompetition which is company-scoped).
+model InternalCompetition {
+  id          String                         @id @default(cuid())
+  title       String
+  description String?                        @db.Text
+  targetType  InternalCompetitionTargetType
+  targetValue Float
+  rewardType  InternalCompetitionRewardType
+  rewardValue Float                          @default(0)
+  rewardNote  String?
+  startDate   DateTime
+  endDate     DateTime
+  active      Boolean                        @default(true)
+  createdById String
+  createdAt   DateTime                       @default(now())
+
+  createdBy User                        @relation("InternalCompetitionCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  progress  InternalCompetitionProgress[]
+
+  @@index([active, startDate, endDate])
+  @@map("internal_competition")
+}
+
+/// Per-user progress snapshot for an InternalCompetition.
+model InternalCompetitionProgress {
+  id            String   @id @default(cuid())
+  userId        String
+  competitionId String
+  progress      Float    @default(0)
+  rank          Int?
+  updatedAt     DateTime @updatedAt
+
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  competition InternalCompetition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, competitionId])
+  @@index([competitionId, progress])
+  @@map("internal_competition_progress")
+}
+
+// =============================================================================
+// INTERNAL TECH TASK QUEUE  (id: bgos_tech_system_v2)
+//
+// Kanban-style task queue for the Tech Exec team.  Each task tracks:
+//   · priority (LOW / MEDIUM / HIGH) → SLA deadline set at creation
+//   · slaDeadlineAt  — when the SLA expires (createdAt + SLA hours)
+//   · startedAt      — timestamp when status moves to IN_PROGRESS
+//   · completedAt    — timestamp when status moves to COMPLETED
+//   · responseTimeMs — ms between createdAt and startedAt (first response)
+//   · completionTimeMs — ms between createdAt and completedAt
+//
+// SLA hours by priority: HIGH = 4 h, MEDIUM = 24 h, LOW = 72 h.
+// Stats: pending count + avg completionTimeMs across COMPLETED tasks.
+// =============================================================================
+
+enum TechTaskStatus {
+  NEW
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum TechTaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model InternalTechTask {
+  id               String           @id @default(cuid())
+  companyId        String
+  /// Display company name — stored at creation time.
+  company          String
+  requestType      String
+  description      String?
+  status           TechTaskStatus   @default(NEW)
+  priority         TechTaskPriority @default(MEDIUM)
+  assignedTo       String?
+  /// createdAt + SLA hours (4 / 24 / 72) for HIGH / MEDIUM / LOW.
+  slaDeadlineAt    DateTime?
+  /// Set when status transitions to IN_PROGRESS.
+  startedAt        DateTime?
+  /// Set when status transitions to COMPLETED.
+  completedAt      DateTime?
+  /// Milliseconds from createdAt → startedAt.
+  responseTimeMs   Int?
+  /// Milliseconds from createdAt → completedAt.
+  completionTimeMs Int?
+  createdById      String
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  assigneeUser User?  @relation("TechTaskAssignee", fields: [assignedTo],  references: [id], onDelete: SetNull)
+  creator      User   @relation("TechTaskCreator",  fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([companyId, status])
+  @@index([assignedTo])
+  @@map("internal_tech_task")
+}
+
+// =============================================================================
+// INTERNAL COMPETITION LEADERBOARD  (id: bgos_competition_engine_v2)
+//
+// One row per active internal staff member.  Refreshed daily by a cron job
+// that reads UserCompany.totalPoints, sorts descending, and assigns dense ranks.
+//
+// Queried with a single indexed lookup: companyId + rank ASC LIMIT 50 — no
+// joins required at read time, so the leaderboard endpoint is fast.
+// =============================================================================
+
+model InternalLeaderboard {
+  userId    String           @id
+  companyId String
+  /// Display points = stored totalPoints / POINTS_SCALE (10).
+  score     Float            @default(0)
+  rank      Int              @default(0)
+  /// Denormalised name — avoids a join on every leaderboard read.
+  userName  String?
+  role      SalesNetworkRole?
+  updatedAt DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Compound index used by the hot path: WHERE companyId = ? ORDER BY rank LIMIT 50
+  @@index([companyId, rank])
+  @@map("internal_leaderboard")
+}
+
+// =============================================================================
+// INTERNAL FRAUD GUARD  (id: bgos_fraud_guard_v1)
+//
+// Suspicious activity audit trail.  Every time a sale is flagged as a
+// duplicate (same client email or phone already sold by another BDE), a row
+// is written here.  Wallet credits are blocked for flagged subscriptions.
+// =============================================================================
+
+model InternalFraudLog {
+  id                String    @id @default(cuid())
+  companyId         String
+  /// User who triggered the suspicious event (usually the BDE who recorded the sale).
+  triggeredByUserId String?
+  /// The subscription row that was flagged, if applicable.
+  subscriptionId    String?
+  /// Short machine-readable reason key (DUPLICATE_EMAIL, DUPLICATE_PHONE, DUPLICATE_CONTACT).
+  reason            String
+  /// Full human-readable description for BOSS review.
+  description       String
+  /// Extra JSON context (matched email, phone, conflicting userId, etc.).
+  metadata          Json?
+  createdAt         DateTime  @default(now())
+
+  triggeredByUser User?                      @relation("FraudLogTrigger",       fields: [triggeredByUserId], references: [id], onDelete: SetNull)
+  subscription    SalesHierarchySubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, createdAt])
+  @@index([triggeredByUserId])
+  @@index([subscriptionId])
+  @@map("internal_fraud_log")
+}
+
+// =============================================================================
+// INTERNAL TRAINING SYSTEM  (id: bgos_training_system_v2)
+//
+// RSM uploads PDFs/scripts/video links; materials are scoped to a role tier
+// (ALL / BDE / BDM / RSM).  BDE has view-only access.  Storage follows the
+// same local-disk pattern as document-storage.ts: fileUrl holds a storage key
+// for uploaded files, or a raw URL for VIDEO type.
+// =============================================================================
+
+enum TrainingMaterialType {
+  PDF
+  VIDEO
+  SCRIPT
+}
+
+enum TrainingRoleScope {
+  ALL
+  BDE
+  BDM
+  RSM
+}
+
+model InternalTrainingMaterial {
+  id          String               @id @default(cuid())
+  companyId   String
+  title       String
+  description String?
+  type        TrainingMaterialType
+  /// Storage key (uploaded file) OR external URL (VIDEO type).
+  fileUrl     String
+  /// Original file name for display; null for VIDEO links.
+  fileName    String?
+  roleScope   TrainingRoleScope    @default(ALL)
+  uploadedBy  String
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  uploader User @relation("TrainingUploader", fields: [uploadedBy], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@index([uploadedBy])
+  @@map("internal_training_material")
+}
+
+// =============================================================================
+// INTERNAL NEXA BEHAVIOR TRACKING  (id: bgos_nexa_behavior_v2)
+//
+// Tracks per-staff performance signals used by the Nexa proactive engine:
+//   · lastLoginAt         — last time the staff member opened their dashboard
+//   · inactivityDays      — days since lastLoginAt (recomputed on each login)
+//   · tasksCompletedToday — counter reset daily at midnight
+//   · tasksCompletedMonth — counter reset monthly
+//   · lastTaskResetDate   — YYYY-MM-DD of the last daily counter reset
+// =============================================================================
+
+model InternalNexaState {
+  userId              String    @id
+  companyId           String
+  lastLoginAt         DateTime?
+  /// Days since lastLoginAt — recomputed on each login call.
+  inactivityDays      Float     @default(0)
+  /// Reset daily; used to trigger "performance low" rule.
+  tasksCompletedToday Int       @default(0)
+  /// Reset monthly.
+  tasksCompletedMonth Int       @default(0)
+  /// ISO date string (YYYY-MM-DD) of the last daily counter reset.
+  lastTaskResetDate   String?
+  updatedAt           DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("internal_nexa_state")
+}
+
+// =============================================================================
+// INTERNAL RECURRING ENGINE  (id: bgos_recurring_engine_v1)
+//
+// Tracks the current effective slab and grace-period state for each internal
+// staff member.  The daily cron reads this table, applies grace-period rules,
+// and emits SalesHierarchyEarning (type=RECURRING) + InternalWalletTransaction.
+//
+// effectiveAmount  — the amount that will be credited on the next monthly pass
+// pendingAmount    — the raw-calculated amount (may be lower if subs dropped)
+// graceSinceAt     — when the raw amount first fell below effective (grace clock)
+// lastCalculatedAt — last time calculateRecurring ran for this user
+// lastCreditedAt   — last time a monthly credit was actually emitted
+// =============================================================================
+
+model InternalRecurringState {
+  userId              String    @id
+  /// Denormalised for cron query efficiency.
+  companyId           String
+  /// Actual amount credited each monthly pass (held at old level during grace).
+  effectiveAmount     Float     @default(0)
+  /// Raw calculated amount (can be lower than effectiveAmount within grace window).
+  pendingAmount       Float     @default(0)
+  /// Set when raw amount drops below effective — grace expires after 7 days.
+  graceSinceAt        DateTime?
+  lastCalculatedAt    DateTime?
+  lastCreditedAt      DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("internal_recurring_state")
+}
+
+// =============================================================================
+// INTERNAL WITHDRAWAL SYSTEM  (id: bgos_payout_withdrawal_v1)
+//
+// Safe withdrawal flow: REQUESTED → (APPROVED→PAID) | REJECTED.
+// Every balance movement is mirrored in InternalWalletTransaction for audit.
+// BDE agreement acceptance is required before the first withdrawal.
+// =============================================================================
+
+enum InternalWithdrawalStatus {
+  REQUESTED  // funds held (deducted from withdrawable)
+  APPROVED   // boss approved — pending bank transfer
+  REJECTED   // rejected — funds returned to withdrawable
+  PAID       // payment confirmed and finalised
+}
+
+/// Withdrawal request raised by an internal staff member.
+model InternalWithdrawal {
+  id            String                   @id @default(cuid())
+  userId        String
+  amount        Float
+  status        InternalWithdrawalStatus @default(REQUESTED)
+  /// Rejection reason or approval note.
+  note          String?
+  processedById String?
+  createdAt     DateTime                 @default(now())
+  processedAt   DateTime?
+
+  user        User  @relation("WithdrawalOwner",     fields: [userId],        references: [id], onDelete: Cascade)
+  processedBy User? @relation("WithdrawalProcessor", fields: [processedById], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@map("internal_withdrawal")
 }

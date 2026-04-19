@@ -1,6 +1,6 @@
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { Landing } from "@/components/landing/Landing";
+import { LandingRouter } from "@/components/landing/LandingRouter";
 import { ACTIVE_COMPANY_COOKIE_NAME, AUTH_COOKIE_NAME } from "@/lib/auth-config";
 import { hostTenantFromHeader } from "@/lib/host-routing";
 import { verifyAccessTokenResult } from "@/lib/jwt";
@@ -33,5 +33,5 @@ export default async function Home() {
     }
   }
 
-  return <Landing />;
+  return <LandingRouter />;
 }

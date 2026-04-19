@@ -96,6 +96,7 @@ function skipsMiddlewareAuth(pathname: string, method: string): boolean {
   if (isPublicRoute(pathname)) return true;
   if (pathname === "/iceconnect/login") return true;
   if (pathname === "/iceconnect/customer-login" || pathname === "/iceconnect/customer") return true;
+  if (pathname === "/internal/login" || pathname.startsWith("/internal/login/")) return true;
   if (
     pathname === "/api/auth/login" ||
     pathname === "/api/auth/signup" ||
@@ -136,6 +137,8 @@ function bgosAllowsPagePath(pathname: string): boolean {
   if (pathname === "/bgos" || pathname.startsWith("/bgos/")) return true;
   if (pathname === "/sales-booster" || pathname.startsWith("/sales-booster/")) return true;
   if (normalizePathname(pathname) === "/setup-retry" || pathname.startsWith("/setup-retry/")) return true;
+  /** Internal platform-staff area (/internal/login is already public; auth guard lives in layout). */
+  if (pathname === "/internal" || pathname.startsWith("/internal/")) return true;
   if (isPublicRoute(pathname)) return true;
   return false;
 }
