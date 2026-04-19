@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { headers } from "next/headers";
 import { BGOSLayout } from "@/components/layout-shells/BGOSLayout";
@@ -12,18 +12,39 @@ const inter = Inter({
   display: "swap",
 });
 
+/**
+ * Viewport — controls theme-color, full-screen viewport fit, and prevents
+ * double-tap zoom on mobile (standard for PWA-like experiences).
+ */
+export const viewport: Viewport = {
+  width:          "device-width",
+  initialScale:   1,
+  maximumScale:   1,
+  themeColor:     "#070A0E",
+  viewportFit:    "cover",
+};
+
 export async function generateMetadata(): Promise<Metadata> {
   const host = (await headers()).get("host") ?? "";
   if (isIceconnectInHost(host)) {
     return {
       title: "ICECONNECT",
       description: "ICECONNECT — field and operations workspace.",
+      appleWebApp: {
+        capable:         true,
+        title:           "ICECONNECT",
+        statusBarStyle:  "black-translucent",
+      },
     };
   }
   return {
-    title: "BGOS — Business Growth Operating System",
-    description:
-      "BGOS automates, manages, and grows your business — while you focus on what truly matters.",
+    title:       "BGOS — Business Growth Operating System",
+    description: "BGOS automates, manages, and grows your business — while you focus on what truly matters.",
+    appleWebApp: {
+      capable:        true,
+      title:          "BGOS",
+      statusBarStyle: "black-translucent",
+    },
   };
 }
 

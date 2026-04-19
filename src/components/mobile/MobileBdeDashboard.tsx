@@ -16,7 +16,14 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import { apiFetch } from "@/lib/api-fetch";
+import {
+  staggerContainer,
+  staggerItem,
+  AnimatedProgress,
+  MotionCard,
+} from "@/components/mobile/MotionWrapper";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -91,11 +98,12 @@ const PLAN_COLORS: Record<string, string> = {
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div
+    <MotionCard
+      tapScale={0.985}
       className={`rounded-2xl border border-white/[0.08] bg-white/[0.03] ${className}`}
     >
       {children}
-    </div>
+    </MotionCard>
   );
 }
 
@@ -138,11 +146,22 @@ function TargetCard({ tracker }: { tracker: Tracker | null }) {
 
         {/* Progress bar */}
         <div className="space-y-1.5">
-          <div className="h-3 overflow-hidden rounded-full bg-white/[0.06]">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-[#4FD1FF] to-[#7C5CFF] transition-all duration-700"
-              style={{ width: `${pct}%` }}
+          <div className="relative h-3 overflow-hidden rounded-full bg-white/[0.06]">
+            <AnimatedProgress
+              percent={pct}
+              delay={0.3}
+              className="h-full rounded-full bg-gradient-to-r from-[#4FD1FF] to-[#7C5CFF] relative"
             />
+            {/* Glow tip */}
+            {pct > 5 && (
+              <motion.div
+                className="absolute top-0 right-0 h-full w-3 rounded-full"
+                style={{ background: "radial-gradient(circle, rgba(124,92,255,0.8) 0%, transparent 70%)" }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: [0, 1, 0.6] }}
+                transition={{ delay: 0.9, duration: 0.4 }}
+              />
+            )}
           </div>
           <div className="flex justify-between text-[10px] text-white/30">
             <span>{pct}% complete</span>
@@ -208,22 +227,30 @@ function NexaCard({ nexa }: { nexa: NexaData | null }) {
           tasks.map((msg, i) => {
             const chip   = CHIP_STYLE[msg.type] ?? CHIP_STYLE.task_reminder;
             const isDone = done.has(i);
+            const isUrgent = msg.type === "urgency";
             return (
-              <button
+              <motion.button
                 key={i}
                 onClick={() => void handleTap(msg, i)}
                 disabled={isDone}
+                initial={{ opacity: 0, x: -12 }}
+                animate={isUrgent && !isDone
+                  ? { opacity: 1, x: [0, -2, 2, -1, 0] }
+                  : { opacity: isDone ? 0.35 : 1, x: 0 }
+                }
+                transition={isUrgent
+                  ? { opacity: { duration: 0.25, delay: i * 0.08 }, x: { duration: 0.4, delay: i * 0.08 + 0.4 } }
+                  : { duration: 0.25, delay: i * 0.08 }
+                }
+                whileTap={{ scale: 0.97 }}
                 className={[
-                  "w-full flex items-center gap-3 rounded-xl border-l-4 px-4 py-3 text-left transition-all active:scale-[0.98]",
+                  "w-full flex items-center gap-3 rounded-xl border-l-4 px-4 py-3 text-left",
                   "bg-white/[0.03]",
                   chip.border,
                   isDone ? "opacity-35" : "",
                 ].join(" ")}
               >
-                {/* Dot */}
                 <span className={`w-2 h-2 rounded-full shrink-0 ${chip.dot}`} />
-
-                {/* Micro-prompt text — 1 line max */}
                 <p
                   className={[
                     "flex-1 text-[14px] font-medium leading-none truncate",
@@ -232,12 +259,10 @@ function NexaCard({ nexa }: { nexa: NexaData | null }) {
                 >
                   {msg.text}
                 </p>
-
-                {/* Arrow — hidden when done */}
                 {!isDone && (
                   <span className="text-white/25 text-[13px] shrink-0">›</span>
                 )}
-              </button>
+              </motion.button>
             );
           })
         )}
@@ -316,31 +341,70 @@ function RewardsCard({ unlockedCount }: { unlockedCount: number }) {
       <div className="px-5 pb-5 pt-2">
         {hasReward ? (
           <div className="flex flex-col items-center gap-4 py-3">
-            {/* Glow pulse */}
+            {/* Animated gift orb */}
             <div className="relative">
-              <div className="absolute inset-0 rounded-full bg-amber-500/20 blur-xl animate-pulse" />
-              <div className="relative flex h-20 w-20 items-center justify-center rounded-full border-2 border-amber-500/40 bg-amber-500/10 text-4xl">
+              {/* Pulsing glow ring */}
+              <motion.div
+                className="absolute inset-0 rounded-full bg-amber-500/25 blur-xl"
+                animate={{ scale: [1, 1.3, 1], opacity: [0.4, 0.7, 0.4] }}
+                transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+              />
+              {/* Shimmer overlay on icon */}
+              <motion.div
+                className="relative flex h-20 w-20 items-center justify-center rounded-full border-2 border-amber-500/40 bg-amber-500/10 text-4xl overflow-hidden"
+              >
                 🎁
-              </div>
+                {/* Shimmer sweep */}
+                <motion.div
+                  className="absolute inset-0 rounded-full"
+                  style={{ background: "linear-gradient(105deg, transparent 40%, rgba(255,200,50,0.35) 50%, transparent 60%)" }}
+                  animate={{ x: ["-100%", "200%"] }}
+                  transition={{ repeat: Infinity, duration: 1.8, ease: "linear", repeatDelay: 0.5 }}
+                />
+              </motion.div>
             </div>
 
-            <div className="text-center">
+            <motion.div
+              className="text-center"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.35 }}
+            >
               <p className="text-base font-bold text-white">
                 {unlockedCount === 1 ? "Reward Unlocked!" : `${unlockedCount} Rewards Unlocked!`}
               </p>
               <p className="mt-1 text-xs text-white/40">Tap to reveal your scratch card</p>
-            </div>
+            </motion.div>
 
-            <Link
-              href="/internal/rewards"
-              className="w-full rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 py-3.5 text-center text-sm font-bold text-black shadow-[0_4px_20px_-4px_rgba(245,158,11,0.5)] active:opacity-80 transition-opacity"
+            <motion.div
+              className="w-full"
+              whileTap={{ scale: 0.96 }}
+              transition={{ duration: 0.1 }}
             >
-              Scratch Now →
-            </Link>
+              <Link
+                href="/internal/rewards"
+                className="flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 py-3.5 text-sm font-bold text-black shadow-[0_4px_24px_-4px_rgba(245,158,11,0.6)] overflow-hidden relative"
+              >
+                {/* Shine sweep */}
+                <motion.div
+                  className="absolute inset-0"
+                  style={{ background: "linear-gradient(105deg, transparent 35%, rgba(255,255,255,0.3) 50%, transparent 65%)" }}
+                  animate={{ x: ["-100%", "200%"] }}
+                  transition={{ repeat: Infinity, duration: 2.2, ease: "linear", repeatDelay: 1 }}
+                />
+                <span className="relative">Scratch Now →</span>
+              </Link>
+            </motion.div>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-3 py-4 text-center">
-            <span className="text-3xl opacity-40">🏆</span>
+            <motion.span
+              className="text-3xl opacity-40"
+              animate={{ rotate: [0, -5, 5, 0] }}
+              transition={{ repeat: Infinity, duration: 3, ease: "easeInOut", repeatDelay: 1 }}
+            >
+              🏆
+            </motion.span>
             <p className="text-sm text-white/40">Keep going for your next reward</p>
             <Link
               href="/internal/rewards"
@@ -479,13 +543,24 @@ export function MobileBdeDashboard() {
           ))}
         </div>
       ) : (
-        <>
-          <TargetCard    tracker={tracker} />
-          <NexaCard      nexa={nexa} />
-          <QuickLeadsCard subs={subs} />
-          <RewardsCard   unlockedCount={unlockedRewards} />
-          <WalletCard    wallet={wallet} />
-        </>
+        <motion.div
+          className="space-y-4"
+          initial="hidden"
+          animate="show"
+          variants={staggerContainer}
+        >
+          {[
+            <TargetCard    key="target"  tracker={tracker} />,
+            <NexaCard      key="nexa"    nexa={nexa} />,
+            <QuickLeadsCard key="leads"  subs={subs} />,
+            <RewardsCard   key="rewards" unlockedCount={unlockedRewards} />,
+            <WalletCard    key="wallet"  wallet={wallet} />,
+          ].map((card, i) => (
+            <motion.div key={i} variants={staggerItem}>
+              {card}
+            </motion.div>
+          ))}
+        </motion.div>
       )}
     </div>
   );

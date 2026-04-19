@@ -3,9 +3,11 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import { useInternalSession } from "@/components/internal/InternalSessionContext";
 import { SalesNetworkRole } from "@prisma/client";
 import { MobileNexaBubble } from "@/components/mobile/MobileNexaBubble";
+import { pageVariants, pageTransition } from "@/components/mobile/MotionWrapper";
 
 // ---------------------------------------------------------------------------
 // Icons
@@ -158,11 +160,27 @@ function TopBar() {
 // FAB — centre floating action button with a two-option popover
 // ---------------------------------------------------------------------------
 
+const fabMenuItems = [
+  {
+    href:    "/internal/onboard-company",
+    label:   "Add Company",
+    iconBg:  "bg-[#4FD1FF]/15",
+    iconClr: "text-[#4FD1FF]",
+    icon:    IconBuilding,
+  },
+  {
+    href:    "/internal/leads",
+    label:   "Add Lead",
+    iconBg:  "bg-[#7C5CFF]/15",
+    iconClr: "text-[#7C5CFF]",
+    icon:    IconUserPlus,
+  },
+];
+
 function FAB() {
   const [open, setOpen] = useState(false);
   const ref             = useRef<HTMLDivElement>(null);
 
-  // Close on outside click
   useEffect(() => {
     if (!open) return;
     function handler(e: MouseEvent) {
@@ -174,60 +192,77 @@ function FAB() {
 
   return (
     <div ref={ref} className="relative flex flex-col items-center">
-      {/* Popover menu — slides up when open */}
-      {open && (
-        <div className="absolute bottom-[calc(100%+12px)] flex flex-col items-center gap-2">
-          {/* Add Company */}
-          <Link
-            href="/internal/onboard-company"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 rounded-2xl border border-white/[0.12] bg-[#0D1117]/90 px-4 py-3 text-sm font-medium text-white shadow-[0_8px_32px_rgba(0,0,0,0.5)] backdrop-blur-xl active:scale-95 transition-transform whitespace-nowrap"
+
+      {/* Menu items — stagger up on open */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            className="absolute bottom-[calc(100%+12px)] flex flex-col items-center gap-2"
+            initial="closed"
+            animate="open"
+            exit="closed"
+            variants={{ open: { transition: { staggerChildren: 0.07 } }, closed: {} }}
           >
-            <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-[#4FD1FF]/15 text-[#4FD1FF]">
-              <IconBuilding />
-            </span>
-            Add Company
-          </Link>
+            {fabMenuItems.map(({ href, label, iconBg, iconClr, icon: Icon }) => (
+              <motion.div
+                key={href}
+                variants={{
+                  open:   { opacity: 1, y: 0,   scale: 1,    transition: { duration: 0.22 } },
+                  closed: { opacity: 0, y: 12,  scale: 0.92                                  },
+                }}
+              >
+                <Link
+                  href={href}
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2.5 rounded-2xl border border-white/[0.12] bg-[#0D1117]/90 px-4 py-3 text-sm font-medium text-white shadow-[0_8px_32px_rgba(0,0,0,0.5)] backdrop-blur-xl whitespace-nowrap active:scale-95 transition-transform"
+                >
+                  <span className={`flex h-7 w-7 items-center justify-center rounded-xl ${iconBg} ${iconClr}`}>
+                    <Icon />
+                  </span>
+                  {label}
+                </Link>
+              </motion.div>
+            ))}
+            <div className="h-2 w-2 rotate-45 rounded-sm bg-[#0D1117]/90 border-r border-b border-white/[0.12]" />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-          {/* Add Lead */}
-          <Link
-            href="/internal/leads"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 rounded-2xl border border-white/[0.12] bg-[#0D1117]/90 px-4 py-3 text-sm font-medium text-white shadow-[0_8px_32px_rgba(0,0,0,0.5)] backdrop-blur-xl active:scale-95 transition-transform whitespace-nowrap"
-          >
-            <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-[#7C5CFF]/15 text-[#7C5CFF]">
-              <IconUserPlus />
-            </span>
-            Add Lead
-          </Link>
-
-          {/* Arrow indicator */}
-          <div className="h-2 w-2 rotate-45 rounded-sm bg-[#0D1117]/90 border-r border-b border-white/[0.12]" />
-        </div>
-      )}
-
-      {/* FAB button */}
-      <button
+      {/* FAB button — idle pulse when closed */}
+      <motion.button
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? "Close actions" : "Quick actions"}
+        animate={open
+          ? { scale: 1,     rotate: 45 }
+          : { scale: [1, 1.06, 1], rotate: 0 }
+        }
+        transition={open
+          ? { duration: 0.22, ease: "easeOut" }
+          : { scale: { repeat: Infinity, duration: 2.4, ease: "easeInOut" }, rotate: { duration: 0.22 } }
+        }
+        whileTap={{ scale: 0.9 }}
         className={[
-          "flex h-14 w-14 items-center justify-center rounded-full shadow-[0_4px_24px_rgba(79,209,255,0.35)] transition-all duration-200 active:scale-95",
+          "flex h-14 w-14 items-center justify-center rounded-full border",
           open
-            ? "bg-white/10 border border-white/20 rotate-45"
-            : "bg-gradient-to-br from-[#4FD1FF] to-[#7C5CFF] border border-white/10",
+            ? "bg-white/10 border-white/20 shadow-none"
+            : "bg-gradient-to-br from-[#4FD1FF] to-[#7C5CFF] border-white/10 shadow-[0_4px_24px_rgba(79,209,255,0.45)]",
         ].join(" ")}
         style={{ marginTop: "-28px" }}
       >
-        {open ? (
-          <IconClose />
-        ) : (
-          <svg className="h-6 w-6 text-black" fill="none" viewBox="0 0 24 24">
-            <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-          </svg>
-        )}
-      </button>
+        <motion.span
+          animate={{ opacity: 1 }}
+          key={open ? "close" : "plus"}
+        >
+          {open ? (
+            <IconClose />
+          ) : (
+            <svg className="h-6 w-6 text-black" fill="none" viewBox="0 0 24 24">
+              <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+            </svg>
+          )}
+        </motion.span>
+      </motion.button>
 
-      {/* Tab label */}
       <span className={`mt-1 text-[10px] font-medium leading-none ${open ? "text-white/70" : "text-white/35"}`}>
         Action
       </span>
@@ -307,15 +342,29 @@ function BottomNav() {
 // ---------------------------------------------------------------------------
 
 export function MobileLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname() ?? "";
+
   return (
     <div className="relative flex min-h-screen flex-col bg-[#05070A] text-white antialiased">
 
       {/* Fixed top bar */}
       <TopBar />
 
-      {/* Scrollable content — inset for top bar + bottom nav + FAB overhang */}
+      {/* Scrollable content with page transition */}
       <main className="flex-1 overflow-y-auto pt-14 pb-[88px]">
-        {children}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={pathname}
+            variants={pageVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={pageTransition}
+            style={{ willChange: "transform, opacity", minHeight: "100%" }}
+          >
+            {children}
+          </motion.div>
+        </AnimatePresence>
       </main>
 
       {/* Nexa floating bubble — above bottom nav */}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { apiFetch } from "@/lib/api-fetch";
 // ---------------------------------------------------------------------------
 // Inline SVG icons (no external icon dependency)
@@ -257,24 +258,28 @@ function SwipeableLeadCard({
 
         {/* Action buttons */}
         <div className="flex gap-2">
-          <a
+          <motion.a
             href={`tel:${lead.phone}`}
-            className="flex-1 flex items-center justify-center gap-1.5 h-[38px] rounded-xl bg-sky-600/15 text-sky-400 text-[13px] font-medium border border-sky-500/20 active:bg-sky-600/30 transition-colors"
+            className="flex-1 flex items-center justify-center gap-1.5 h-[38px] rounded-xl bg-sky-600/15 text-sky-400 text-[13px] font-medium border border-sky-500/20"
+            whileTap={{ scale: 0.93, backgroundColor: "rgba(14,165,233,0.25)" }}
+            transition={{ duration: 0.1 }}
             onClick={(e) => e.stopPropagation()}
           >
             <IcoPhone size={14} />
             Call
-          </a>
-          <a
+          </motion.a>
+          <motion.a
             href={`https://wa.me/${whatsappNumber}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-1 flex items-center justify-center gap-1.5 h-[38px] rounded-xl bg-emerald-600/15 text-emerald-400 text-[13px] font-medium border border-emerald-500/20 active:bg-emerald-600/30 transition-colors"
+            className="flex-1 flex items-center justify-center gap-1.5 h-[38px] rounded-xl bg-emerald-600/15 text-emerald-400 text-[13px] font-medium border border-emerald-500/20"
+            whileTap={{ scale: 0.93, backgroundColor: "rgba(5,150,105,0.25)" }}
+            transition={{ duration: 0.1 }}
             onClick={(e) => e.stopPropagation()}
           >
             <IcoWhatsapp size={14} />
             WhatsApp
-          </a>
+          </motion.a>
         </div>
       </div>
     </div>
@@ -460,13 +465,23 @@ export function MobileLeadsPage() {
           </div>
         ) : (
           <>
-            {leads.map((lead) => (
-              <SwipeableLeadCard
-                key={lead.id}
-                lead={lead}
-                onAction={handleAction}
-              />
-            ))}
+            <AnimatePresence initial={false}>
+              {leads.map((lead, i) => (
+                <motion.div
+                  key={lead.id}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, x: -40, transition: { duration: 0.22 } }}
+                  transition={{ duration: 0.28, ease: "easeOut", delay: Math.min(i * 0.04, 0.3) }}
+                  layout
+                >
+                  <SwipeableLeadCard
+                    lead={lead}
+                    onAction={handleAction}
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
 
             {/* Load more */}
             {remaining > 0 && (
