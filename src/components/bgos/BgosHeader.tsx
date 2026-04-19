@@ -10,8 +10,9 @@ import { BgosAddLeadModal } from "./BgosAddLeadModal";
 import { BgosCompanySwitcher } from "./BgosCompanySwitcher";
 import { useBgosDashboardContext } from "./BgosDataProvider";
 import { BGOS_MAIN_PAD } from "./layoutTokens";
-import { SUPER_BOSS_HOME_PATH } from "@/lib/role-routing";
+import { SUPER_BOSS_HOME_PATH, getRoleHome } from "@/lib/role-routing";
 import { useBgosTheme } from "./BgosThemeContext";
+import { BgosTextLogo } from "./BgosTextLogo";
 
 type BillingPeek = {
   planLabel: string;
@@ -65,7 +66,9 @@ export function BgosHeader() {
     billing: null,
   });
   const logoHref =
-    controlShell || isSuperBoss ? SUPER_BOSS_HOME_PATH : "/bgos/dashboard";
+    controlShell || isSuperBoss
+      ? SUPER_BOSS_HOME_PATH
+      : getRoleHome(sessionUser.role || "ADMIN");
   const profileRef = useRef<HTMLDivElement | null>(null);
   const notifRef = useRef<HTMLDivElement | null>(null);
 
@@ -171,20 +174,7 @@ export function BgosHeader() {
       <div
         className={`flex h-14 min-h-14 items-center gap-2 sm:gap-4 ${BGOS_MAIN_PAD}`}
       >
-        <Link
-          href={logoHref}
-          className="flex shrink-0 items-center gap-2 transition-opacity hover:opacity-90"
-          aria-label="BGOS Home"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/bgos-logo-placeholder.svg"
-            alt=""
-            className="h-8 w-auto sm:h-9"
-            width={120}
-            height={32}
-          />
-        </Link>
+        <BgosTextLogo href={logoHref} size="lg" />
         {controlShell || isSuperBoss || bossBillingBypass ? null : (
           <BgosCompanySwitcher light={light} />
         )}

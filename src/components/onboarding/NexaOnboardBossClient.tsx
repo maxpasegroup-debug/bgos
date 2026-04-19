@@ -399,11 +399,13 @@ export function NexaOnboardBossClient({
     setBusy(true);
     setBanner(null);
     try {
+      const uid = state.user.id?.trim();
       const body = {
-        source: "NEXA_ENGINE",
+        source: "NEXA_ENGINE" as const,
         name: companyName.trim(),
         industry: "SOLAR",
         businessType: "SOLAR",
+        ...(uid ? { user_id: uid } : {}),
       };
       let companyId: string | undefined;
       for (let attempt = 0; attempt < 3; attempt++) {
@@ -453,7 +455,7 @@ export function NexaOnboardBossClient({
       window.localStorage.removeItem(STORAGE_KEY);
       window.setTimeout(() => {
         /** Readymade (solar) bosses land on the tenant BGOS dashboard — not the internal control plane. */
-        window.location.assign("/bgos/dashboard");
+        window.location.assign("/bgos/control/v4");
       }, 800);
     } finally {
       setBusy(false);
@@ -464,12 +466,14 @@ export function NexaOnboardBossClient({
     setBusy(true);
     setBanner(null);
     try {
+      const uidCustom = state.user.id?.trim();
       const createBody = {
-        source: "NEXA_ENGINE",
+        source: "NEXA_ENGINE" as const,
         name: companyName.trim(),
         industry: "CUSTOM",
         businessType: "CUSTOM",
-        plan: "PRO",
+        plan: "PRO" as const,
+        ...(uidCustom ? { user_id: uidCustom } : {}),
       };
       let newCompanyId: string | undefined;
       for (let attempt = 0; attempt < 3; attempt++) {
@@ -509,6 +513,7 @@ export function NexaOnboardBossClient({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             companyId: newCompanyId,
+            user_id: state.user.id?.trim(),
             category: "CUSTOM",
             custom: {
               businessType: customBusinessType,
@@ -525,7 +530,7 @@ export function NexaOnboardBossClient({
       setState((s) => ({ ...s, step: 7, company: { ...s.company, id: newCompanyId } }));
       window.localStorage.removeItem(STORAGE_KEY);
       window.setTimeout(() => {
-        window.location.assign("/bgos/dashboard?building=1");
+        window.location.assign("/bgos/control/v4?building=1");
       }, 800);
     } finally {
       setBusy(false);

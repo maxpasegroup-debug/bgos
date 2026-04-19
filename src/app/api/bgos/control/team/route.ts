@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
         { status: 500 },
       );
     }
-    const cacheKey = `control:team:v3:${org.companyId}`;
+    const cacheKey = `control:team:v4:${org.companyId}`;
     const cached = getApiCache<{
       internalCompanyId: string;
       bdeMonthlyTargetInr: number;
@@ -66,6 +66,10 @@ export async function GET(request: NextRequest) {
         parentUserId: true,
         region: true,
         archivedAt: true,
+        activeSubscriptionsCount: true,
+        totalPoints: true,
+        benefitLevel: true,
+        bdeSlotLimit: true,
         user: { select: { id: true, name: true, email: true, isActive: true } },
       },
       orderBy: { createdAt: "asc" },
@@ -99,6 +103,10 @@ export async function GET(request: NextRequest) {
       archivedAt: m.archivedAt?.toISOString() ?? null,
       assignedClients: leadMap.get(m.user.id) ?? 0,
       pendingTasks: taskMap.get(m.user.id) ?? 0,
+      activeSubscriptionsCount: m.activeSubscriptionsCount,
+      totalPoints: m.totalPoints,
+      benefitLevel: m.benefitLevel,
+      bdeSlotLimit: m.bdeSlotLimit,
     });
 
     const sales = memberships.filter((m) => SALES_DEPT_ROLES.includes(m.jobRole)).map(mapMember);

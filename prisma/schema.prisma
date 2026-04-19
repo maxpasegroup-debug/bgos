@@ -430,6 +430,13 @@ model Company {
   techQueueEntries             TechQueueEntry[]
   nexaTasks                    NexaTask[]
   techRoundRobinState          TechRoundRobinState?
+  salesHierarchySubscriptions  SalesHierarchySubscription[]
+  salesHierarchyEarnings       SalesHierarchyEarning[]
+  nexaCoachingLogs             NexaCoachingLog[]
+  nexaCompetitions             NexaCompetition[]
+  nexaEmployeeWelfare          NexaEmployeeWelfare[]
+  nexaAnnouncements            NexaAnnouncement[]
+  nexaPersuasionStates         NexaPersuasionState[]
 
   @@index([name])
   @@index([ownerId])
@@ -674,16 +681,27 @@ model UserCompany {
   /** RSM region label (e.g. South India). */
   region            String?
   archivedAt        DateTime?
+  /// Sales hierarchy V1 — active customer subs counted for this member (see sales_subscriptions).
+  activeSubscriptionsCount Int      @default(0)
+  totalPoints              Int      @default(0)
+  /// BDE: capped recurring; BDM+ false = full recurring (config-driven).
+  recurringCap             Boolean  @default(true)
+  /// BDM: max direct BDEs; raised by performance.
+  bdeSlotLimit             Int      @default(0)
+  createdByUserId          String?
+  benefitLevel             SalesBenefitLevel @default(FULL)
 
   user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   company    Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   parentUser User?   @relation("SalesNetworkParent", fields: [parentUserId], references: [id], onDelete: SetNull)
+  createdByUser User? @relation("MembershipCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
 
   @@unique([userId, companyId])
   @@index([companyId])
   @@index([userId])
   @@index([parentUserId])
   @@index([companyId, salesNetworkRole])
+  @@index([createdByUserId])
 }
 
 /** BGOS Control hybrid sales network role (orthogonal to {@link UserRole} jobRole). */
@@ -693,6 +711,26 @@ enum SalesNetworkRole {
   BDM
   BDE
   TECH_EXEC
+}
+
+/// BDM benefit tier when active subscription count fluctuates (grace band).
+enum SalesBenefitLevel {
+  FULL
+  GRACE
+  REDUCED
+}
+
+/// Hierarchy subscription plan (sales engine — not company billing plan).
+enum SalesHierarchyPlan {
+  BASIC
+  PRO
+  CUSTOM
+}
+
+enum SalesHierarchySubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
 }
 
 enum NetworkCommissionType {
@@ -787,6 +825,10 @@ model PromotionTracker {
   currentStreak          Int      @default(0)
   targetMet              Boolean  @default(false)
   eligibleForPromotion   Boolean  @default(false)
+  /// V1 engine: promotion path (BDM or RSM).
+  roleTarget             SalesNetworkRole?
+  activeCountSnapshot    Int?
+  lastPromotionCheckAt   DateTime?
   updatedAt              DateTime @updatedAt
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -795,6 +837,46 @@ model PromotionTracker {
   @@unique([companyId, userId])
   @@index([companyId])
   @@map("promotion_tracker")
+}
+
+/// Customer subscription sale attributed to a hierarchy member (sales engine).
+model SalesHierarchySubscription {
+  id          String                         @id @default(cuid())
+  companyId   String
+  ownerUserId String
+  planType    SalesHierarchyPlan
+  points      Int                            @default(0)
+  status      SalesHierarchySubscriptionStatus @default(ACTIVE)
+  startedAt   DateTime                       @default(now())
+  expiresAt   DateTime
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  owner   User    @relation("SalesHierarchySubscriptionOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  earnings SalesHierarchyEarning[]
+
+  @@index([companyId, ownerUserId])
+  @@index([status, expiresAt])
+  @@map("sales_subscriptions")
+}
+
+model SalesHierarchyEarning {
+  id             String                @id @default(cuid())
+  companyId      String
+  userId         String
+  sourceUserId   String?
+  subscriptionId String?
+  amount         Float
+  type           NetworkCommissionType
+  createdAt      DateTime              @default(now())
+
+  company      Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user         User                      @relation("SalesHierarchyEarningPayee", fields: [userId], references: [id], onDelete: Cascade)
+  sourceUser   User?                     @relation("SalesHierarchyEarningSource", fields: [sourceUserId], references: [id], onDelete: SetNull)
+  subscription SalesHierarchySubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, userId])
+  @@index([createdAt])
+  @@map("sales_hierarchy_earnings")
 }
 
 model TechQueueEntry {
@@ -873,7 +955,11 @@ model User {
 
   companiesOwned                    Company[]                     @relation("OwnedCompany")
   memberships                       UserCompany[]
+  membershipsCreated                UserCompany[]                 @relation("MembershipCreatedBy")
   networkManagedMembers             UserCompany[]                 @relation("SalesNetworkParent")
+  salesHierarchySubscriptionsOwned  SalesHierarchySubscription[]  @relation("SalesHierarchySubscriptionOwner")
+  salesHierarchyEarningsReceived    SalesHierarchyEarning[]       @relation("SalesHierarchyEarningPayee")
+  salesHierarchyEarningsAsSource    SalesHierarchyEarning[]       @relation("SalesHierarchyEarningSource")
   performanceMetrics                PerformanceMetric[]
   networkCommissionsReceived        NetworkCommission[]           @relation("NetworkCommissionPayee")
   networkCommissionsAsSource        NetworkCommission[]           @relation("NetworkCommissionSource")
@@ -908,6 +994,12 @@ model User {
   microFranchiseReferrals           MicroFranchiseApplication[]   @relation("MicroFranchiseReferrer")
   microFranchiseAssignments         MicroFranchiseApplication[]   @relation("MicroFranchiseAssignee")
   microFranchisePartner             MicroFranchisePartner?
+  nexaCoachingLogs                  NexaCoachingLog[]
+  nexaCompetitionParticipants       NexaCompetitionParticipant[]
+  nexaCompetitionsCreated           NexaCompetition[]             @relation("NexaCompetitionCreator")
+  nexaEmployeeWelfare               NexaEmployeeWelfare[]
+  nexaAnnouncementsCreated          NexaAnnouncement[]            @relation("NexaAnnouncementCreator")
+  nexaPersuasionStates              NexaPersuasionState[]
 
   @@index([email])
 }
@@ -2037,4 +2129,150 @@ model OfferAnnouncement {
   updatedAt DateTime          @updatedAt
 
   @@index([audience, isActive])
+}
+
+/// Nexa CEO engine — coaching line items (audit + culture).
+enum NexaCoachingActionType {
+  CALL
+  FOLLOWUP
+  CLOSE
+  TRAIN
+}
+
+enum NexaCoachingPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum NexaCompetitionMetric {
+  POINTS
+  REVENUE
+  SUBSCRIPTIONS
+  LEADS
+}
+
+enum NexaWelfareType {
+  BONUS
+  RECOGNITION
+  SUPPORT
+}
+
+enum NexaAnnouncementKind {
+  PRODUCT
+  COMPETITION
+  UPDATE
+  GENERAL
+}
+
+enum NexaAnnouncementScope {
+  ALL
+  ROLES
+  REGIONS
+}
+
+model NexaCoachingLog {
+  id         String                 @id @default(cuid())
+  companyId  String
+  userId     String
+  role       String                 @db.VarChar(48)
+  message    String                 @db.Text
+  actionType NexaCoachingActionType
+  priority   NexaCoachingPriority   @default(MEDIUM)
+  createdAt  DateTime               @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, userId, createdAt])
+  @@map("nexa_coaching_logs")
+}
+
+model NexaCompetition {
+  id           String                @id @default(cuid())
+  companyId    String
+  title        String
+  description  String?               @db.Text
+  reward       String                @db.Text
+  targetMetric NexaCompetitionMetric
+  targetValue  Float
+  startDate    DateTime
+  endDate      DateTime
+  createdById  String
+  createdAt    DateTime              @default(now())
+
+  company       Company                      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy     User                         @relation("NexaCompetitionCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  participants  NexaCompetitionParticipant[]
+
+  @@index([companyId, startDate, endDate])
+  @@map("nexa_competitions")
+}
+
+model NexaCompetitionParticipant {
+  id            String  @id @default(cuid())
+  competitionId String
+  userId        String
+  progress      Float   @default(0)
+  rank          Int?
+
+  competition NexaCompetition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([competitionId, userId])
+  @@index([competitionId, rank])
+  @@map("nexa_competition_participants")
+}
+
+model NexaEmployeeWelfare {
+  id        String          @id @default(cuid())
+  companyId String
+  userId    String
+  type      NexaWelfareType
+  message   String          @db.Text
+  createdAt DateTime        @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, userId, createdAt])
+  @@map("nexa_employee_welfare")
+}
+
+model NexaAnnouncement {
+  id            String               @id @default(cuid())
+  companyId     String
+  title         String
+  message       String               @db.Text
+  kind          NexaAnnouncementKind @default(GENERAL)
+  scope         NexaAnnouncementScope  @default(ALL)
+  /// JSON: string[] of {@link UserRole} values when scope = ROLES.
+  targetRoles   Json?
+  /// JSON: string[] region labels when scope = REGIONS (matches {@link UserCompany.region}).
+  targetRegions Json?
+  createdById   String
+  createdAt     DateTime             @default(now())
+  expiresAt     DateTime?
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy User    @relation("NexaAnnouncementCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([companyId, createdAt])
+  @@map("nexa_announcements")
+}
+
+/// One row per user per company — idempotent micro-win celebrations for Nexa persuasion.
+model NexaPersuasionState {
+  id             String   @id @default(cuid())
+  companyId      String
+  userId         String
+  celebratedWins String[] @default([])
+  updatedAt      DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId])
+  @@map("nexa_persuasion_state")
 }

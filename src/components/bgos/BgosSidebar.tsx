@@ -63,8 +63,12 @@ export function BgosSidebar() {
     if (item.href === "/bgos/dashboard") {
       return pathname === "/bgos/dashboard" || pathname === "/bgos" || pathname.startsWith("/bgos/dashboard/");
     }
-    if (item.href === "/bgos/control/home")
-      return pathname === "/bgos/control/home" || pathname.startsWith("/bgos/control/");
+    if (item.href === "/bgos/control/v4")
+      return (
+        pathname === "/bgos/control/v4" ||
+        pathname === "/bgos/control" ||
+        pathname.startsWith("/bgos/control/v4/")
+      );
     return pathname === item.href || pathname.startsWith(`${item.href}/`);
   }
 
@@ -401,20 +405,6 @@ function RisksIcon({ className }: { className?: string }) {
   );
 }
 
-function NexaIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" aria-hidden>
-      <path
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={1.75}
-        d="M13 10V3L4 14h7v7l9-11h-7z"
-      />
-    </svg>
-  );
-}
-
 function SettingsIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" aria-hidden>
@@ -436,28 +426,11 @@ function SettingsIcon({ className }: { className?: string }) {
   );
 }
 
-function GiftIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" aria-hidden>
-      <path
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={1.75}
-        d="M20 12v8a2 2 0 01-2 2H6a2 2 0 01-2-2v-8M2 12h20M12 22V8M12 8H7.5A3.5 3.5 0 017 4.5 3.5 3.5 0 0110.5 8M12 8h4.5A3.5 3.5 0 0017 4.5 3.5 3.5 0 0013.5 8"
-      />
-    </svg>
-  );
-}
-
 const superBossControlNav: NavDef[] = [
-  { id: "sb-home", label: "Home", href: "/bgos/control/home", icon: HomeIcon },
-  { id: "sb-clients", label: "Clients", href: "/bgos/control/clients", icon: BuildingIcon },
-  { id: "sb-team", label: "People & Network", href: "/bgos/control/team", icon: TeamIcon },
-  { id: "sb-sales", label: "Sales", href: "/bgos/control/sales", icon: SalesIcon },
-  { id: "sb-tech", label: "Technical Dept", href: "/bgos/control/technical", icon: OpsIcon },
+  { id: "sb-cc", label: "Command Center", href: "/bgos/control/v4", icon: HomeIcon },
+  { id: "sb-sales", label: "Sales Network", href: "/bgos/control/sales", icon: SalesIcon },
+  { id: "sb-hr", label: "People", href: "/bgos/control/hr", icon: TeamIcon },
   { id: "sb-accounts", label: "Accounts", href: "/bgos/control/accounts", icon: BillingIcon },
-  { id: "sb-mf", label: "Micro Franchise", href: "/bgos/control/micro-franchise", icon: NexaIcon },
-  { id: "sb-performance", label: "Performance Engine", href: "/bgos/control/performance-engine", icon: GiftIcon },
-  { id: "sb-booster", label: "Sales Booster", href: "/bgos/control/sales-booster", icon: LightningIcon },
+  { id: "sb-tech", label: "Tech", href: "/bgos/control/tech", icon: OpsIcon },
+  { id: "sb-work", label: "Work Board", href: "/bgos/control/work", icon: ChartReportIcon },
 ];

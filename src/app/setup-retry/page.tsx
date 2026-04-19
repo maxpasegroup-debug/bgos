@@ -26,7 +26,7 @@ export default function SetupRetryPage() {
     const roleOk = u.role === "ADMIN";
     const workspaceReady = (u as { workspaceReady?: boolean }).workspaceReady === true;
     if (companyOk && roleOk && u.needsOnboarding === false && workspaceReady) {
-      router.replace("/bgos/dashboard");
+      router.replace("/bgos/control/v4");
       return;
     }
     setChecking(false);

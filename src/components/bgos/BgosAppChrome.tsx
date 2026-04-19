@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { BgosAmbientBackground } from "./BgosAmbientBackground";
 import { BgosCheckoutSuccess } from "./BgosCheckoutSuccess";
 import { useBgosDashboardContext } from "./BgosDataProvider";
@@ -12,10 +13,13 @@ import { PlanUpgradeBanner } from "./PlanUpgradeBanner";
 import { useBgosTheme } from "./BgosThemeContext";
 
 export function BgosAppChrome({ children }: { children: ReactNode }) {
+  const pathname = usePathname() ?? "";
   const { companyPlan, planLockedToBasic, trialReadOnly, controlShell } =
     useBgosDashboardContext();
   const { theme } = useBgosTheme();
   const light = theme === "light";
+  /** Control plane (super boss) — V4 design system base. */
+  const controlV4Surface = controlShell && pathname.startsWith("/bgos/control");
   const sidebarPad = controlShell
     ? "pl-16 transition-all duration-300 ease-in-out peer-hover/bgos-sidebar:pl-[240px]"
     : BGOS_SIDEBAR_PAD;
@@ -26,7 +30,9 @@ export function BgosAppChrome({ children }: { children: ReactNode }) {
       className={
         light
           ? "relative flex h-screen flex-col overflow-hidden bg-slate-50 text-slate-900 antialiased"
-          : "relative flex h-screen flex-col overflow-hidden bg-[#0b0f19] text-white antialiased"
+          : controlV4Surface
+            ? "relative flex h-screen flex-col overflow-hidden bg-[#05070A] text-white antialiased"
+            : "relative flex h-screen flex-col overflow-hidden bg-[#0b0f19] text-white antialiased"
       }
     >
       {trialReadOnly ? <BgosTrialExpiredOverlay /> : null}

@@ -16,6 +16,7 @@ import {
   jsonErrorForUserUniqueViolation,
 } from "@/lib/user-email-availability";
 import { EMAIL_ALREADY_IN_USE_MESSAGE } from "@/lib/user-identity-messages";
+import { BDM_INITIAL_BDE_SLOTS } from "@/config/sales-hierarchy";
 
 function jobRoleFromSalesNetwork(r: SalesNetworkRole): UserRole {
   switch (r) {
@@ -67,6 +68,13 @@ export async function POST(request: NextRequest) {
 
   let jobRole = parsed.data.role;
   let networkRole: SalesNetworkRole | null = parsed.data.salesNetworkRole ?? null;
+  if (!networkRole) {
+    if (jobRole === UserRole.SALES_EXECUTIVE || jobRole === UserRole.TELECALLER) {
+      networkRole = SalesNetworkRole.BDE;
+    } else if (jobRole === UserRole.TECH_EXECUTIVE) {
+      networkRole = SalesNetworkRole.TECH_EXEC;
+    }
+  }
 
   if (networkRole) {
     if (networkRole === SalesNetworkRole.BDM) {
@@ -95,9 +103,25 @@ export async function POST(request: NextRequest) {
   if (parsed.data.parentUserId) {
     const parent = await prisma.userCompany.findFirst({
       where: { companyId: org.companyId, userId: parsed.data.parentUserId },
+      select: { userId: true, salesNetworkRole: true, bdeSlotLimit: true },
     });
     if (!parent) {
       return jsonError(400, "VALIDATION_ERROR", "Parent must be a user in this workspace.");
+    }
+    if (networkRole === SalesNetworkRole.BDE && parent.salesNetworkRole === SalesNetworkRole.BDM) {
+      const limit =
+        parent.bdeSlotLimit > 0 ? parent.bdeSlotLimit : BDM_INITIAL_BDE_SLOTS;
+      const used = await prisma.userCompany.count({
+        where: {
+          companyId: org.companyId,
+          parentUserId: parent.userId,
+          salesNetworkRole: SalesNetworkRole.BDE,
+          archivedAt: null,
+        },
+      });
+      if (used >= limit) {
+        return jsonError(400, "SLOT_LIMIT", "BDM BDE slot limit reached — expand slots via performance.");
+      }
     }
   }
 
@@ -123,6 +147,8 @@ export async function POST(request: NextRequest) {
           salesNetworkRole: networkRole,
           parentUserId: parsed.data.parentUserId ?? null,
           region: networkRole === SalesNetworkRole.RSM ? (parsed.data.region ?? null) : null,
+          recurringCap: networkRole === SalesNetworkRole.BDE,
+          createdByUserId: session.sub,
         },
       });
       if (networkRole === SalesNetworkRole.BDE) {

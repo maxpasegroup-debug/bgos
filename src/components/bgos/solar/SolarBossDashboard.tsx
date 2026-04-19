@@ -5,6 +5,9 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { useMemo } from "react";
 import { useBgosDashboardContext } from "@/components/bgos/BgosDataProvider";
+import { NexaAnnouncementsStrip } from "@/components/bgos/nexa/NexaAnnouncementsStrip";
+import { NexaCompetitionsStrip } from "@/components/bgos/nexa/NexaCompetitionsStrip";
+import { NexaTodaysGamePlan } from "@/components/bgos/nexa/NexaTodaysGamePlan";
 import type { DashboardMetrics, PipelineStageCount } from "@/types";
 
 const card =
@@ -286,6 +289,14 @@ export function SolarBossDashboard({
           </div>
         </div>
       </motion.section>
+
+      <div className="mx-auto mt-6 max-w-6xl space-y-4 px-4 sm:px-6">
+        <NexaAnnouncementsStrip />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <NexaTodaysGamePlan />
+          <NexaCompetitionsStrip />
+        </div>
+      </div>
 
       {/* Grid */}
       <div className="mx-auto mt-8 grid max-w-6xl grid-cols-1 gap-6 px-4 sm:px-6 md:grid-cols-2 xl:grid-cols-3">

@@ -4,13 +4,13 @@
  */
 
 /** Platform owner (`BGOS_BOSS_EMAIL` + JWT `superBoss`) — internal control plane, not tenant solar dashboard. */
-export const SUPER_BOSS_HOME_PATH = "/bgos/control/home";
+export const SUPER_BOSS_HOME_PATH = "/bgos/control/v4";
 export const TECH_EXEC_HOME_PATH = "/iceconnect/tech";
 export const MICRO_FRANCHISE_HOME_PATH = "/iceconnect/micro-franchise";
 
 export const ROLE_HOME: Readonly<Record<string, string>> = {
-  /** Company boss — tenant BGOS app (`/bgos/dashboard`). Platform owner uses {@link SUPER_BOSS_HOME_PATH} only. */
-  ADMIN: "/bgos/dashboard",
+  /** Company boss — Nexa Command Center (`/bgos/control/v4`). Solar CRM lives under `/bgos/sales` etc. */
+  ADMIN: "/bgos/control/v4",
   MANAGER: "/iceconnect/manager",
   SALES_EXECUTIVE: "/iceconnect/sales",
   TELECALLER: "/iceconnect/leads",
@@ -228,6 +228,18 @@ const API_RULES: RouteRule[] = [
       "INVENTORY_MANAGER",
       "ACCOUNTANT",
       "LCO",
+    ]),
+  },
+  {
+    prefix: "/api/sales",
+    roles: new Set([
+      "ADMIN",
+      "MANAGER",
+      "SALES_EXECUTIVE",
+      "SALES_HEAD",
+      "TELECALLER",
+      "TECH_HEAD",
+      "TECH_EXECUTIVE",
     ]),
   },
   {

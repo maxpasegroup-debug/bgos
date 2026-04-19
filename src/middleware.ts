@@ -91,6 +91,7 @@ function skipsMiddlewareAuth(pathname: string, method: string): boolean {
   if (pathname === "/api/internal-sales/public/lead" && method === "POST") return true;
   if (pathname === "/api/micro-franchise/apply" && method === "POST") return true;
   if (pathname === "/api/internal-sales/cron/automation" && method === "POST") return true;
+  if (pathname === "/api/internal/cron/sales-hierarchy" && method === "POST") return true;
   if (pathname.startsWith("/api/onboarding/workflow/public/")) return true;
   if (isPublicRoute(pathname)) return true;
   if (pathname === "/iceconnect/login") return true;

@@ -11,20 +11,32 @@ const bodySchema = z.object({
   companyId: z.string().trim().min(1),
   category: z.string().trim().min(1),
   custom: z.unknown().optional(),
+  user_id: z.string().trim().min(1).optional(),
 });
 
 export async function POST(request: NextRequest) {
-  const session = await requireActiveCompanyMembership(request);
-  if (session instanceof NextResponse) return session;
-  if (session.role !== UserRole.ADMIN && session.role !== UserRole.MANAGER) return forbidden();
-  const parsed = await parseJsonBodyZod(request, bodySchema);
-  if (!parsed.ok) return parsed.response;
-
-  if (parsed.data.companyId !== session.companyId) {
-    return NextResponse.json({ success: false as const, message: "Company mismatch" }, { status: 403 });
-  }
-
   try {
+    const session = await requireActiveCompanyMembership(request);
+    if (session instanceof NextResponse) return session;
+    if (session.role !== UserRole.ADMIN && session.role !== UserRole.MANAGER) return forbidden();
+    const parsed = await parseJsonBodyZod(request, bodySchema);
+    if (!parsed.ok) return parsed.response;
+
+    if (parsed.data.user_id != null && parsed.data.user_id !== session.sub) {
+      console.error("[system/init] user_id mismatch", parsed.data.user_id, session.sub);
+      return NextResponse.json(
+        { ok: false as const, success: false as const, message: "user_id must match the signed-in user" },
+        { status: 403 },
+      );
+    }
+
+    if (parsed.data.companyId !== session.companyId) {
+      return NextResponse.json(
+        { ok: false as const, success: false as const, message: "Company mismatch" },
+        { status: 403 },
+      );
+    }
+
     const category = parsed.data.category.toUpperCase();
     if (category === CompanyIndustry.SOLAR) {
       await applyIndustryTemplate(parsed.data.companyId, "SOLAR");
@@ -52,8 +64,10 @@ export async function POST(request: NextRequest) {
       });
     }
     return NextResponse.json({
+      ok: true as const,
       success: true as const,
       data: {
+        user_id: session.sub,
         companyId: parsed.data.companyId,
         initialized: true,
         reused: true,
@@ -66,6 +80,7 @@ export async function POST(request: NextRequest) {
     if (stack) console.error("POST /api/system/init stack", stack);
     return NextResponse.json(
       {
+        ok: false as const,
         success: false as const,
         message: message || "System initialization failed",
         error: message || "System initialization failed",

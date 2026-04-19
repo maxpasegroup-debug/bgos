@@ -62,6 +62,8 @@ const bodySchema = z
     referralPhone: z.string().trim().max(32).optional(),
     microFranchisePartnerId: z.string().trim().max(64).optional(),
     source: z.string().trim().optional(),
+    /** Must match authenticated user when provided (client parity with `/api/onboarding/init`). */
+    user_id: z.string().trim().min(1).optional(),
   })
   .superRefine((data, ctx) => {
     const businessType = data.businessType;
@@ -156,7 +158,8 @@ async function respondIdempotentExistingWorkspace(
     idempotent: true as const,
     message: "Workspace already exists — refreshed your session.",
     employeesCreated: 0,
-    dashboardsAssigned: ["/bgos/dashboard"] as const,
+    dashboardsAssigned: ["/bgos/control/v4"] as const,
+    redirect_to: "/bgos/control/v4" as const,
     businessType: CompanyBusinessType.SOLAR,
     deprecated: true as const,
     migrateTo: "/api/onboarding/launch" as const,
@@ -209,6 +212,13 @@ export async function POST(request: NextRequest) {
     }
 
     const data = parsed.data;
+    if (data.user_id != null && data.user_id.trim() !== user.sub) {
+      console.error("[company/create] user_id mismatch", { body: data.user_id, session: user.sub });
+      return NextResponse.json(
+        { ok: false as const, error: "user_id must match the signed-in user.", code: "USER_MISMATCH" as const },
+        { status: 403 },
+      );
+    }
     const source = data.source?.trim() ?? "";
 
     if (source !== "NEXA_ENGINE") {
@@ -391,6 +401,7 @@ export async function POST(request: NextRequest) {
       companyId: launch.companyId,
       employeesCreated: launch.employeesCreated,
       dashboardsAssigned: launch.dashboardsAssigned,
+      redirect_to: "/bgos/control/v4" as const,
       businessType: launch.businessType,
       deprecated: true as const,
       migrateTo: "/api/onboarding/launch" as const,

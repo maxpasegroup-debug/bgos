@@ -163,7 +163,7 @@ export function useBgosData(
     pathname === "/bgos/dashboard" ||
     pathname === "/bgos" ||
     pathname.startsWith("/bgos/dashboard/") ||
-    pathname === "/bgos/control/home" ||
+    pathname === "/bgos/control/v4" ||
     pathname.startsWith("/bgos/control/");
   const sbLandingMeChecked = useRef(false);
   const superBossNoCompanyRef = useRef(false);

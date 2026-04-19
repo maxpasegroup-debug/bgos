@@ -1024,7 +1024,7 @@ export function NexaUnifiedOnboardingClient({
                 {credentialsFile ? (
                   <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} transition={{ duration: 0.12 }} onClick={downloadCredentials} className="rounded-2xl border px-6 py-3">Download Login Credentials</motion.button>
                 ) : null}
-                <a href={source === "SALES" ? "/iceconnect/customers" : "/bgos/dashboard"} className="inline-block rounded-2xl bg-slate-900 px-6 py-3 text-white">
+                <a href={source === "SALES" ? "/iceconnect/customers" : "/bgos/control/v4"} className="inline-block rounded-2xl bg-slate-900 px-6 py-3 text-white">
                   Launch Dashboard
                 </a>
               </div>

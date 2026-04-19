@@ -1,7 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { BgosIntelligenceHome } from "@/components/bgos/BgosIntelligenceHome";
-
+/** Legacy URL — Nexa Command Center lives at `/bgos/control/v4`. */
 export default function ControlHomePage() {
-  return <BgosIntelligenceHome />;
+  redirect("/bgos/control/v4");
 }

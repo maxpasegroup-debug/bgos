@@ -38,44 +38,48 @@ function resolveNexaSource(
 }
 
 export async function POST(request: NextRequest) {
-  /** Pre-company users (first workspace) must be able to start Nexa — do not require an active company. */
-  const session = requireAuth(request);
-  if (session instanceof NextResponse) return session;
-  if (!ALLOWED.includes(session.role)) return forbidden();
+  try {
+    /** Pre-company users (first workspace) must be able to start Nexa — do not require an active company. */
+    const session = requireAuth(request);
+    if (session instanceof NextResponse) return session;
+    if (!ALLOWED.includes(session.role)) return forbidden();
 
-  const parsed = await parseJsonBodyZod(request, bodySchema);
-  if (!parsed.ok) return parsed.response;
+    const parsed = await parseJsonBodyZod(request, bodySchema);
+    if (!parsed.ok) return parsed.response;
 
-  if (parsed.data.user_id !== session.sub || parsed.data.email.toLowerCase() !== session.email.toLowerCase()) {
-    return NextResponse.json(
-      { success: false as const, message: "Onboarding context mismatch" },
-      { status: 403 },
-    );
-  }
-
-  const { source, franchisePartnerId } = resolveNexaSource(parsed.data);
-
-  if (parsed.data.lead_id) {
-    const lead = await prisma.lead.findUnique({
-      where: { id: parsed.data.lead_id },
-      select: { id: true, assignedTo: true },
-    });
-    if (!lead) {
-      return NextResponse.json({ success: false as const, message: "Lead not found" }, { status: 400 });
-    }
-    if (
-      parsed.data.sales_owner_id &&
-      lead.assignedTo &&
-      lead.assignedTo !== parsed.data.sales_owner_id
-    ) {
+    if (parsed.data.user_id !== session.sub || parsed.data.email.toLowerCase() !== session.email.toLowerCase()) {
+      console.error("[onboarding/init] session mismatch", { sub: session.sub, bodyUser: parsed.data.user_id });
       return NextResponse.json(
-        { success: false as const, message: "Lead is not assigned to this sales owner" },
+        { ok: false as const, success: false as const, message: "Onboarding context mismatch" },
         { status: 403 },
       );
     }
-  }
 
-  try {
+    const { source, franchisePartnerId } = resolveNexaSource(parsed.data);
+
+    if (parsed.data.lead_id) {
+      const lead = await prisma.lead.findUnique({
+        where: { id: parsed.data.lead_id },
+        select: { id: true, assignedTo: true },
+      });
+      if (!lead) {
+        return NextResponse.json(
+          { ok: false as const, success: false as const, message: "Lead not found" },
+          { status: 400 },
+        );
+      }
+      if (
+        parsed.data.sales_owner_id &&
+        lead.assignedTo &&
+        lead.assignedTo !== parsed.data.sales_owner_id
+      ) {
+        return NextResponse.json(
+          { ok: false as const, success: false as const, message: "Lead is not assigned to this sales owner" },
+          { status: 403 },
+        );
+      }
+    }
+
     const started = await startNexaOnboarding({
       userId: session.sub,
       source,
@@ -87,6 +91,7 @@ export async function POST(request: NextRequest) {
     });
 
     const res = NextResponse.json({
+      ok: true as const,
       success: true as const,
       data: {
         user_id: session.sub,
@@ -107,7 +112,12 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("POST /api/onboarding/init", error);
     return NextResponse.json(
-      { success: false as const, message: "Could not initialize onboarding" },
+      {
+        ok: false as const,
+        success: false as const,
+        message: "Could not initialize onboarding",
+        error: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 },
     );
   }

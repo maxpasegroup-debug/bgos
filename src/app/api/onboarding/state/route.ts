@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
     const session_ready = Boolean(session?.id);
 
     return NextResponse.json({
+      ok: true as const,
       success: true as const,
       data: {
         user_exists,
@@ -42,7 +43,12 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("GET /api/onboarding/state", error);
     return NextResponse.json(
-      { success: false as const, message: "Could not check onboarding state" },
+      {
+        ok: false as const,
+        success: false as const,
+        message: "Could not check onboarding state",
+        error: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 },
     );
   }
