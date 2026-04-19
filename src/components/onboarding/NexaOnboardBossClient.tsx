@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch, readApiJson } from "@/lib/api-fetch";
+import { BGOS_BOSS_READY_HOME } from "@/lib/system-readiness";
 
 type FlowType = "readymade" | "custom";
 type Mode = "new" | "existing" | "sales" | "manager";
@@ -530,7 +531,7 @@ export function NexaOnboardBossClient({
       setState((s) => ({ ...s, step: 7, company: { ...s.company, id: newCompanyId } }));
       window.localStorage.removeItem(STORAGE_KEY);
       window.setTimeout(() => {
-        window.location.assign("/bgos/control/v4?building=1");
+        window.location.assign(`${BGOS_BOSS_READY_HOME}?building=1`);
       }, 800);
     } finally {
       setBusy(false);

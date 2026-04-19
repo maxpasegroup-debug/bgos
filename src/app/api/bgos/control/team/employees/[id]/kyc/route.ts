@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSuperBossApi } from "@/lib/require-super-boss";
+import { requireInternalPlatformApi } from "@/lib/require-internal-platform";
 import { getOrCreateInternalSalesCompanyId } from "@/lib/internal-sales-org";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -16,7 +16,7 @@ const bodySchema = z.object({
 });
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
-  const session = requireSuperBossApi(request);
+  const session = requireInternalPlatformApi(request);
   if (session instanceof NextResponse) return session;
 
   const { id } = await context.params;

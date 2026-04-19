@@ -4,7 +4,7 @@ import { z } from "zod";
 import { jsonError, logCaughtError, parseJsonBodyZod } from "@/lib/api-response";
 import { deleteApiCacheByPrefix } from "@/lib/api-runtime-cache";
 import { prisma } from "@/lib/prisma";
-import { requireSuperBossApi } from "@/lib/require-super-boss";
+import { requireInternalPlatformApi } from "@/lib/require-internal-platform";
 
 const bodySchema = z.object({
   companyId: z.string().min(1),
@@ -14,7 +14,7 @@ const bodySchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const session = requireSuperBossApi(request);
+    const session = requireInternalPlatformApi(request);
     if (session instanceof NextResponse) return session;
 
     const parsed = await parseJsonBodyZod(request, bodySchema);

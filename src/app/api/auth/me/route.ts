@@ -162,6 +162,16 @@ export async function GET() {
         );
       }
       const bossLocked = isBossReady(session.user.role, session.user.companyId);
+      let salesNetworkRole: string | null = null;
+      if (session.user.companyId) {
+        const uc = await prisma.userCompany.findUnique({
+          where: {
+            userId_companyId: { userId: session.user.sub, companyId: session.user.companyId },
+          },
+          select: { salesNetworkRole: true },
+        });
+        salesNetworkRole = uc?.salesNetworkRole ?? null;
+      }
       return jsonSuccess({
         authenticated: true as const,
         planLockedToBasic: bossBillingBypass ? false : isPlanLockedToBasic(),
@@ -183,6 +193,7 @@ export async function GET() {
           activeCompanyIdCookie,
           memberships: session.user.memberships ?? null,
           isSuperBoss,
+          salesNetworkRole,
         },
       });
     }

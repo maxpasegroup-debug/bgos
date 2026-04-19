@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch, readApiJson } from "@/lib/api-fetch";
+import { BGOS_BOSS_READY_HOME } from "@/lib/system-readiness";
 
 export default function SetupRetryPage() {
   const router = useRouter();
@@ -26,7 +27,7 @@ export default function SetupRetryPage() {
     const roleOk = u.role === "ADMIN";
     const workspaceReady = (u as { workspaceReady?: boolean }).workspaceReady === true;
     if (companyOk && roleOk && u.needsOnboarding === false && workspaceReady) {
-      router.replace("/bgos/control/v4");
+      router.replace(BGOS_BOSS_READY_HOME);
       return;
     }
     setChecking(false);

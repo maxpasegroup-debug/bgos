@@ -80,6 +80,12 @@ function payloadToUser(decoded: Record<string, unknown>): AuthUser | null {
     jobRole: m.jobRole as UserRole,
   }));
   const superBoss = decoded.superBoss === true;
+  const salesNetworkRoleRaw = decoded.salesNetworkRole;
+  const salesNetworkRole =
+    typeof salesNetworkRoleRaw === "string" && salesNetworkRoleRaw.length > 0
+      ? salesNetworkRoleRaw
+      : undefined;
+  const isInternal = decoded.isInternal === true;
   return {
     sub,
     email,
@@ -88,6 +94,8 @@ function payloadToUser(decoded: Record<string, unknown>): AuthUser | null {
     companyPlan,
     workspaceReady,
     ...(memberships?.length ? { memberships } : {}),
+    ...(salesNetworkRole ? { salesNetworkRole } : {}),
+    ...(isInternal ? { isInternal: true as const } : {}),
     ...(superBoss ? { superBoss: true as const } : {}),
   };
 }

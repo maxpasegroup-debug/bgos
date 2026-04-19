@@ -17,6 +17,7 @@ import {
   SUPER_BOSS_HOME_PATH,
   TECH_EXEC_HOME_PATH,
 } from "@/lib/role-routing";
+import { dashboardHomeFromSalesNetworkRole } from "@/lib/sales-network-home";
 import { BGOS_BOSS_READY_HOME, BGOS_ONBOARDING_ENTRY } from "@/lib/system-readiness";
 import {
   applyProductionBossJwtMembershipOverrides,
@@ -55,9 +56,14 @@ function internalPostLoginLocation(
   companyId: string | null,
   workspaceActivated: boolean,
   userEmail: string,
+  salesNetworkRole: string | null | undefined,
 ): string {
   if (isSuperBossEmail(userEmail)) {
     return SUPER_BOSS_HOME_PATH;
+  }
+  const snrHome = dashboardHomeFromSalesNetworkRole(salesNetworkRole);
+  if (snrHome && workspaceActivated && companyId) {
+    return snrHome;
   }
   if (role === UserRole.TECH_EXECUTIVE) {
     return TECH_EXEC_HOME_PATH;
@@ -222,6 +228,7 @@ export async function POST(request: Request) {
           companyId: m.companyId,
           plan: m.company.plan,
           jobRole: m.jobRole,
+          salesNetworkRole: m.salesNetworkRole ?? null,
           trialEndsAt: m.company.trialEndDate?.toISOString() ?? null,
           subscriptionPeriodEnd: m.company.subscriptionPeriodEnd?.toISOString() ?? null,
           subscriptionStatus: m.company.subscriptionStatus,
@@ -267,6 +274,10 @@ export async function POST(request: Request) {
     const workspaceActivated = Boolean(workspaceActivatedAt);
     const workspaceReady = needsOnboarding ? false : workspaceActivated;
 
+    const rowForJwt =
+      mems.find((m) => m.companyId === resolvedCompanyId) ?? mems[0];
+    const salesNetworkRoleForJwt = rowForJwt?.salesNetworkRole ?? undefined;
+
     const token = signAccessToken({
       sub: user.id,
       email: user.email,
@@ -275,6 +286,8 @@ export async function POST(request: Request) {
       companyPlan: jwtCompanyPlan,
       workspaceReady,
       ...(mems.length ? { memberships: mems } : {}),
+      ...(salesNetworkRoleForJwt ? { salesNetworkRole: salesNetworkRoleForJwt } : {}),
+      ...(user.isInternal ? { isInternal: true as const } : {}),
       ...(boss ? { superBoss: true as const } : {}),
     });
 
@@ -336,6 +349,7 @@ export async function POST(request: Request) {
                 companyId,
                 workspaceActivated,
                 user.email,
+                salesNetworkRoleForJwt,
               );
     const forcedNextPath = forcePasswordReset
       ? "/reset-password"

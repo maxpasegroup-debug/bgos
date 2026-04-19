@@ -54,7 +54,7 @@ export default function ControlWorkBoardPage() {
       style={{ background: `linear-gradient(180deg, ${ds.colors.bgPrimary} 0%, ${ds.colors.bgSecondary} 50%)` }}
     >
       <div className="mx-auto max-w-6xl">
-        <Link href="/bgos/control/v4" className="text-sm text-[#4FD1FF] hover:underline">
+        <Link href="/internal/control" className="text-sm text-[#4FD1FF] hover:underline">
           ← Command Center
         </Link>
         <motion.h1

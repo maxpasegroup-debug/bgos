@@ -6,6 +6,9 @@ import {
   SalesNetworkRole,
 } from "@prisma/client";
 import {
+  BDE_MILESTONE_BONUS_INR,
+  BDE_POINTS_MILESTONE_FIRST,
+  BDE_RECURRING_CAP_RATIO,
   OVERRIDE_BDM_FROM_BDE,
   OVERRIDE_RSM_FROM_BDM_LAYER,
   PLAN_SALE_VALUE_INR,
@@ -47,7 +50,12 @@ export async function recordHierarchySale(
 
   const ownerMem = await prisma.userCompany.findUnique({
     where: { userId_companyId: { userId: input.ownerUserId, companyId: input.companyId } },
-    select: { parentUserId: true, salesNetworkRole: true },
+    select: {
+      parentUserId: true,
+      salesNetworkRole: true,
+      recurringCap: true,
+      totalPoints: true,
+    },
   });
   if (!ownerMem) {
     throw new Error("OWNER_NOT_IN_COMPANY");
@@ -66,6 +74,7 @@ export async function recordHierarchySale(
       },
     });
 
+    const prevPoints = ownerMem.totalPoints ?? 0;
     await tx.userCompany.update({
       where: { userId_companyId: { userId: input.ownerUserId, companyId: input.companyId } },
       data: {
@@ -73,6 +82,7 @@ export async function recordHierarchySale(
         activeSubscriptionsCount: { increment: 1 },
       },
     });
+    const newPoints = prevPoints + points;
 
     await tx.salesHierarchyEarning.create({
       data: {
@@ -84,6 +94,65 @@ export async function recordHierarchySale(
         type: NetworkCommissionType.DIRECT,
       },
     });
+
+    if (
+      ownerMem.salesNetworkRole === SalesNetworkRole.BDE &&
+      prevPoints < BDE_POINTS_MILESTONE_FIRST &&
+      newPoints >= BDE_POINTS_MILESTONE_FIRST
+    ) {
+      await tx.salesHierarchyEarning.create({
+        data: {
+          companyId: input.companyId,
+          userId: input.ownerUserId,
+          sourceUserId: null,
+          subscriptionId: sub.id,
+          amount: BDE_MILESTONE_BONUS_INR,
+          type: NetworkCommissionType.DIRECT,
+        },
+      });
+    }
+
+    if (ownerMem.salesNetworkRole === SalesNetworkRole.BDE && ownerMem.recurringCap) {
+      const recurringAmt = saleValue * 0.1 * BDE_RECURRING_CAP_RATIO;
+      await tx.salesHierarchyEarning.create({
+        data: {
+          companyId: input.companyId,
+          userId: input.ownerUserId,
+          sourceUserId: null,
+          subscriptionId: sub.id,
+          amount: recurringAmt,
+          type: NetworkCommissionType.RECURRING,
+        },
+      });
+    }
+
+    if (ownerMem.salesNetworkRole === SalesNetworkRole.BDM) {
+      const recurringBdm = saleValue * 0.12;
+      await tx.salesHierarchyEarning.create({
+        data: {
+          companyId: input.companyId,
+          userId: input.ownerUserId,
+          sourceUserId: null,
+          subscriptionId: sub.id,
+          amount: recurringBdm,
+          type: NetworkCommissionType.RECURRING,
+        },
+      });
+    }
+
+    if (ownerMem.salesNetworkRole === SalesNetworkRole.RSM) {
+      const regionalPct = saleValue * 0.06;
+      await tx.salesHierarchyEarning.create({
+        data: {
+          companyId: input.companyId,
+          userId: input.ownerUserId,
+          sourceUserId: null,
+          subscriptionId: sub.id,
+          amount: regionalPct,
+          type: NetworkCommissionType.RECURRING,
+        },
+      });
+    }
 
     if (ownerMem.salesNetworkRole === SalesNetworkRole.BDE && ownerMem.parentUserId) {
       const parentMem = await tx.userCompany.findUnique({

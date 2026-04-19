@@ -10,7 +10,7 @@ import { z } from "zod";
 import { logCaughtError, parseJsonBodyZod } from "@/lib/api-response";
 import { handleApiError } from "@/lib/route-error";
 import { prisma } from "@/lib/prisma";
-import { requireSuperBossApi } from "@/lib/require-super-boss";
+import { requireInternalPlatformApi } from "@/lib/require-internal-platform";
 
 const createSchema = z.object({
   title: z.string().trim().min(1).max(200),
@@ -26,7 +26,7 @@ const createSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    const session = requireSuperBossApi(request);
+    const session = requireInternalPlatformApi(request);
     if (session instanceof NextResponse) return session;
     const items = await prisma.bonusCampaign.findMany({ orderBy: { createdAt: "desc" }, take: 200 });
     return NextResponse.json({ ok: true as const, items });
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = requireSuperBossApi(request);
+    const session = requireInternalPlatformApi(request);
     if (session instanceof NextResponse) return session;
     const parsed = await parseJsonBodyZod(request, createSchema);
     if (!parsed.ok) return parsed.response;

@@ -72,7 +72,11 @@ export function BgosHeader() {
   const profileRef = useRef<HTMLDivElement | null>(null);
   const notifRef = useRef<HTMLDivElement | null>(null);
 
-  const onBossDashboard = pathname === "/bgos/dashboard" || pathname === "/bgos";
+  const onBossDashboard =
+    pathname === "/bgos/dashboard" ||
+    pathname === "/bgos" ||
+    pathname === "/bgos/boss/home" ||
+    pathname.startsWith("/bgos/boss/home/");
   const nexaActionCount =
     dashboard != null
       ? (dashboard.nexa?.pendingFollowUps ?? 0) +

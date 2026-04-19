@@ -2,7 +2,7 @@ import { LeadStatus } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSuperBossApi } from "@/lib/require-super-boss";
+import { requireInternalPlatformApi } from "@/lib/require-internal-platform";
 
 function nowMonth() {
   const d = new Date();
@@ -10,7 +10,7 @@ function nowMonth() {
 }
 
 export async function GET(request: NextRequest) {
-  const session = requireSuperBossApi(request);
+  const session = requireInternalPlatformApi(request);
   if (session instanceof NextResponse) return session;
 
   const { year, month } = nowMonth();

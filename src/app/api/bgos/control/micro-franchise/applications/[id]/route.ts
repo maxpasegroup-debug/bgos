@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { logCaughtError, parseJsonBodyZod } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
-import { requireSuperBossApi } from "@/lib/require-super-boss";
+import { requireInternalPlatformApi } from "@/lib/require-internal-platform";
 
 const STATUSES = new Set(["APPLICATION", "REVIEW", "TRAINING", "MOU", "APPROVED", "REJECTED"]);
 
@@ -18,7 +18,7 @@ export async function PATCH(
   ctx: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = requireSuperBossApi(request);
+    const session = requireInternalPlatformApi(request);
     if (session instanceof NextResponse) return session;
     const { id } = await ctx.params;
     const parsed = await parseJsonBodyZod(request, patchSchema);

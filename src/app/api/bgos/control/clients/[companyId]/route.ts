@@ -11,7 +11,7 @@ import { ACTIVITY_TYPES, logActivity } from "@/lib/activity-log";
 import { deleteApiCacheByPrefix, getApiCache, setApiCache } from "@/lib/api-runtime-cache";
 import { bossControlClientCategory } from "@/lib/bgos-control-client-category";
 import { prisma } from "@/lib/prisma";
-import { requireSuperBossApi } from "@/lib/require-super-boss";
+import { requireInternalPlatformApi } from "@/lib/require-internal-platform";
 import { companyMembershipClass } from "@/lib/user-company";
 
 const SALES_ROLES: UserRole[] = [
@@ -55,7 +55,7 @@ function invalidateControlCaches(companyId: string): void {
 }
 
 export async function GET(request: NextRequest, ctx: Ctx) {
-  const session = requireSuperBossApi(request);
+  const session = requireInternalPlatformApi(request);
   if (session instanceof NextResponse) return session;
   const { companyId } = await ctx.params;
   const cacheKey = `control:client:${companyId}`;
@@ -259,7 +259,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
 }
 
 export async function PATCH(request: NextRequest, ctx: Ctx) {
-  const session = requireSuperBossApi(request);
+  const session = requireInternalPlatformApi(request);
   if (session instanceof NextResponse) return session;
   const { companyId } = await ctx.params;
 
@@ -429,7 +429,7 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
 }
 
 export async function DELETE(request: NextRequest, ctx: Ctx) {
-  const session = requireSuperBossApi(request);
+  const session = requireInternalPlatformApi(request);
   if (session instanceof NextResponse) return session;
   const { companyId } = await ctx.params;
 

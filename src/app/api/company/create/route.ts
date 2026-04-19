@@ -22,6 +22,7 @@ import { signAccessToken } from "@/lib/jwt";
 import { isSuperBossEmail } from "@/lib/super-boss";
 import { applyBossCompanyAttributionFromSession } from "@/lib/nexa-boss-company-attribution";
 import { runOnboardingLaunch } from "@/lib/onboarding-launch-engine";
+import { BGOS_BOSS_READY_HOME } from "@/lib/system-readiness";
 import { normalizeMicroFranchisePhone } from "@/lib/micro-franchise-phone";
 import type { LaunchIndustry } from "@/lib/company-launch-engine";
 
@@ -158,8 +159,8 @@ async function respondIdempotentExistingWorkspace(
     idempotent: true as const,
     message: "Workspace already exists — refreshed your session.",
     employeesCreated: 0,
-    dashboardsAssigned: ["/bgos/control/v4"] as const,
-    redirect_to: "/bgos/control/v4" as const,
+    dashboardsAssigned: [BGOS_BOSS_READY_HOME],
+    redirect_to: BGOS_BOSS_READY_HOME,
     businessType: CompanyBusinessType.SOLAR,
     deprecated: true as const,
     migrateTo: "/api/onboarding/launch" as const,
@@ -401,7 +402,7 @@ export async function POST(request: NextRequest) {
       companyId: launch.companyId,
       employeesCreated: launch.employeesCreated,
       dashboardsAssigned: launch.dashboardsAssigned,
-      redirect_to: "/bgos/control/v4" as const,
+      redirect_to: BGOS_BOSS_READY_HOME,
       businessType: launch.businessType,
       deprecated: true as const,
       migrateTo: "/api/onboarding/launch" as const,

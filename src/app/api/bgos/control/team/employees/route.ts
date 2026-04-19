@@ -4,11 +4,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { parseJsonBodyZod, jsonError, prismaKnownErrorResponse } from "@/lib/api-response";
 import { deleteApiCacheByPrefix } from "@/lib/api-runtime-cache";
-import { requireSuperBossApi } from "@/lib/require-super-boss";
+import { getOrCreateInternalSalesCompanyId } from "@/lib/internal-sales-org";
+import { requireInternalSalesRecruiter } from "@/lib/require-internal-sales-recruiter";
 import { hashPassword } from "@/lib/password";
 import { handleApiError } from "@/lib/route-error";
 import { prisma } from "@/lib/prisma";
-import { getOrCreateInternalSalesCompanyId } from "@/lib/internal-sales-org";
 import { companyMembershipClass, toPublicUser } from "@/lib/user-company";
 import { INTERNAL_ORG_EMPLOYEE_ROLES } from "@/lib/internal-hr-roles";
 import {
@@ -44,9 +44,6 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const session = requireSuperBossApi(request);
-  if (session instanceof NextResponse) return session;
-
   const parsed = await parseJsonBodyZod(request, bodySchema);
   if (!parsed.ok) return parsed.response;
 
@@ -57,6 +54,9 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
+
+  const session = await requireInternalSalesRecruiter(request, org.companyId);
+  if (session instanceof NextResponse) return session;
 
   const companyRow = await prisma.company.findUnique({
     where: { id: org.companyId },
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
       return jsonError(
         400,
         "VALIDATION_ERROR",
-        "BDM is earned via Nexa promotion (3 consecutive months on target) — not created manually.",
+        "BDM is earned via promotion (60 active subscriptions as BDE) — not created manually.",
       );
     }
     if (networkRole === SalesNetworkRole.BOSS) {
@@ -100,21 +100,41 @@ export async function POST(request: NextRequest) {
     return jsonError(409, "EMAIL_IN_USE", EMAIL_ALREADY_IN_USE_MESSAGE);
   }
 
-  if (parsed.data.parentUserId) {
-    const parent = await prisma.userCompany.findFirst({
+  if (networkRole === SalesNetworkRole.RSM) {
+    if (!parsed.data.parentUserId) {
+      return jsonError(400, "VALIDATION_ERROR", "RSM requires parentUserId (Boss).");
+    }
+    const bossParent = await prisma.userCompany.findFirst({
+      where: { companyId: org.companyId, userId: parsed.data.parentUserId },
+      select: { salesNetworkRole: true },
+    });
+    if (!bossParent || bossParent.salesNetworkRole !== SalesNetworkRole.BOSS) {
+      return jsonError(400, "VALIDATION_ERROR", "RSM must be created under the Boss.");
+    }
+  }
+
+  if (networkRole === SalesNetworkRole.BDE) {
+    if (!parsed.data.parentUserId) {
+      return jsonError(400, "VALIDATION_ERROR", "BDE requires parentUserId (RSM or BDM).");
+    }
+    const salesParent = await prisma.userCompany.findFirst({
       where: { companyId: org.companyId, userId: parsed.data.parentUserId },
       select: { userId: true, salesNetworkRole: true, bdeSlotLimit: true },
     });
-    if (!parent) {
-      return jsonError(400, "VALIDATION_ERROR", "Parent must be a user in this workspace.");
+    if (
+      !salesParent ||
+      (salesParent.salesNetworkRole !== SalesNetworkRole.RSM &&
+        salesParent.salesNetworkRole !== SalesNetworkRole.BDM)
+    ) {
+      return jsonError(400, "VALIDATION_ERROR", "BDE must report to an RSM or BDM.");
     }
-    if (networkRole === SalesNetworkRole.BDE && parent.salesNetworkRole === SalesNetworkRole.BDM) {
+    if (salesParent.salesNetworkRole === SalesNetworkRole.BDM) {
       const limit =
-        parent.bdeSlotLimit > 0 ? parent.bdeSlotLimit : BDM_INITIAL_BDE_SLOTS;
+        salesParent.bdeSlotLimit > 0 ? salesParent.bdeSlotLimit : BDM_INITIAL_BDE_SLOTS;
       const used = await prisma.userCompany.count({
         where: {
           companyId: org.companyId,
-          parentUserId: parent.userId,
+          parentUserId: salesParent.userId,
           salesNetworkRole: SalesNetworkRole.BDE,
           archivedAt: null,
         },

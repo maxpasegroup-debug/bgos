@@ -1,19 +1,16 @@
-import { TaskStatus, SalesNetworkRole, UserRole } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { SalesNetworkRole } from "@prisma/client";
 import { logCaughtError } from "@/lib/api-response";
-import { getApiCache, setApiCache } from "@/lib/api-runtime-cache";
-import { prisma } from "@/lib/prisma";
-import { requireSuperBossApi } from "@/lib/require-super-boss";
 import { getOrCreateInternalSalesCompanyId } from "@/lib/internal-sales-org";
-import { BDE_DEFAULT_MONTHLY_REVENUE_TARGET } from "@/lib/sales-network/defaults";
-
-const SALES_DEPT_ROLES: UserRole[] = [UserRole.MANAGER, UserRole.SALES_EXECUTIVE];
-const TECH_DEPT_ROLES: UserRole[] = [UserRole.TECH_HEAD, UserRole.TECH_EXECUTIVE];
+import { parseSalesNetworkRoleQuery } from "@/lib/internal-platform/get-internal-membership";
+import { buildInternalTeamPayload } from "@/lib/internal-platform/internal-team-payload";
+import { prisma } from "@/lib/prisma";
+import { requireInternalPlatformApi } from "@/lib/require-internal-platform";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = requireSuperBossApi(request);
+    const session = requireInternalPlatformApi(request);
     if (session instanceof NextResponse) return session;
 
     const org = await getOrCreateInternalSalesCompanyId();
@@ -23,109 +20,18 @@ export async function GET(request: NextRequest) {
         { status: 500 },
       );
     }
-    const cacheKey = `control:team:v4:${org.companyId}`;
-    const cached = getApiCache<{
-      internalCompanyId: string;
-      bdeMonthlyTargetInr: number;
-      departments: {
-        sales: Array<{
-          userId: string;
-          name: string;
-          email: string;
-          role: UserRole;
-          salesNetworkRole: SalesNetworkRole | null;
-          parentUserId: string | null;
-          region: string | null;
-          archivedAt: string | null;
-        }>;
-        tech: Array<{
-          userId: string;
-          name: string;
-          email: string;
-          role: UserRole;
-          salesNetworkRole: SalesNetworkRole | null;
-          parentUserId: string | null;
-          region: string | null;
-          archivedAt: string | null;
-        }>;
-      };
-    }>(cacheKey);
-    if (cached) {
-      return NextResponse.json({
-        ok: true as const,
-        internalCompanyId: cached.internalCompanyId,
-        departments: cached.departments,
-      });
-    }
-
-    const memberships = await prisma.userCompany.findMany({
-      where: { companyId: org.companyId },
-      select: {
-        jobRole: true,
-        salesNetworkRole: true,
-        parentUserId: true,
-        region: true,
-        archivedAt: true,
-        activeSubscriptionsCount: true,
-        totalPoints: true,
-        benefitLevel: true,
-        bdeSlotLimit: true,
-        user: { select: { id: true, name: true, email: true, isActive: true } },
-      },
-      orderBy: { createdAt: "asc" },
-    });
-
-  const ids = memberships.map((m) => m.user.id);
-  const [leadCounts, taskCounts] = await Promise.all([
-    prisma.lead.groupBy({
-      by: ["assignedTo"],
-      where: { assignedTo: { in: ids } },
-      _count: { _all: true },
-    }),
-    prisma.task.groupBy({
-      by: ["userId"],
-      where: { userId: { in: ids }, status: TaskStatus.PENDING },
-      _count: { _all: true },
-    }),
-  ]);
-  const leadMap = new Map(leadCounts.map((x) => [x.assignedTo ?? "", x._count._all]));
-  const taskMap = new Map(taskCounts.map((x) => [x.userId ?? "", x._count._all]));
-
-    const mapMember = (m: (typeof memberships)[number]) => ({
-      userId: m.user.id,
-      name: m.user.name,
-      email: m.user.email,
-      role: m.jobRole,
-      isActive: m.user.isActive,
-      salesNetworkRole: m.salesNetworkRole,
-      parentUserId: m.parentUserId,
-      region: m.region,
-      archivedAt: m.archivedAt?.toISOString() ?? null,
-      assignedClients: leadMap.get(m.user.id) ?? 0,
-      pendingTasks: taskMap.get(m.user.id) ?? 0,
-      activeSubscriptionsCount: m.activeSubscriptionsCount,
-      totalPoints: m.totalPoints,
-      benefitLevel: m.benefitLevel,
-      bdeSlotLimit: m.bdeSlotLimit,
-    });
-
-    const sales = memberships.filter((m) => SALES_DEPT_ROLES.includes(m.jobRole)).map(mapMember);
-
-    const tech = memberships.filter((m) => TECH_DEPT_ROLES.includes(m.jobRole)).map(mapMember);
-
-    const payload = {
-      ok: true as const,
-      internalCompanyId: org.companyId,
-      bdeMonthlyTargetInr: BDE_DEFAULT_MONTHLY_REVENUE_TARGET,
-      departments: {
-        sales,
-        tech,
-      },
-    };
-    setApiCache(cacheKey, {
-      internalCompanyId: payload.internalCompanyId,
-      bdeMonthlyTargetInr: payload.bdeMonthlyTargetInr,
-      departments: payload.departments,
+    const { searchParams } = request.nextUrl;
+    const limit = searchParams.get("limit");
+    const offset = searchParams.get("offset");
+    const roleParam =
+      parseSalesNetworkRoleQuery(searchParams.get("role")) ??
+      parseSalesNetworkRoleQuery(searchParams.get("networkRole"));
+    const networkRole =
+      roleParam && Object.values(SalesNetworkRole).includes(roleParam) ? roleParam : undefined;
+    const payload = await buildInternalTeamPayload(prisma, org.companyId, {
+      limit: limit ? Number(limit) : undefined,
+      offset: offset ? Number(offset) : undefined,
+      networkRole,
     });
     return NextResponse.json(payload);
   } catch (e) {

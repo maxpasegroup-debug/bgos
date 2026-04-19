@@ -3,5 +3,5 @@ import { CommandCenterV4Client } from "@/components/bgos/v4/CommandCenterV4Clien
 export const dynamic = "force-dynamic";
 
 export default function ControlV4CommandCenterPage() {
-  return <CommandCenterV4Client />;
+  return <CommandCenterV4Client variant="client" />;
 }

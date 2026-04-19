@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSuperBossApi } from "@/lib/require-super-boss";
+import { requireInternalPlatformApi } from "@/lib/require-internal-platform";
 import { getOrCreateInternalSalesCompanyId } from "@/lib/internal-sales-org";
 import { eligibleSalaryRupees, currentPeriod, monthBoundsUTC } from "@/lib/iceconnect-sales-hub";
 
@@ -21,7 +21,7 @@ function toMonthKey(year: number, month1to12: number): string {
 }
 
 export async function GET(request: NextRequest, context: RouteContext) {
-  const session = requireSuperBossApi(request);
+  const session = requireInternalPlatformApi(request);
   if (session instanceof NextResponse) return session;
 
   const { id } = await context.params;
@@ -421,7 +421,7 @@ const patchSchema = z
   .refine((d) => Object.keys(d).length > 0, { message: "Provide payload" });
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
-  const session = requireSuperBossApi(request);
+  const session = requireInternalPlatformApi(request);
   if (session instanceof NextResponse) return session;
   const { id } = await context.params;
   const employeeId = id.trim();

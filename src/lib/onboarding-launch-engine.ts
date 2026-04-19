@@ -32,6 +32,7 @@ import { companyMembershipClass } from "@/lib/user-company";
 import { publicBgosOrigin, publicIceconnectOrigin } from "@/lib/host-routing";
 import { mapTeamEntries } from "@/lib/nexa-onboarding-engine";
 import { sendAccountReadyEmail } from "@/lib/account-ready-email";
+import { BGOS_BOSS_READY_HOME } from "@/lib/system-readiness";
 
 export type OnboardingLaunchIndustry = LaunchIndustry;
 
@@ -197,7 +198,7 @@ function loginUrlForRole(role: UserRole): string {
  * BGOS for company ADMIN; ICECONNECT (and partner) homes for employee job roles — see {@link ROLE_HOME}.
  */
 function dashboardsAssignedFor(employeeJobRoles: UserRole[]): string[] {
-  const set = new Set<string>(["/bgos/control/v4"]);
+  const set = new Set<string>([BGOS_BOSS_READY_HOME]);
   for (const r of employeeJobRoles) {
     set.add(getRoleHome(r));
   }
@@ -256,7 +257,7 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
         ok: true,
         companyId: existingByOwnerAndName.id,
         employeesCreated: 0,
-        dashboardsAssigned: ["/bgos/control/v4"],
+        dashboardsAssigned: [BGOS_BOSS_READY_HOME],
         credentials: dupCreds,
         credentialsFile: {
           filename: `${name.replace(/\s+/g, "_")}_credentials.xlsx`,

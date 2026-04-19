@@ -3,11 +3,11 @@ import { NextResponse } from "next/server";
 import { logCaughtError } from "@/lib/api-response";
 import { getApiCache, setApiCache } from "@/lib/api-runtime-cache";
 import { prisma } from "@/lib/prisma";
-import { requireSuperBossApi } from "@/lib/require-super-boss";
+import { requireInternalPlatformApi } from "@/lib/require-internal-platform";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = requireSuperBossApi(request);
+    const session = requireInternalPlatformApi(request);
     if (session instanceof NextResponse) return session;
     const cacheKey = "control:accounts-overview";
     const cached = getApiCache<{

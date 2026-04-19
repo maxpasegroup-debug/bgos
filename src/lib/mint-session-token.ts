@@ -32,7 +32,7 @@ export async function mintSessionAccessToken(input: {
     loadMembershipsForJwt(input.userId),
     prisma.user.findUnique({
       where: { id: input.userId },
-      select: { workspaceActivatedAt: true },
+      select: { workspaceActivatedAt: true, isInternal: true },
     }),
   ]);
 
@@ -57,6 +57,8 @@ export async function mintSessionAccessToken(input: {
     companyPlan: row.plan,
     workspaceReady,
     memberships: mems,
+    ...(row.salesNetworkRole ? { salesNetworkRole: row.salesNetworkRole } : {}),
+    ...(user.isInternal ? { isInternal: true as const } : {}),
     ...(isSuperBossEmail(input.email) ? { superBoss: true as const } : {}),
   });
 }
@@ -86,7 +88,7 @@ export async function mintSessionAccessTokenForUser(input: {
     loadMembershipsForJwt(input.userId),
     prisma.user.findUnique({
       where: { id: input.userId },
-      select: { workspaceActivatedAt: true },
+      select: { workspaceActivatedAt: true, isInternal: true },
     }),
   ]);
 
@@ -113,6 +115,7 @@ export async function mintSessionAccessTokenForUser(input: {
       companyId: input.activeCompanyId,
       plan: co.plan,
       jobRole: UserRole.ADMIN,
+      salesNetworkRole: null,
       trialEndsAt: co.trialEndDate?.toISOString() ?? null,
       subscriptionPeriodEnd: co.subscriptionPeriodEnd?.toISOString() ?? null,
       subscriptionStatus: co.subscriptionStatus,
@@ -138,10 +141,15 @@ export async function mintSessionAccessTokenForUser(input: {
       companyId: m.companyId,
       plan: m.plan,
       jobRole: m.jobRole,
+      salesNetworkRole: m.salesNetworkRole,
       trialEndsAt: m.trialEndsAt,
       subscriptionPeriodEnd: m.subscriptionPeriodEnd,
       subscriptionStatus: m.subscriptionStatus,
     })),
+    ...(activeRow.salesNetworkRole
+      ? { salesNetworkRole: activeRow.salesNetworkRole }
+      : {}),
+    ...(user.isInternal ? { isInternal: true as const } : {}),
     superBoss: true as const,
   });
 }

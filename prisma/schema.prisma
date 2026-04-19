@@ -952,6 +952,11 @@ model User {
    * Updated on every successful authentication.
    */
   lastLogin            DateTime?
+  /**
+   * Platform / BGOS internal team (sales, tech) — never mixed with client tenant employees.
+   * See internal org `Company.internalSalesOrg` and {@link UserCompany.salesNetworkRole}.
+   */
+  isInternal           Boolean   @default(false)
 
   companiesOwned                    Company[]                     @relation("OwnedCompany")
   memberships                       UserCompany[]
@@ -1002,6 +1007,7 @@ model User {
   nexaPersuasionStates              NexaPersuasionState[]
 
   @@index([email])
+  @@index([isInternal])
 }
 
 /**

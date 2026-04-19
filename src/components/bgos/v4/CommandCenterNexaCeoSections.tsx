@@ -115,7 +115,7 @@ export function CommandCenterNexaCeoSections() {
             Launch competition
           </Link>
           <Link
-            href="/bgos/dashboard"
+            href="/bgos/boss/home"
             className="rounded-2xl border border-[#4FD1FF]/25 bg-[#4FD1FF]/10 px-4 py-2 text-xs font-semibold text-[#4FD1FF] no-underline"
           >
             Send announcement

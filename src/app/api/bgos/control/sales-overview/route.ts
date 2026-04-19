@@ -5,7 +5,7 @@ import { logCaughtError } from "@/lib/api-response";
 import { getApiCache, setApiCache } from "@/lib/api-runtime-cache";
 import { buildRevenueForecast } from "@/lib/nexa-revenue-intelligence";
 import { prisma } from "@/lib/prisma";
-import { requireSuperBossApi } from "@/lib/require-super-boss";
+import { requireInternalPlatformApi } from "@/lib/require-internal-platform";
 
 const FUNNEL = {
   leads: [LeadStatus.NEW, LeadStatus.CONTACTED] as LeadStatus[],
@@ -21,7 +21,7 @@ const FUNNEL = {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = requireSuperBossApi(request);
+    const session = requireInternalPlatformApi(request);
     if (session instanceof NextResponse) return session;
     const cacheKey = "control:sales-overview";
     const cached = getApiCache<{

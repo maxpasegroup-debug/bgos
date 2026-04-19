@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { logCaughtError, parseJsonBodyZod } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
-import { requireSuperBossApi } from "@/lib/require-super-boss";
+import { requireInternalPlatformApi } from "@/lib/require-internal-platform";
 
 const createSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -15,7 +15,7 @@ const createSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    const session = requireSuperBossApi(request);
+    const session = requireInternalPlatformApi(request);
     if (session instanceof NextResponse) return session;
     const rows = await prisma.commissionPlan.findMany({
       orderBy: { createdAt: "asc" },
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = requireSuperBossApi(request);
+    const session = requireInternalPlatformApi(request);
     if (session instanceof NextResponse) return session;
     const parsed = await parseJsonBodyZod(request, createSchema);
     if (!parsed.ok) return parsed.response;

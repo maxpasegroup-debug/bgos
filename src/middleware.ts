@@ -31,6 +31,7 @@ import {
   roleCanAccessPath,
   SUPER_BOSS_HOME_PATH,
 } from "@/lib/role-routing";
+import { redirectHomeFromJwtPayload } from "@/lib/sales-network-home";
 import {
   customPaymentPendingAllowsApiRequest,
   jwtSaysCustomPaymentPending,
@@ -134,6 +135,8 @@ function bgosAllowsPagePath(pathname: string): boolean {
   if (pathname === "/") return true;
   if (normalizePathname(pathname) === "/lead") return true;
   if (pathname === "/bgos" || pathname.startsWith("/bgos/")) return true;
+  if (pathname === "/internal" || pathname.startsWith("/internal/")) return true;
+  if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) return true;
   if (pathname === "/sales-booster" || pathname.startsWith("/sales-booster/")) return true;
   if (normalizePathname(pathname) === "/setup-retry" || pathname.startsWith("/setup-retry/")) return true;
   if (isPublicRoute(pathname)) return true;
@@ -143,6 +146,8 @@ function bgosAllowsPagePath(pathname: string): boolean {
 function iceAllowsPagePath(pathname: string): boolean {
   const p = normalizePathname(pathname);
   if (p === "/lead") return true;
+  if (p === "/dashboard" || p.startsWith("/dashboard/")) return true;
+  if (p === "/internal" || p.startsWith("/internal/")) return true;
   /** Onboarding runs on the same app; ICECONNECT host must not force login for these paths. */
   if (p === "/onboarding" || p.startsWith("/onboarding/")) return true;
   if (p === "/setup-retry" || p.startsWith("/setup-retry/")) return true;
@@ -279,11 +284,43 @@ function readToken(request: NextRequest): string | null {
   return null;
 }
 
+/** Map legacy `/bgos/control/*` URLs to `/internal/*`. */
+function legacyBgosControlToInternal(normalizedPath: string): string {
+  if (normalizedPath === "/bgos/control" || normalizedPath === "/bgos/control/v4") {
+    return "/internal/control";
+  }
+  if (normalizedPath.startsWith("/bgos/control/sales")) {
+    return normalizedPath.replace("/bgos/control/sales", "/internal/sales");
+  }
+  if (normalizedPath.startsWith("/bgos/control/hr")) {
+    return normalizedPath.replace("/bgos/control/hr", "/internal/team");
+  }
+  if (normalizedPath.startsWith("/bgos/control/tech")) {
+    return normalizedPath.replace("/bgos/control/tech", "/internal/tech");
+  }
+  if (normalizedPath.startsWith("/bgos/control/work")) {
+    return "/internal/control";
+  }
+  if (normalizedPath.startsWith("/bgos/control/accounts")) {
+    return "/internal/control";
+  }
+  if (normalizedPath.startsWith("/bgos/control/clients")) {
+    return normalizedPath.replace("/bgos/control/clients", "/internal/sales");
+  }
+  return "/internal/control";
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const method = request.method;
   const host = request.headers.get("host") || "";
   const tenant = hostTenantFromHeader(host);
+
+  if (normalizePathname(pathname) === "/internal/login") {
+    const u = new URL("/login", request.url);
+    u.searchParams.set("from", "/internal/control");
+    return NextResponse.redirect(u);
+  }
 
   if (tenant === "bgos") {
     if (pathname.startsWith("/api")) {
@@ -302,7 +339,7 @@ export async function middleware(request: NextRequest) {
           if (pl.superBoss === true && isSuperBossEmail(em)) {
             destPath = SUPER_BOSS_HOME_PATH;
           } else if (isSystemReadyFromJwtPayload(pl, request.cookies.get(ACTIVE_COMPANY_COOKIE_NAME)?.value)) {
-            destPath = getRoleHome(String(pl.role ?? "ADMIN"));
+            destPath = redirectHomeFromJwtPayload(pl);
           }
         }
       }
@@ -320,7 +357,7 @@ export async function middleware(request: NextRequest) {
           if (pl.superBoss === true && isSuperBossEmail(em)) {
             destPath = SUPER_BOSS_HOME_PATH;
           } else if (isSystemReadyFromJwtPayload(pl, request.cookies.get(ACTIVE_COMPANY_COOKIE_NAME)?.value)) {
-            destPath = getRoleHome(String(pl.role ?? "ADMIN"));
+            destPath = redirectHomeFromJwtPayload(pl);
           }
         }
       }
@@ -361,7 +398,7 @@ export async function middleware(request: NextRequest) {
         const p = iceVerified.payload as Record<string, unknown>;
         const em = typeof p.email === "string" ? p.email : "";
         const sb = p.superBoss === true && isSuperBossEmail(em);
-        const homePath = sb ? SUPER_BOSS_HOME_PATH : getRoleHome(String(p.role));
+        const homePath = sb ? SUPER_BOSS_HOME_PATH : redirectHomeFromJwtPayload(p);
         return NextResponse.redirect(absoluteRoleHomeUrl(tenant, homePath, request.url));
       }
       return NextResponse.next();
@@ -383,7 +420,7 @@ export async function middleware(request: NextRequest) {
           const homePath = sb
             ? SUPER_BOSS_HOME_PATH
             : ready
-              ? getRoleHome(roleStr)
+              ? redirectHomeFromJwtPayload(p)
               : BGOS_ONBOARDING_ENTRY;
           return NextResponse.redirect(absoluteRoleHomeUrl(tenant, homePath, request.url));
         }
@@ -589,6 +626,11 @@ export async function middleware(request: NextRequest) {
   }
 
   const role = String(verified.payload.role);
+  const jwtPayload = verified.payload as Record<string, unknown>;
+  const jwtSalesNetworkRole =
+    typeof jwtPayload.salesNetworkRole === "string" ? jwtPayload.salesNetworkRole : null;
+  const jwtIsInternal = jwtPayload.isInternal === true;
+  const internalPlatform = edgeSuperBoss || jwtIsInternal;
 
   /** Company boss (ADMIN) must use bgos.online — not employee dashboards on iceconnect.in. */
   if (tenant === "ice" && !edgeSuperBoss && role === "ADMIN") {
@@ -614,13 +656,20 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname === "/iceconnect" || pathname === "/iceconnect/") {
-    const homePath = edgeSuperBoss ? SUPER_BOSS_HOME_PATH : getRoleHome(role);
+    const homePath = edgeSuperBoss ? SUPER_BOSS_HOME_PATH : redirectHomeFromJwtPayload(jwtPayload);
     if (normalizePathname(homePath) !== normalizePathname(pathname)) {
       return NextResponse.redirect(absoluteRoleHomeUrl(tenant, homePath, request.url));
     }
   }
 
-  if (pathname.startsWith("/api/bgos/control") && !edgeSuperBoss) {
+  if (pathname.startsWith("/api/bgos/control") && !internalPlatform) {
+    return NextResponse.json(
+      { ok: false, error: "Forbidden", code: "FORBIDDEN" },
+      { status: 403 },
+    );
+  }
+
+  if (pathname.startsWith("/api/internal") && !internalPlatform) {
     return NextResponse.json(
       { ok: false, error: "Forbidden", code: "FORBIDDEN" },
       { status: 403 },
@@ -651,31 +700,41 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(SUPER_BOSS_HOME_PATH, publicBgosOrigin()));
   }
 
-  /** `/bgos/control/*` is only for the platform owner (JWT superBoss + BGOS_BOSS_EMAIL). Tenant bosses use `/bgos/dashboard`. */
-  if (
-    normalizedPath === "/bgos/control" ||
-    normalizedPath.startsWith("/bgos/control/")
-  ) {
-    if (!edgeSuperBoss) {
+  /**
+   * Legacy `/bgos/control/*` → canonical `/internal/*` for platform team.
+   * Client bosses are sent to `/bgos/boss/home`.
+   */
+  if (normalizedPath === "/bgos/control" || normalizedPath.startsWith("/bgos/control/")) {
+    if (internalPlatform) {
+      const dest = legacyBgosControlToInternal(normalizedPath);
+      if (normalizePathname(dest) !== normalizedPath) {
+        return NextResponse.redirect(new URL(dest, request.url));
+      }
+    } else {
       if (pathname.startsWith("/api")) {
         return NextResponse.json(
           { ok: false, error: "Forbidden", code: "FORBIDDEN" },
           { status: 403 },
         );
       }
-      const homePath = getRoleHome(role);
-      return NextResponse.redirect(absoluteRoleHomeUrl(tenant, homePath, request.url));
+      return NextResponse.redirect(new URL("/bgos/boss/home", request.url));
     }
   }
 
-  if (!roleCanAccessPath(role, pathname, { superBoss: edgeSuperBoss })) {
+  if (
+    !roleCanAccessPath(role, pathname, {
+      superBoss: edgeSuperBoss,
+      salesNetworkRole: jwtSalesNetworkRole,
+      isInternal: jwtIsInternal,
+    })
+  ) {
     if (pathname.startsWith("/api")) {
       return NextResponse.json(
         { ok: false, error: "Forbidden", code: "FORBIDDEN" },
         { status: 403 },
       );
     }
-    const homePath = edgeSuperBoss ? SUPER_BOSS_HOME_PATH : getRoleHome(role);
+    const homePath = edgeSuperBoss ? SUPER_BOSS_HOME_PATH : redirectHomeFromJwtPayload(jwtPayload);
     if (normalizePathname(homePath) === normalizePathname(pathname)) {
       return NextResponse.redirect(loginRedirectUrl(request, pathname, tenant));
     }

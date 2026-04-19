@@ -1,12 +1,19 @@
 import "server-only";
 
-import type { CompanyPlan, CompanySubscriptionStatus, UserRole } from "@prisma/client";
+import type {
+  CompanyPlan,
+  CompanySubscriptionStatus,
+  SalesNetworkRole,
+  UserRole,
+} from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export type JwtMembershipRow = {
   companyId: string;
   plan: CompanyPlan;
   jobRole: UserRole;
+  /** Sales network role for this membership (internal hierarchy). */
+  salesNetworkRole: SalesNetworkRole | null;
   trialEndsAt: string | null;
   subscriptionPeriodEnd: string | null;
   /** Mirrors {@link Company.subscriptionStatus} for Edge billing holds (e.g. custom PAYMENT_PENDING). */
@@ -37,6 +44,7 @@ export async function loadMembershipsForJwt(userId: string): Promise<JwtMembersh
       companyId: r.companyId,
       plan: r.company.plan,
       jobRole: r.jobRole,
+      salesNetworkRole: r.salesNetworkRole ?? null,
       trialEndsAt: r.company.trialEndDate?.toISOString() ?? null,
       subscriptionPeriodEnd: co.subscriptionPeriodEnd?.toISOString() ?? null,
       subscriptionStatus: r.company.subscriptionStatus,

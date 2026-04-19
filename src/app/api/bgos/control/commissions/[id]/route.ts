@@ -5,7 +5,7 @@ import { z } from "zod";
 import { parseJsonBodyZod } from "@/lib/api-response";
 import { handleApiError } from "@/lib/route-error";
 import { prisma } from "@/lib/prisma";
-import { requireSuperBossApi } from "@/lib/require-super-boss";
+import { requireInternalPlatformApi } from "@/lib/require-internal-platform";
 
 const patchSchema = z
   .object({
@@ -24,7 +24,7 @@ export async function PATCH(
   ctx: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = requireSuperBossApi(request);
+    const session = requireInternalPlatformApi(request);
     if (session instanceof NextResponse) return session;
     const { id } = await ctx.params;
     const parsed = await parseJsonBodyZod(request, patchSchema);
@@ -51,7 +51,7 @@ export async function DELETE(
   ctx: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = requireSuperBossApi(request);
+    const session = requireInternalPlatformApi(request);
     if (session instanceof NextResponse) return session;
     const { id } = await ctx.params;
     await prisma.commissionRule.delete({ where: { id } });

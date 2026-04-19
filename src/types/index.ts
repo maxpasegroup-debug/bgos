@@ -30,6 +30,12 @@ export type AccessTokenPayload = {
   }>;
   /** Set only for {@link process.env.BGOS_BOSS_EMAIL} at login / token mint — do not trust from clients. */
   superBoss?: boolean;
+  /**
+   * Active-company sales network layer ({@link SalesNetworkRole} in DB) — drives `/dashboard/*` homes.
+   */
+  salesNetworkRole?: string;
+  /** Platform internal team (sales/tech) — {@link User.isInternal}. */
+  isInternal?: boolean;
   iat?: number;
   exp?: number;
 };

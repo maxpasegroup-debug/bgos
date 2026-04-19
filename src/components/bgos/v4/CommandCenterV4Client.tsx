@@ -38,7 +38,9 @@ function greeting(): string {
   return "Good evening";
 }
 
-export function CommandCenterV4Client() {
+export type CommandCenterVariant = "client" | "internal";
+
+export function CommandCenterV4Client({ variant = "client" }: { variant?: CommandCenterVariant }) {
   const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [briefErr, setBriefErr] = useState<string | null>(null);
   const [tasks, setTasks] = useState<NexaTaskRow[]>([]);
@@ -78,7 +80,11 @@ export function CommandCenterV4Client() {
 
   const loadTasks = useCallback(async () => {
     try {
-      const res = await apiFetch("/api/bgos/control/network/nexa-tasks", { credentials: "include" });
+      const tasksUrl =
+        variant === "internal"
+          ? "/api/internal/network/nexa-tasks"
+          : "/api/company/nexa-tasks";
+      const res = await apiFetch(tasksUrl, { credentials: "include" });
       const j = ((await readApiJson(res, "nexa-tasks")) ?? {}) as {
         success?: boolean;
         data?: { tasks?: NexaTaskRow[] };
@@ -94,7 +100,7 @@ export function CommandCenterV4Client() {
     } catch {
       setTasks([]);
     }
-  }, []);
+  }, [variant]);
 
   useEffect(() => {
     void loadBriefing();
@@ -136,32 +142,60 @@ export function CommandCenterV4Client() {
   const progress = tasks.filter((x) => x.status === "IN_PROGRESS");
   const done = tasks.filter((x) => x.status === "DONE");
 
-  const modules = [
-    {
-      href: "/bgos/control/sales",
-      title: "Sales Network",
-      desc: "Hierarchy, targets, promotions, performance.",
-      icon: "◎",
-    },
-    {
-      href: "/bgos/control/hr",
-      title: "People & HR",
-      desc: "RSM, Tech Exec, team, wellbeing, training.",
-      icon: "◆",
-    },
-    {
-      href: "/bgos/control/accounts",
-      title: "Accounts & Compliance",
-      desc: "Revenue, expenses, commissions, alerts.",
-      icon: "◇",
-    },
-    {
-      href: "/bgos/control/tech",
-      title: "Tech & Automation",
-      desc: "Queue, requests, completions.",
-      icon: "⎔",
-    },
-  ];
+  const modules =
+    variant === "internal"
+      ? [
+          {
+            href: "/internal/sales",
+            title: "Sales Network",
+            desc: "Hierarchy, targets, promotions, performance.",
+            icon: "◎",
+          },
+          {
+            href: "/internal/team",
+            title: "People & HR",
+            desc: "RSM, Tech Exec, team, wellbeing, training.",
+            icon: "◆",
+          },
+          {
+            href: "/internal/control",
+            title: "Accounts & Compliance",
+            desc: "Revenue, expenses, commissions, alerts.",
+            icon: "◇",
+          },
+          {
+            href: "/internal/tech",
+            title: "Tech & Automation",
+            desc: "Queue, requests, completions.",
+            icon: "⎔",
+          },
+        ]
+      : [
+          {
+            href: "/bgos/sales",
+            title: "Sales",
+            desc: "Pipeline, leads, and customer motion.",
+            icon: "◎",
+          },
+          {
+            href: "/bgos/hr",
+            title: "People & HR",
+            desc: "Team, roles, and people operations.",
+            icon: "◆",
+          },
+          {
+            href: "/bgos/accounts",
+            title: "Accounts",
+            desc: "Finance and compliance snapshot.",
+            icon: "◇",
+          },
+          {
+            href: "/bgos/internal-tech",
+            title: "Tech & Automation",
+            desc: "Requests, integrations, and delivery.",
+            icon: "⎔",
+          },
+        ];
 
   return (
     <div
@@ -177,7 +211,8 @@ export function CommandCenterV4Client() {
                 animate={{ opacity: 1, y: 0 }}
                 className={bodyMutedClass}
               >
-                {greeting()}, Boss.
+                {greeting()}
+                {variant === "internal" ? ", platform lead." : ", Boss."}
               </motion.p>
               <motion.h1
                 initial={{ opacity: 0, y: 8 }}
@@ -185,10 +220,12 @@ export function CommandCenterV4Client() {
                 transition={{ delay: 0.05 }}
                 className={`${headingClass} mt-2`}
               >
-                Nexa Command Center
+                {variant === "internal" ? "Nexa Internal Command Center" : "Nexa Command Center"}
               </motion.h1>
               <p className={`${bodyMutedClass} mt-2 max-w-2xl`}>
-                Decisions over navigation — Nexa surfaces what matters; you approve the move.
+                {variant === "internal"
+                  ? "BGOS platform control — sales network, tech, and revenue separate from tenant workspaces."
+                  : "Decisions over navigation — Nexa surfaces what matters; you approve the move."}
               </p>
             </header>
 
@@ -245,13 +282,19 @@ export function CommandCenterV4Client() {
                   type="button"
                   className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-2 text-xs font-semibold text-emerald-300"
                 >
-                  Approve focus
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  className="rounded-2xl border border-sky-400/30 bg-sky-500/10 px-4 py-2 text-xs font-semibold text-sky-200"
+                >
+                  Act
                 </button>
                 <button
                   type="button"
                   className="rounded-2xl border border-white/10 px-4 py-2 text-xs font-medium text-[#AEB6C4]"
                 >
-                  Ignore for now
+                  Ignore
                 </button>
                 <button
                   type="button"
@@ -302,7 +345,7 @@ export function CommandCenterV4Client() {
                   Work board
                 </h2>
                 <Link
-                  href="/bgos/control/work"
+                  href={variant === "internal" ? "/internal/control" : "/bgos/operations"}
                   className="text-xs font-medium text-[#4FD1FF] hover:underline"
                 >
                   Open full board

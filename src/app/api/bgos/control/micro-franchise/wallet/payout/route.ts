@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { logCaughtError, parseJsonBodyZod } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
-import { requireSuperBossApi } from "@/lib/require-super-boss";
+import { requireInternalPlatformApi } from "@/lib/require-internal-platform";
 
 const bodySchema = z.object({
   transactionIds: z.array(z.string().min(1)).min(1),
@@ -12,7 +12,7 @@ const bodySchema = z.object({
 /** Mark released commissions as paid out (external transfer) and deduct partner balance. */
 export async function POST(request: NextRequest) {
   try {
-    const session = requireSuperBossApi(request);
+    const session = requireInternalPlatformApi(request);
     if (session instanceof NextResponse) return session;
     const parsed = await parseJsonBodyZod(request, bodySchema);
     if (!parsed.ok) return parsed.response;

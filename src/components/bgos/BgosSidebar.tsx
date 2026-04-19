@@ -39,7 +39,7 @@ export function BgosSidebar() {
     hasProPlan && !planLockedToBasic ? "/sales-booster" : "/bgos/pricing";
 
   const solarBossNav: NavDef[] = [
-    { id: "home", label: "Home", href: "/bgos/dashboard", icon: HomeIcon },
+    { id: "home", label: "Home", href: "/bgos/boss/home", icon: HomeIcon },
     { id: "sales-booster", label: "Sales Booster", href: salesBoosterHref, icon: LightningIcon, booster: true },
     { id: "pipeline", label: "Pipeline", href: "/bgos/sales", icon: SalesIcon },
     { id: "installations", label: "Installations", href: "/bgos/operations", icon: OpsIcon },
@@ -63,11 +63,15 @@ export function BgosSidebar() {
     if (item.href === "/bgos/dashboard") {
       return pathname === "/bgos/dashboard" || pathname === "/bgos" || pathname.startsWith("/bgos/dashboard/");
     }
-    if (item.href === "/bgos/control/v4")
+    if (item.href === "/internal/control")
+      return pathname === "/internal/control" || pathname.startsWith("/internal/control/");
+    if (item.href === "/bgos/boss/home")
       return (
-        pathname === "/bgos/control/v4" ||
-        pathname === "/bgos/control" ||
-        pathname.startsWith("/bgos/control/v4/")
+        pathname === "/bgos/boss/home" ||
+        pathname === "/bgos" ||
+        pathname.startsWith("/bgos/boss/home/") ||
+        pathname === "/bgos/dashboard" ||
+        pathname.startsWith("/bgos/dashboard/")
       );
     return pathname === item.href || pathname.startsWith(`${item.href}/`);
   }
@@ -427,10 +431,10 @@ function SettingsIcon({ className }: { className?: string }) {
 }
 
 const superBossControlNav: NavDef[] = [
-  { id: "sb-cc", label: "Command Center", href: "/bgos/control/v4", icon: HomeIcon },
-  { id: "sb-sales", label: "Sales Network", href: "/bgos/control/sales", icon: SalesIcon },
-  { id: "sb-hr", label: "People", href: "/bgos/control/hr", icon: TeamIcon },
-  { id: "sb-accounts", label: "Accounts", href: "/bgos/control/accounts", icon: BillingIcon },
-  { id: "sb-tech", label: "Tech", href: "/bgos/control/tech", icon: OpsIcon },
-  { id: "sb-work", label: "Work Board", href: "/bgos/control/work", icon: ChartReportIcon },
+  { id: "sb-cc", label: "Command Center", href: "/internal/control", icon: HomeIcon },
+  { id: "sb-sales", label: "Sales Network", href: "/internal/sales", icon: SalesIcon },
+  { id: "sb-hr", label: "People", href: "/internal/team", icon: TeamIcon },
+  { id: "sb-accounts", label: "Accounts", href: "/internal/control", icon: BillingIcon },
+  { id: "sb-tech", label: "Tech", href: "/internal/tech", icon: OpsIcon },
+  { id: "sb-work", label: "Work Board", href: "/internal/control", icon: ChartReportIcon },
 ];

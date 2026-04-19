@@ -3,14 +3,14 @@
  * Company ADMIN (boss) defaults to BGOS; managers / execs use ICECONNECT hubs.
  */
 
-/** Platform owner (`BGOS_BOSS_EMAIL` + JWT `superBoss`) — internal control plane, not tenant solar dashboard. */
-export const SUPER_BOSS_HOME_PATH = "/bgos/control/v4";
+/** Platform owner (`BGOS_BOSS_EMAIL` + JWT `superBoss`) — internal control plane only. */
+export const SUPER_BOSS_HOME_PATH = "/internal/control";
 export const TECH_EXEC_HOME_PATH = "/iceconnect/tech";
 export const MICRO_FRANCHISE_HOME_PATH = "/iceconnect/micro-franchise";
 
 export const ROLE_HOME: Readonly<Record<string, string>> = {
-  /** Company boss — Nexa Command Center (`/bgos/control/v4`). Solar CRM lives under `/bgos/sales` etc. */
-  ADMIN: "/bgos/control/v4",
+  /** Client company boss — tenant workspace (never `/internal/*`). */
+  ADMIN: "/bgos/boss/home",
   MANAGER: "/iceconnect/manager",
   SALES_EXECUTIVE: "/iceconnect/sales",
   TELECALLER: "/iceconnect/leads",
@@ -243,6 +243,18 @@ const API_RULES: RouteRule[] = [
     ]),
   },
   {
+    prefix: "/api/sales-network",
+    roles: new Set([
+      "ADMIN",
+      "MANAGER",
+      "SALES_HEAD",
+      "SALES_EXECUTIVE",
+      "TELECALLER",
+      "TECH_HEAD",
+      "TECH_EXECUTIVE",
+    ]),
+  },
+  {
     prefix: "/api/nexa",
     roles: new Set([
       "ADMIN",
@@ -353,6 +365,10 @@ function allowedByRules(pathname: string, role: string, rules: RouteRule[]): boo
 export type RoleAccessOpts = {
   /** Platform owner only — see {@link process.env.BGOS_BOSS_EMAIL} + JWT `superBoss`. */
   superBoss?: boolean;
+  /** JWT `salesNetworkRole` — internal hierarchy dashboards under `/dashboard/*`. */
+  salesNetworkRole?: string | null;
+  /** JWT `isInternal` — BGOS platform team (`/internal/*`). */
+  isInternal?: boolean;
 };
 
 function normalizePathnameRole(pathname: string): string {
@@ -364,6 +380,7 @@ function normalizePathnameRole(pathname: string): string {
 
 function superBossAllowedPath(p: string): boolean {
   if (p === "/bgos/dashboard" || p.startsWith("/bgos/dashboard/")) return false;
+  if (p === "/internal" || p.startsWith("/internal/")) return true;
   if (p === "/bgos/control" || p.startsWith("/bgos/control/")) return true;
   if (p === "/sales-booster" || p.startsWith("/sales-booster/")) return true;
   if (p === "/onboarding" || p.startsWith("/onboarding/")) return true;
@@ -402,6 +419,28 @@ export function roleCanAccessPath(
     }
     if (superBossAllowedPath(p)) return true;
     return false;
+  }
+
+  if (opts?.isInternal === true && (p === "/internal" || p.startsWith("/internal/"))) {
+    return true;
+  }
+
+  if (opts?.isInternal === true && (p === "/iceconnect" || p.startsWith("/iceconnect/"))) {
+    return false;
+  }
+
+  const snr = opts?.salesNetworkRole ?? null;
+  if (p === "/dashboard/bde" || p.startsWith("/dashboard/bde/")) {
+    return snr === "BDE";
+  }
+  if (p === "/dashboard/bdm" || p.startsWith("/dashboard/bdm/")) {
+    return snr === "BDM";
+  }
+  if (p === "/dashboard/rsm" || p.startsWith("/dashboard/rsm/")) {
+    return snr === "RSM";
+  }
+  if (p === "/dashboard/tech" || p.startsWith("/dashboard/tech/")) {
+    return snr === "TECH_EXEC" || role === "TECH_HEAD" || role === "TECH_EXECUTIVE";
   }
 
   /** Internal control plane: only the configured platform owner (`superBoss` + BGOS_BOSS_EMAIL). */

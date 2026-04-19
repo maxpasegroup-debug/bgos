@@ -1,5 +1,11 @@
 import type { SalesHierarchyPlan } from "@prisma/client";
 
+/** First points milestone for BDE — triggers one-time bonus accrual (see record-sale). */
+export const BDE_POINTS_MILESTONE_FIRST = 20;
+
+/** Notional INR bonus when crossing {@link BDE_POINTS_MILESTONE_FIRST} (productized in ledger). */
+export const BDE_MILESTONE_BONUS_INR = 30_000;
+
 /** BDE → BDM: minimum active subscriptions (status active, not expired). */
 export const BDE_TO_BDM_ACTIVE_SUBS = 60;
 

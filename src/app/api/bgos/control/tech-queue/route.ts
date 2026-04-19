@@ -4,7 +4,7 @@ import { TechPipelineStage } from "@prisma/client";
 import { logCaughtError } from "@/lib/api-response";
 import { getApiCache, setApiCache } from "@/lib/api-runtime-cache";
 import { prisma } from "@/lib/prisma";
-import { requireSuperBossApi } from "@/lib/require-super-boss";
+import { requireInternalPlatformApi } from "@/lib/require-internal-platform";
 
 const PRIORITY_ORDER = { CRITICAL: 0, HIGH: 1, LOW: 2 } as const;
 
@@ -21,7 +21,7 @@ const DELAY_MS = 72 * 60 * 60 * 1000;
 
 export async function GET(request: NextRequest) {
   try {
-    const session = requireSuperBossApi(request);
+    const session = requireInternalPlatformApi(request);
     if (session instanceof NextResponse) return session;
     const cacheKey = "control:tech-queue";
     const cached = getApiCache<{

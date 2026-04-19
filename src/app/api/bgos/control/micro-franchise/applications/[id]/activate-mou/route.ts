@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { logCaughtError } from "@/lib/api-response";
 import { activateMicroFranchiseFromApplication } from "@/lib/micro-franchise-activate";
-import { requireSuperBossApi } from "@/lib/require-super-boss";
+import { requireInternalPlatformApi } from "@/lib/require-internal-platform";
 
 /**
  * Boss override: skip pipeline, set APPROVED, provision partner + wallet + ICECONNECT user.
@@ -12,7 +12,7 @@ export async function POST(
   ctx: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = requireSuperBossApi(request);
+    const session = requireInternalPlatformApi(request);
     if (session instanceof NextResponse) return session;
     const { id } = await ctx.params;
 
