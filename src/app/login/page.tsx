@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense, useRef, useState } from "react";
 import { z } from "zod";
 import { resolveAfterLoginNavigation } from "@/lib/cross-domain-login";
@@ -14,7 +14,6 @@ const clientLoginSchema = z.object({
 });
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -62,6 +61,7 @@ function LoginForm() {
       const data = (await res.json()) as {
         ok?: boolean;
         error?: string;
+        message?: string;
         code?: string;
         nextPath?: string;
         needsCompanySelection?: boolean;
@@ -84,11 +84,20 @@ function LoginForm() {
         }
         if (typeof data.error === "string" && data.error.trim()) {
           setError(data.error);
+        } else if (typeof data.message === "string" && data.message.trim()) {
+          setError(data.message);
         } else if (data.code === "VALIDATION_ERROR") {
           setError("Please check your email and password.");
         } else {
           setError("Sign-in failed");
         }
+        return;
+      }
+      // Fail-loud guard: login must establish a readable session immediately.
+      const meCheck = await apiFetch("/api/auth/me", { credentials: "include" });
+      const meData = (await meCheck.json()) as { authenticated?: boolean };
+      if (!meCheck.ok || meData.authenticated !== true) {
+        setError("Session cookie was not established. Please disable strict tracking protection and try again.");
         return;
       }
       if (data.isSuperBoss === true) {
@@ -97,8 +106,7 @@ function LoginForm() {
         } catch (e) {
           console.error("API ERROR:", e);
         }
-        router.replace(SUPER_BOSS_HOME_PATH);
-        router.refresh();
+        window.location.assign(SUPER_BOSS_HOME_PATH);
         return;
       }
 
@@ -117,8 +125,7 @@ function LoginForm() {
           u.needsWorkspaceActivation !== true &&
           (u as { workspaceReady?: boolean }).workspaceReady === true;
         if (!ready) {
-          router.replace("/onboarding/nexa");
-          router.refresh();
+          window.location.assign("/onboarding/nexa");
           return;
         }
       } else if (
@@ -126,8 +133,7 @@ function LoginForm() {
         u?.companyId == null ||
         u?.needsWorkspaceActivation === true
       ) {
-        router.replace("/onboarding/nexa");
-        router.refresh();
+        window.location.assign("/onboarding/nexa");
         return;
       }
 
@@ -139,8 +145,7 @@ function LoginForm() {
           (listJson.ok && Array.isArray(listJson.companies) && listJson.companies.length > 1) ||
           (Array.isArray(data.companies) && data.companies.length > 1);
         if (multiCompany) {
-          router.replace("/iceconnect/select-company");
-          router.refresh();
+          window.location.assign("/iceconnect/select-company");
           return;
         }
         await apiFetch("/api/auth/refresh-session", { method: "POST" }).catch(() => undefined);
@@ -153,13 +158,11 @@ function LoginForm() {
           typeof data.nextPath === "string" && data.nextPath.startsWith("/")
             ? data.nextPath
             : "/onboarding/nexa";
-        router.replace(dest);
-        router.refresh();
+        window.location.assign(dest);
         return;
       }
       if (role === "TECH_EXECUTIVE") {
-        router.replace(TECH_EXEC_HOME_PATH);
-        router.refresh();
+        window.location.assign(TECH_EXEC_HOME_PATH);
         return;
       }
 
@@ -174,8 +177,7 @@ function LoginForm() {
       }
       const serverPath =
         typeof data.nextPath === "string" && data.nextPath.startsWith("/") ? data.nextPath : null;
-      router.replace(serverPath ?? nav.path);
-      router.refresh();
+      window.location.assign(serverPath ?? nav.path);
     } catch (e) {
       console.error("API ERROR:", e);
       setError(formatFetchFailure(e, "Sign-in request failed"));
