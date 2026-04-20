@@ -303,6 +303,16 @@ export async function middleware(request: NextRequest) {
   const tenant = hostTenantFromHeader(host);
   const serverActionRequest = isServerActionRequest(request);
 
+  /**
+   * Never redirect/rewrite Next.js Server Action POSTs from middleware.
+   * Redirecting these requests can desync action IDs between client/server and
+   * cause "Failed to find Server Action" + aborted/ECONNRESET loops.
+   * Let the target action and route-level auth enforce access instead.
+   */
+  if (serverActionRequest) {
+    return NextResponse.next();
+  }
+
   if (!pathname.startsWith("/api") && !isStrictAllowedPagePath(pathname)) {
     return NextResponse.redirect(new URL("/login", request.url));
   }

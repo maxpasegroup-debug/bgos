@@ -18,18 +18,21 @@ export function IceconnectTechOnboardingRequestsClient() {
   const [busy, setBusy] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<Row[]> => {
     setErr(null);
     try {
       const res = await apiFetch("/api/onboarding/pipeline", { credentials: "include" });
       const j = (await res.json()) as { ok?: boolean; data?: Row[]; error?: string };
       if (!res.ok || !j.ok) {
         setErr(j.error ?? "Could not load");
-        return;
+        return [];
       }
-      setRows((j.data ?? []).filter((r) => r.status === "sent_to_tech"));
+      const techQueue = (j.data ?? []).filter((r) => r.status === "sent_to_tech");
+      setRows(techQueue);
+      return techQueue;
     } catch (e) {
       setErr(formatFetchFailure(e, "Request failed"));
+      return [];
     }
   }, []);
 
@@ -60,8 +63,13 @@ export function IceconnectTechOnboardingRequestsClient() {
         setErr(j.error ?? "Update failed");
         return;
       }
-      await load();
-      await openDetail(selected.id);
+      const refreshed = await load();
+      const updated = refreshed.find((r) => r.id === selected.id) ?? null;
+      if (updated) {
+        openDetail(updated);
+      } else {
+        setSelected(null);
+      }
     } catch (e) {
       setErr(formatFetchFailure(e, "Request failed"));
     } finally {
