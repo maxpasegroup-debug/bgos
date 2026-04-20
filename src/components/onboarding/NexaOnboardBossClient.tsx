@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { apiFetch, readApiJson } from "@/lib/api-fetch";
+import { apiFetch, formatFetchFailure, readApiJson } from "@/lib/api-fetch";
 
 type FlowType = "readymade" | "custom";
 type Mode = "new" | "existing" | "sales" | "manager";
@@ -369,6 +369,13 @@ export function NexaOnboardBossClient({
         step: 4,
         user: { ...s.user, id: initResult.userId },
       }));
+    } catch (e) {
+      console.error("[NexaOnboardBoss] submitAccount exception", e);
+      setBanner({
+        text: formatFetchFailure(e, "Could not complete login/signup"),
+        showRetry: true,
+        onRetry: () => void submitAccount(),
+      });
     } finally {
       authSubmitInFlightRef.current = false;
       setBusy(false);

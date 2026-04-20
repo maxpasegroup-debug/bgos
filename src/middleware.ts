@@ -109,6 +109,7 @@ function skipsMiddlewareAuth(pathname: string, method: string): boolean {
 
 function isStrictAllowedPagePath(pathname: string): boolean {
   const p = normalizePathname(pathname);
+  if (p === "/") return true;
   if (p === "/login") return true;
   if (p === "/signup") return true;
   if (p === "/onboarding" || p.startsWith("/onboarding/")) return true;
