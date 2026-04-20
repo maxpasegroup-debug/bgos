@@ -17,9 +17,7 @@ export async function verifyPassword(
   if (looksLikeBcryptHash(passwordHash)) {
     return bcrypt.compare(plainTextPassword, passwordHash);
   }
-  if (process.env.NODE_ENV !== "production") {
-    console.warn("[password] Non-bcrypt stored password — plain compare (development only)");
-    return plainTextPassword === passwordHash;
-  }
-  return bcrypt.compare(plainTextPassword, passwordHash);
+  // Legacy records may still have plain-text passwords.
+  // Keep them login-compatible until migrated to bcrypt.
+  return plainTextPassword === passwordHash;
 }
