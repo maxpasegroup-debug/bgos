@@ -147,6 +147,24 @@ export async function GET() {
         where: { id: session.user.sub },
         select: { name: true },
       });
+
+      let employeeSystem: string | null = null;
+      let employeeDomain: string | null = null;
+      let iceconnectEmployeeRole: string | null = null;
+      if (token) {
+        const vrIce = verifyAccessTokenResult(token);
+        if (vrIce.ok) {
+          const p = vrIce.payload as Record<string, unknown>;
+          employeeSystem =
+            typeof p.employeeSystem === "string" ? p.employeeSystem : null;
+          employeeDomain =
+            typeof p.employeeDomain === "string" ? p.employeeDomain : null;
+          iceconnectEmployeeRole =
+            typeof p.iceconnectEmployeeRole === "string"
+              ? p.iceconnectEmployeeRole
+              : null;
+        }
+      }
       let jwtSuperBoss = false;
       if (token) {
         const vr = verifyAccessTokenResult(token);
@@ -183,6 +201,9 @@ export async function GET() {
           activeCompanyIdCookie,
           memberships: session.user.memberships ?? null,
           isSuperBoss,
+          employeeSystem,
+          employeeDomain,
+          iceconnectEmployeeRole,
         },
       });
     }

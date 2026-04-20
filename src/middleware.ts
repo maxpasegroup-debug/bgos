@@ -42,6 +42,8 @@ import { jwtCompanyPlanFromUnknown, jwtPlanIsProPlus } from "@/lib/plan-tier";
 import { isBgosProductionBossBypassEmail } from "@/lib/bgos-production-boss-bypass";
 import { isSuperBossEmail } from "@/lib/super-boss";
 import { BGOS_ONBOARDING_ENTRY, isSystemReadyFromJwtPayload } from "@/lib/system-readiness";
+import { iceconnectEmployeePathAllowed, iceconnectRoleHomePath } from "@/lib/iceconnect-employee";
+import type { IceconnectEmployeeRole } from "@prisma/client";
 
 function normalizePathname(pathname: string): string {
   if (pathname.length > 1 && pathname.endsWith("/")) {
@@ -68,6 +70,7 @@ function isOnboardingPublicPath(p: string): boolean {
 
 function isPublicRoute(pathname: string): boolean {
   const p = normalizePathname(pathname);
+  if (p === "/coming-soon") return true;
   if (isOnboardingPublicPath(p)) return true;
   if (p === "/micro-franchise/apply" || p.startsWith("/micro-franchise/apply")) return true;
   if (p === "/contact" || p === "/privacy" || p === "/terms") return true;
@@ -133,6 +136,9 @@ function loginRedirectUrl(request: NextRequest, pathname: string, tenant: HostTe
 function bgosAllowsPagePath(pathname: string): boolean {
   /** `/` is handled in `app/page.tsx` (logged in → `/bgos`, else → `/login`). */
   if (pathname === "/") return true;
+  if (normalizePathname(pathname) === "/coming-soon") return true;
+  if (normalizePathname(pathname) === "/bgos-boss") return true;
+  if (normalizePathname(pathname) === "/solar-boss" || pathname.startsWith("/solar-boss/")) return true;
   if (normalizePathname(pathname) === "/lead") return true;
   if (pathname === "/bgos" || pathname.startsWith("/bgos/")) return true;
   if (pathname === "/sales-booster" || pathname.startsWith("/sales-booster/")) return true;
@@ -145,6 +151,7 @@ function bgosAllowsPagePath(pathname: string): boolean {
 
 function iceAllowsPagePath(pathname: string): boolean {
   const p = normalizePathname(pathname);
+  if (p === "/coming-soon") return true;
   if (p === "/lead") return true;
   /** Onboarding runs on the same app; ICECONNECT host must not force login for these paths. */
   if (p === "/onboarding" || p.startsWith("/onboarding/")) return true;
@@ -282,11 +289,89 @@ function readToken(request: NextRequest): string | null {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// REBUILD MODE — set to false when new dashboards are ready to ship.
+// Allows only auth pages, /coming-soon, and all API routes through.
+// Everything else (any dashboard, any workspace) is redirected to /coming-soon.
+// ---------------------------------------------------------------------------
+const REBUILD_MODE = true;
+
+function isRebuildModeAllowed(pathname: string): boolean {
+  if (pathname.startsWith("/api/")) return true;          // all APIs stay live
+  if (pathname.startsWith("/_next/")) return true;        // Next.js assets
+  const p = normalizePathname(pathname);
+  return (
+    p === "/" ||
+    p === "/login" ||
+    p === "/signup" ||
+    p === "/coming-soon" ||
+    p === "/bgos-boss" ||                                 // boss dashboard always reachable
+    p === "/solar-boss" ||
+    p.startsWith("/solar-boss/") ||
+    p === "/iceconnect/rsm" ||
+    p === "/iceconnect/bdm" ||
+    p === "/iceconnect/bde" ||
+    p === "/iceconnect/onboard" ||
+    p === "/iceconnect/sales/onboarding" ||
+    p.startsWith("/iceconnect/sales/onboarding/") ||
+    p === "/iceconnect/tech" ||
+    p.startsWith("/iceconnect/tech/") ||
+    p === "/iceconnect/login" ||
+    p === "/iceconnect/customer-login" ||
+    p === "/internal/login" ||
+    p === "/legal" ||
+    p.startsWith("/legal/") ||
+    p === "/contact" ||
+    p === "/privacy" ||
+    p === "/terms"
+  );
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const method = request.method;
   const host = request.headers.get("host") || "";
   const tenant = hostTenantFromHeader(host);
+
+  // ── REBUILD MODE GUARD ────────────────────────────────────────────────────
+  if (REBUILD_MODE && !isRebuildModeAllowed(pathname)) {
+    // Authenticated boss always lands on their dashboard, never /coming-soon.
+    const rebuildToken = readToken(request);
+    if (rebuildToken) {
+      const rebuildVerified = await verifyJwtEdge(rebuildToken);
+      if (rebuildVerified.ok) {
+        const rebuildEmail = typeof rebuildVerified.payload.email === "string"
+          ? rebuildVerified.payload.email : "";
+        if (isSuperBossEmail(rebuildEmail)) {
+          return NextResponse.redirect(new URL("/bgos-boss", request.url));
+        }
+      }
+    }
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(`[rebuild-mode] Blocked: ${pathname} → /coming-soon`);
+    }
+    return NextResponse.redirect(new URL("/coming-soon", request.url));
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // ── BOSS-ONLY ROUTE GUARD (/bgos-boss) ───────────────────────────────────
+  // Defense-in-depth: even if REBUILD_MODE is off, only boss@bgos.online enters.
+  if (normalizePathname(pathname) === "/bgos-boss" && !pathname.startsWith("/api")) {
+    const bossToken = readToken(request);
+    if (!bossToken) {
+      return NextResponse.redirect(new URL("/login?reason=boss-only", request.url));
+    }
+    const bossVerified = await verifyJwtEdge(bossToken);
+    if (!bossVerified.ok) {
+      return NextResponse.redirect(new URL("/login?reason=boss-only", request.url));
+    }
+    const bossEmail = typeof bossVerified.payload.email === "string"
+      ? bossVerified.payload.email : "";
+    if (!isSuperBossEmail(bossEmail)) {
+      return NextResponse.redirect(new URL("/login?reason=unauthorized", request.url));
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 
   if (tenant === "bgos") {
     if (pathname.startsWith("/api")) {
@@ -379,15 +464,29 @@ export async function middleware(request: NextRequest) {
         ) {
           const p = loginVerified.payload as Record<string, unknown>;
           const em = typeof p.email === "string" ? p.email : "";
+          // Boss always goes to their private dashboard.
+          if (isSuperBossEmail(em)) {
+            return NextResponse.redirect(new URL("/bgos-boss", request.url));
+          }
+          // In rebuild mode, everyone else lands on /coming-soon after login.
+          if (REBUILD_MODE) {
+            return NextResponse.redirect(new URL("/coming-soon", request.url));
+          }
           const sb = p.superBoss === true && isSuperBossEmail(em);
           const activeCo = request.cookies.get(ACTIVE_COMPANY_COOKIE_NAME)?.value;
           const ready = isSystemReadyFromJwtPayload(p, activeCo ?? undefined);
           const roleStr = String(p.role);
+          const solarBoss =
+            ready &&
+            roleStr === "ADMIN" &&
+            p.employeeDomain === "SOLAR";
           const homePath = sb
             ? SUPER_BOSS_HOME_PATH
-            : ready
-              ? getRoleHome(roleStr)
-              : BGOS_ONBOARDING_ENTRY;
+            : solarBoss
+              ? "/solar-boss"
+              : ready
+                ? getRoleHome(roleStr)
+                : BGOS_ONBOARDING_ENTRY;
           return NextResponse.redirect(absoluteRoleHomeUrl(tenant, homePath, request.url));
         }
       }
@@ -444,6 +543,54 @@ export async function middleware(request: NextRequest) {
 
   const needsCompany = requestHeaders.get(AUTH_HEADER_NEEDS_COMPANY) === "1";
   const normalizedPath = normalizePathname(pathname);
+
+  /**
+   * Legacy surface lock: keep runtime focused on three product surfaces only:
+   * `/bgos-boss`, `/solar-boss`, `/iceconnect/*`.
+   */
+  if (
+    !pathname.startsWith("/api") &&
+    (normalizedPath === "/dashboard" ||
+      normalizedPath.startsWith("/bgos/control") ||
+      normalizedPath.startsWith("/bgos/dashboard") ||
+      normalizedPath.startsWith("/sales-booster") ||
+      normalizedPath.startsWith("/internal"))
+  ) {
+    if (edgeSuperBoss) {
+      return NextResponse.redirect(new URL("/bgos-boss", request.url));
+    }
+    const role = typeof verified.payload.role === "string" ? verified.payload.role : "";
+    const domain = typeof verified.payload.employeeDomain === "string" ? verified.payload.employeeDomain : "";
+    const system = typeof verified.payload.employeeSystem === "string" ? verified.payload.employeeSystem : "";
+    const iceRole =
+      typeof verified.payload.iceconnectEmployeeRole === "string"
+        ? verified.payload.iceconnectEmployeeRole
+        : null;
+    if (role === "ADMIN" && domain === "SOLAR") {
+      return NextResponse.redirect(new URL("/solar-boss", request.url));
+    }
+    if (system === "ICECONNECT" && iceRole) {
+      const home = iceconnectRoleHomePath(iceRole as IceconnectEmployeeRole);
+      if (home) return NextResponse.redirect(new URL(home, request.url));
+    }
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  /** Solar Boss workspace — company ADMIN with JWT `employeeDomain: SOLAR` only. */
+  if (
+    tenant === "bgos" &&
+    !pathname.startsWith("/api") &&
+    (normalizedPath === "/solar-boss" || normalizedPath.startsWith("/solar-boss/"))
+  ) {
+    if (edgeSuperBoss) {
+      return NextResponse.redirect(new URL("/bgos-boss", request.url));
+    }
+    const jobRole = String(verified.payload.role ?? "");
+    const domain = verified.payload.employeeDomain;
+    if (jobRole !== "ADMIN" || domain !== "SOLAR") {
+      return NextResponse.redirect(new URL("/bgos/dashboard", request.url));
+    }
+  }
 
   const isCompanyCreatePost = normalizedPath === "/api/company/create" && method === "POST";
   const isOnboardingLaunchPost = normalizedPath === "/api/onboarding/launch" && method === "POST";
@@ -671,7 +818,24 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (!roleCanAccessPath(role, pathname, { superBoss: edgeSuperBoss })) {
+  const iceGate = iceconnectEmployeePathAllowed(
+    pathname,
+    verified.payload as Record<string, unknown>,
+  );
+  if (iceGate === "deny") {
+    if (pathname.startsWith("/api")) {
+      return NextResponse.json(
+        { ok: false, error: "Forbidden", code: "FORBIDDEN" },
+        { status: 403 },
+      );
+    }
+    return NextResponse.redirect(new URL("/iceconnect/login?reason=iceconnect", request.url));
+  }
+
+  const roleOk =
+    iceGate === "allow" ||
+    roleCanAccessPath(role, pathname, { superBoss: edgeSuperBoss });
+  if (!roleOk) {
     if (pathname.startsWith("/api")) {
       return NextResponse.json(
         { ok: false, error: "Forbidden", code: "FORBIDDEN" },

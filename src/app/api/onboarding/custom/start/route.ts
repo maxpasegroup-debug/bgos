@@ -16,6 +16,7 @@ import { razorpayAmountForPlan } from "@/lib/razorpay-billing";
 import { requireRazorpayConfigOr503 } from "@/lib/razorpay-env-guards";
 import { setActiveCompanyCookie, setSessionCookie } from "@/lib/session-cookie";
 import { companyMembershipClass } from "@/lib/user-company";
+import { ensureCompanyLimits } from "@/lib/company-limits";
 
 const bodySchema = z.object({
   companyName: z.string().trim().min(1),
@@ -78,6 +79,7 @@ export async function POST(request: NextRequest) {
         },
       });
     }
+    await ensureCompanyLimits(companyId);
 
     await prisma.onboardingSession.create({
       data: {

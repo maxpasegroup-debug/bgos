@@ -70,9 +70,14 @@ const ONBOARDING_WORKFLOW_ROLES = new Set<string>([
 type RouteRule = { prefix: string; roles: Set<string> };
 
 const PAGE_RULES: RouteRule[] = [
+  { prefix: "/solar-boss", roles: new Set(["ADMIN"]) },
   { prefix: "/bgos", roles: new Set(["ADMIN", "MANAGER"]) },
   { prefix: "/sales-booster", roles: new Set(["ADMIN", "MANAGER"]) },
   { prefix: "/iceconnect/manager", roles: new Set(["MANAGER"]) },
+  {
+    prefix: "/iceconnect/sales/onboarding",
+    roles: new Set(["SALES_EXECUTIVE", "TELECALLER", "SALES_HEAD", "ADMIN"]),
+  },
   { prefix: "/iceconnect/sales", roles: new Set(["SALES_EXECUTIVE", "TELECALLER", "ADMIN"]) },
   { prefix: "/iceconnect/sales-head", roles: new Set(["SALES_HEAD", "ADMIN"]) },
   { prefix: "/iceconnect/partner", roles: new Set(["CHANNEL_PARTNER", "ADMIN"]) },

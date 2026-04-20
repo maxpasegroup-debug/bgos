@@ -1,4 +1,4 @@
-import { CompanyPlan, UserRole } from "@prisma/client";
+import { CompanyPlan, EmployeeDomain, UserRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { parseJsonBody, zodValidationErrorResponse } from "@/lib/api-response";
@@ -24,6 +24,8 @@ import {
 } from "@/lib/bgos-production-boss-bypass";
 import { setActiveCompanyCookie, setSessionCookie } from "@/lib/session-cookie";
 import { isSuperBossEmail } from "@/lib/super-boss";
+import { iceconnectRoleHomePath } from "@/lib/iceconnect-employee";
+import { SOLAR_BOSS_HOME } from "@/lib/solar-boss-config";
 
 const bodySchema = z.object({
   email: z.string().trim().min(1, "Email is required").email("Enter a valid email"),
@@ -55,6 +57,7 @@ function internalPostLoginLocation(
   companyId: string | null,
   workspaceActivated: boolean,
   userEmail: string,
+  employeeDomain: EmployeeDomain | null | undefined,
 ): string {
   if (isSuperBossEmail(userEmail)) {
     return SUPER_BOSS_HOME_PATH;
@@ -66,6 +69,15 @@ function internalPostLoginLocation(
     return MICRO_FRANCHISE_HOME_PATH;
   }
   if (isBossReady(role, companyId)) {
+    if (
+      workspaceActivated &&
+      role === UserRole.ADMIN &&
+      employeeDomain === EmployeeDomain.SOLAR
+    ) {
+      return companyId && companyId.length > 0
+        ? `${SOLAR_BOSS_HOME}?company_id=${encodeURIComponent(companyId)}`
+        : SOLAR_BOSS_HOME;
+    }
     return workspaceActivated ? BGOS_BOSS_READY_HOME : BGOS_ONBOARDING_ENTRY;
   }
   if (companyId == null || companyId === "") {
@@ -250,6 +262,18 @@ export async function POST(request: Request) {
         { status: 403 },
       );
     }
+    /** Explicit BGOS-only identity cannot use ICECONNECT host. */
+    if (loginHostTenant === "ice" && user.employeeSystem === "BGOS") {
+      return NextResponse.json(
+        {
+          success: false as const,
+          ok: false as const,
+          error: "This account is registered for BGOS only. Sign in at bgos.online.",
+          code: "WRONG_HOST" as const,
+        },
+        { status: 403 },
+      );
+    }
 
     const resolvedCompanyId = primary?.companyId ?? companyId;
     let workspaceActivatedAt = user.workspaceActivatedAt;
@@ -276,6 +300,11 @@ export async function POST(request: Request) {
       workspaceReady,
       ...(mems.length ? { memberships: mems } : {}),
       ...(boss ? { superBoss: true as const } : {}),
+      ...(user.employeeSystem ? { employeeSystem: user.employeeSystem } : {}),
+      ...(user.employeeDomain ? { employeeDomain: user.employeeDomain } : {}),
+      ...(user.iceconnectEmployeeRole
+        ? { iceconnectEmployeeRole: user.iceconnectEmployeeRole }
+        : {}),
     });
 
     const companiesPayload =
@@ -290,8 +319,8 @@ export async function POST(request: Request) {
       name: user.name,
       email: user.email,
       role: effectiveRole,
-      companyId,
-      companyPlan: productionBossBypass && companyId ? CompanyPlan.PRO : companyPlan,
+      companyId: resolvedCompanyId,
+      companyPlan: productionBossBypass && resolvedCompanyId ? CompanyPlan.PRO : companyPlan,
       ...(needsOnboarding
         ? { needsOnboarding: true as const }
         : {
@@ -324,19 +353,29 @@ export async function POST(request: Request) {
       orderBy: { createdAt: "desc" },
       select: { id: true },
     });
+    const iceHome =
+      loginHostTenant === "ice" &&
+      user.employeeSystem === "ICECONNECT" &&
+      user.iceconnectEmployeeRole
+        ? iceconnectRoleHomePath(user.iceconnectEmployeeRole)
+        : null;
+
     const nextPath = boss
       ? SUPER_BOSS_HOME_PATH
-      : effectiveRole === UserRole.TECH_EXECUTIVE
-        ? TECH_EXEC_HOME_PATH
-        : effectiveRole === UserRole.MICRO_FRANCHISE
-          ? MICRO_FRANCHISE_HOME_PATH
-          : internalPostLoginLocation(
-                effectiveRole,
-                parsed.data.from?.trim() || undefined,
-                companyId,
-                workspaceActivated,
-                user.email,
-              );
+      : iceHome
+        ? iceHome
+        : effectiveRole === UserRole.TECH_EXECUTIVE
+          ? TECH_EXEC_HOME_PATH
+          : effectiveRole === UserRole.MICRO_FRANCHISE
+            ? MICRO_FRANCHISE_HOME_PATH
+            : internalPostLoginLocation(
+                  effectiveRole,
+                  parsed.data.from?.trim() || undefined,
+                  resolvedCompanyId,
+                  workspaceActivated,
+                  user.email,
+                  user.employeeDomain,
+                );
     const forcedNextPath = forcePasswordReset
       ? "/reset-password"
       : inProgressSession
@@ -365,8 +404,8 @@ export async function POST(request: Request) {
       { status: 200 },
     );
     await setSessionCookie(res, token);
-    if (companyId) {
-      await setActiveCompanyCookie(res, companyId);
+    if (resolvedCompanyId) {
+      await setActiveCompanyCookie(res, resolvedCompanyId);
     }
     console.info("[auth/login] response", {
       userId: user.id,

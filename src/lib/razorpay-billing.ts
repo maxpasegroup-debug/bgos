@@ -5,6 +5,7 @@ import { CompanySubscriptionStatus, type CompanyPlan, Prisma } from "@prisma/cli
 import Razorpay from "razorpay";
 import { PRICING_VERSION, priceForPlanPaise, validatePaymentAmountOrThrow } from "@/config/pricing";
 import { prisma } from "@/lib/prisma";
+import { touchCompanyUsageAfterLimitsOrPlanChange } from "@/lib/usage-metrics-engine";
 
 /** Basic monthly in paise */
 export const RAZORPAY_BASIC_MONTHLY_PAISE = priceForPlanPaise("BASIC");
@@ -164,6 +165,11 @@ export async function applySuccessfulRazorpayPayment(input: {
     });
     applied = true;
   });
+  if (applied) {
+    void touchCompanyUsageAfterLimitsOrPlanChange(input.companyId).catch((e) =>
+      console.error("[razorpay-billing] usage metrics touch failed", e),
+    );
+  }
   return { applied };
 }
 

@@ -30,6 +30,10 @@ export type AccessTokenPayload = {
   }>;
   /** Set only for {@link process.env.BGOS_BOSS_EMAIL} at login / token mint — do not trust from clients. */
   superBoss?: boolean;
+  /** ICECONNECT workforce identity (see Prisma User.employeeSystem). */
+  employeeSystem?: "BGOS" | "ICECONNECT";
+  employeeDomain?: "BGOS" | "SOLAR";
+  iceconnectEmployeeRole?: "RSM" | "BDM" | "BDE" | "TECH_EXEC";
   iat?: number;
   exp?: number;
 };

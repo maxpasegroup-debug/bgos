@@ -42,6 +42,26 @@ enum UserRole {
   MICRO_FRANCHISE
 }
 
+/// Which product surface this user belongs to (ICECONNECT = field / solar workforce app).
+enum EmployeeSystem {
+  BGOS
+  ICECONNECT
+}
+
+/// Business domain for data flow to BGOS Boss (brain vs solar install base).
+enum EmployeeDomain {
+  BGOS
+  SOLAR
+}
+
+/// ICECONNECT mobile hierarchy role (orthogonal to {@link UserRole} jobRole).
+enum IceconnectEmployeeRole {
+  RSM
+  BDM
+  BDE
+  TECH_EXEC
+}
+
 enum CompanyPlan {
   BASIC
   PRO
@@ -279,6 +299,10 @@ model Company {
    */
   plan         CompanyPlan         @default(BASIC)
   ownerId      String
+  /// Tenant routing: SOLAR (solar boss) vs BGOS (default brain).
+  workspaceDomain EmployeeDomain @default(SOLAR)
+  /// Onboarding dashboard template (solar, builder, academy, custom).
+  dashboardTemplate OnboardingRequestDashboardType @default(SOLAR)
   createdAt    DateTime            @default(now())
 
   /**
@@ -378,6 +402,7 @@ model Company {
   deals                        Deal[]
   tasks                        Task[]
   installations                Installation[]
+  projects                     Project[]
   payments                     Payment[]
   quotations                   Quotation[]
   moneyInvoices                Invoice[]
@@ -385,6 +410,7 @@ model Company {
   invoicePayments              InvoicePayment[]
   activityLogs                 ActivityLog[]
   serviceTickets               ServiceTicket[]
+  serviceJobs                  ServiceJob[]
   automations                  Automation[]
   nexaActions                  NexaAction[]
   documents                    Document[]
@@ -392,6 +418,7 @@ model Company {
   attendances                  Attendance[]
   salaries                     Salary[]
   products                     Product[]
+  inventoryItems               InventoryItem[]
   stocks                       Stock[]
   stockLogs                    StockLog[]
   channelPartners              ChannelPartner[]
@@ -437,11 +464,120 @@ model Company {
   nexaEmployeeWelfare          NexaEmployeeWelfare[]
   nexaAnnouncements            NexaAnnouncement[]
   nexaPersuasionStates         NexaPersuasionState[]
+  /// Plan caps for users / leads / projects (solar boss scaling gate).
+  companyLimit                 CompanyLimit?
+  subscription                 Subscription?
+  usageMetric                  UsageMetric?
+  usageFlags                   UsageFlag[]
+  usageCapacityNotifications   UsageCapacityNotification[]
 
   @@index([name])
   @@index([ownerId])
   @@index([launchChannelPartnerId])
   @@index([microFranchisePartnerId])
+}
+
+/// Enforces max users, leads, and projects per company (upgrade path when exceeded).
+model CompanyLimit {
+  id          String @id @default(cuid())
+  companyId   String @unique
+  maxUsers    Int    @default(12)
+  maxLeads    Int    @default(300)
+  maxProjects Int    @default(50)
+  updatedAt   DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("company_limits")
+}
+
+/// Billing subscription snapshot per company (explicit payment layer table).
+model Subscription {
+  id        String                    @id @default(cuid())
+  companyId String                    @unique
+  plan      CompanyPlan
+  status    CompanySubscriptionStatus
+  expiry    DateTime
+  createdAt DateTime                  @default(now())
+  updatedAt DateTime                  @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("subscriptions")
+}
+
+/// Cached tenant usage for capacity alerts (recalculated daily or on demand).
+model UsageMetric {
+  id              String   @id @default(cuid())
+  companyId       String   @unique
+  currentUsers    Int      @default(0)
+  currentLeads    Int      @default(0)
+  currentProjects Int      @default(0)
+  updatedAt       DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("usage_metrics")
+}
+
+enum UsageFlagKind {
+  USERS
+  LEADS
+  PROJECTS
+}
+
+enum UsageFlagStatus {
+  ACTIVE
+  IN_PROGRESS
+  CONVERTED
+  CLOSED
+}
+
+enum UsageCapacityNotificationStatus {
+  UNREAD
+  READ
+}
+
+/// High-usage (e.g. ≥80% of cap) capacity flag for sales follow-up.
+model UsageFlag {
+  id            String            @id @default(cuid())
+  companyId     String
+  kind          UsageFlagKind
+  status        UsageFlagStatus   @default(ACTIVE)
+  handledById   String?
+  /// UI workflow: pending → contacted → closed (parallel to {@link status}).
+  actionStatus  String            @default("pending")
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  company       Company                     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  handledBy     User?                       @relation("UsageFlagHandledBy", fields: [handledById], references: [id], onDelete: SetNull)
+  notifications UsageCapacityNotification[]
+
+  @@index([companyId, kind, status])
+  @@index([companyId, status])
+  @@map("usage_flags")
+}
+
+/// In-app alerts for ICECONNECT sales (RSM / BDM / BDE) when capacity flags fire.
+model UsageCapacityNotification {
+  id          String                          @id @default(cuid())
+  companyId   String
+  userId      String
+  usageFlagId String?
+  message     String                          @db.Text
+  status      UsageCapacityNotificationStatus   @default(UNREAD)
+  createdAt   DateTime                        @default(now())
+  readAt      DateTime?
+
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  usageFlag UsageFlag? @relation(fields: [usageFlagId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([companyId])
+  @@map("usage_capacity_notifications")
 }
 
 /**
@@ -1057,7 +1193,313 @@ model User {
   internalTechTasksCreated          InternalTechTask[]            @relation("TechTaskCreator")
   internalFraudLogsTriggered        InternalFraudLog[]            @relation("FraudLogTrigger")
 
+  /**
+   * ICECONNECT workforce identity — when set to ICECONNECT, user may use /iceconnect/{rsm,bdm,bde,tech}.
+   * Null = legacy users (routing uses {@link UserCompany.jobRole} only).
+   */
+  employeeSystem         EmployeeSystem?
+  employeeDomain         EmployeeDomain?
+  iceconnectEmployeeRole IceconnectEmployeeRole?
+  parentId               String?
+  parent                 User?   @relation("IceconnectHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  iceconnectChildren     User[]  @relation("IceconnectHierarchy")
+
+  onboardingRequestsCreated OnboardingRequest[] @relation("OnboardingRequestCreator")
+  onboardingRequestBossFor  OnboardingRequest[] @relation("OnboardingRequestBossUser")
+  usageFlagsHandled         UsageFlag[]           @relation("UsageFlagHandledBy")
+  usageCapacityNotifications UsageCapacityNotification[]
+  bdeMissions                BdeMission[]
+  bdeTasks                   BdeTask[]
+  bdeProspects               BdeProspect[]
+  bdeStreak                  BdeStreak?
+  bdeRewards                 BdeReward[]
+  bdeWallet                  BdeWallet?
+  bdeWalletTransactions      BdeWalletTransaction[]
+  bdeWithdrawRequests        BdeWithdrawRequest[]
+  bdeOnboarding              BdeOnboarding?
+  userMissions               UserMission[]
+  userTasks                  UserTask[]
+
   @@index([email])
+  @@index([parentId])
+  @@index([employeeSystem, iceconnectEmployeeRole])
+}
+
+/// ICECONNECT BDE daily Nexa mission (prospecting goal).
+enum BdeMissionStatus {
+  PENDING
+  COMPLETED
+}
+
+enum BdeTaskStatus {
+  PENDING
+  DONE
+}
+
+enum BdeProspectPipelineStage {
+  NEW
+  CONTACTED
+  TRIAL_STARTED
+  CONVERTED
+}
+
+enum BdeRewardStatus {
+  LOCKED
+  UNLOCKED
+  REVEALED
+}
+
+model BdeMission {
+  id               String           @id @default(cuid())
+  userId           String
+  /// Calendar date (UTC) for the mission day.
+  date             DateTime         @db.Date
+  targetProspects  Int              @default(5)
+  completedCount   Int              @default(0)
+  callsLogged      Int              @default(0)
+  status           BdeMissionStatus @default(PENDING)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks     BdeTask[]
+  prospects BdeProspect[]
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("bde_missions")
+}
+
+model BdeTask {
+  id        String        @id @default(cuid())
+  userId    String
+  missionId String
+  taskText  String
+  status    BdeTaskStatus @default(PENDING)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  user    User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mission BdeMission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@index([missionId, status])
+  @@map("bde_tasks")
+}
+
+/// Field prospect captured by BDE (Nexa mission progress).
+model BdeProspect {
+  id             String                     @id @default(cuid())
+  userId         String
+  missionId      String?
+  companyName    String
+  phone          String
+  location       String?
+  pipelineStage  BdeProspectPipelineStage   @default(NEW)
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mission BdeMission? @relation(fields: [missionId], references: [id], onDelete: SetNull)
+  userMissionId String?
+  userMission   UserMission? @relation(fields: [userMissionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([userMissionId])
+  @@map("bde_prospects")
+}
+
+model BdeStreak {
+  userId         String    @id
+  currentStreak  Int       @default(0)
+  lastActiveDate DateTime? @db.Date
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("bde_streaks")
+}
+
+model BdeReward {
+  id        String          @id @default(cuid())
+  userId    String
+  type      String
+  value     String
+  status    BdeRewardStatus @default(LOCKED)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@index([userId])
+  @@map("bde_rewards")
+}
+
+/// ICECONNECT BDE earnings wallet (not micro-franchise {@link Wallet}).
+model BdeWallet {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  totalEarned        Float    @default(0)
+  withdrawableAmount Float    @default(0)
+  bonusAmount        Float    @default(0)
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("bde_wallets")
+}
+
+enum BdeWalletTransactionType {
+  EARNING
+  BONUS
+  REWARD
+}
+
+model BdeWalletTransaction {
+  id          String                   @id @default(cuid())
+  userId      String
+  type        BdeWalletTransactionType
+  amount      Float
+  /// Idempotency key: e.g. `prospect:<id>`, `reward:<type>`.
+  referenceId String?
+  createdAt   DateTime                 @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, referenceId])
+  @@map("bde_wallet_transactions")
+}
+
+enum BdeWithdrawRequestStatus {
+  PENDING
+  APPROVED
+  PAID
+}
+
+model BdeWithdrawRequest {
+  id        String                   @id @default(cuid())
+  userId    String
+  amount    Float
+  status    BdeWithdrawRequestStatus @default(PENDING)
+  createdAt DateTime                 @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@map("bde_withdraw_requests")
+}
+
+/// 7-day Nexa BDE onboarding journey (checklist + day progression).
+model BdeOnboarding {
+  userId       String   @id
+  currentDay   Int      @default(1)
+  startedAt    DateTime @default(now())
+  completed    Boolean  @default(false)
+  /// Per-day completed task keys: `{ "1": ["d1_intro", ...], "2": [...] }`
+  progressJson Json     @default("{}")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("bde_onboarding")
+}
+
+/// Unified BDE mission (onboarding day or daily) — one row per user per calendar day.
+enum UserMissionType {
+  ONBOARDING
+  DAILY
+}
+
+enum UserMissionStatus {
+  PENDING
+  COMPLETED
+}
+
+enum UserTaskStatus {
+  PENDING
+  DONE
+}
+
+model UserMission {
+  id             String            @id @default(cuid())
+  userId         String
+  missionDate    DateTime          @db.Date
+  type           UserMissionType
+  /// Set when type = ONBOARDING (which journey day 1–7).
+  onboardingDay  Int?
+  targetCount    Int
+  completedCount Int             @default(0)
+  callsLogged    Int               @default(0)
+  status         UserMissionStatus @default(PENDING)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks      UserTask[]
+  prospects  BdeProspect[]
+
+  @@unique([userId, missionDate])
+  @@index([userId, missionDate])
+  @@map("user_missions")
+}
+
+model UserTask {
+  id            String        @id @default(cuid())
+  userId        String
+  userMissionId String
+  taskKey       String
+  label         String
+  status        UserTaskStatus @default(PENDING)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mission UserMission @relation(fields: [userMissionId], references: [id], onDelete: Cascade)
+
+  @@unique([userMissionId, taskKey])
+  @@index([userMissionId, status])
+  @@map("user_tasks")
+}
+
+/// BDE-initiated company onboarding pipeline (BDE → Sales → Tech → Boss account).
+enum OnboardingRequestDashboardType {
+  SOLAR
+  BUILDER
+  ACADEMY
+  CUSTOM
+}
+
+enum OnboardingRequestStatus {
+  PENDING
+  SALES_REVIEW
+  TECH_QUEUE
+  COMPLETED
+}
+
+model OnboardingRequest {
+  id              String                         @id @default(cuid())
+  createdByUserId String
+  companyName     String
+  bossEmail       String
+  dashboardType   OnboardingRequestDashboardType
+  /// Build target; mirrors {@link dashboardType} (e.g. solar → solar).
+  template        OnboardingRequestDashboardType
+  status          OnboardingRequestStatus        @default(PENDING)
+  notes           String?                        @db.Text
+  /// Sales review: team structure, roles, departments, expected users (JSON).
+  salesQuestionnaire Json?
+  techTemplate       String?
+  techNotes          String?                      @db.Text
+  bossUserId         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdBy User  @relation("OnboardingRequestCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  bossUser  User? @relation("OnboardingRequestBossUser", fields: [bossUserId], references: [id], onDelete: SetNull)
+
+  @@index([createdByUserId])
+  @@index([status])
+  @@map("onboarding_requests")
 }
 
 /**
@@ -1304,6 +1746,8 @@ model Lead {
   customerUser   CustomerPortalUser?
   complaints     CustomerComplaint[]
   installations  Installation[]
+  projects       Project[]
+  serviceJobs    ServiceJob[]
   serviceTickets ServiceTicket[]
   siteReport     String?             @db.Text
 
@@ -1479,6 +1923,68 @@ model Installation {
   @@index([status])
   @@index([leadId])
   @@index([assignedTo])
+}
+
+/// Solar project lifecycle (planning -> execution -> closure), company-scoped.
+model Project {
+  id          String   @id @default(cuid())
+  companyId   String
+  leadId      String?
+  name        String
+  status      String   @default("PLANNED")
+  startDate   DateTime?
+  endDate     DateTime?
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead    Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@unique([companyId, leadId])
+  @@index([companyId])
+  @@index([leadId])
+  @@index([status])
+  @@map("projects")
+}
+
+/// Solar service jobs (post-install or support), company-scoped.
+model ServiceJob {
+  id          String   @id @default(cuid())
+  companyId   String
+  leadId      String?
+  title       String
+  status      String   @default("OPEN")
+  scheduledAt DateTime?
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead    Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([leadId])
+  @@index([status])
+  @@map("services")
+}
+
+/// Inventory master for solar operations (stock ledger stays in ProductMovement).
+model InventoryItem {
+  id        String   @id @default(cuid())
+  companyId String
+  name      String
+  sku       String?
+  quantity  Int      @default(0)
+  unit      String   @default("unit")
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([companyId, name])
+  @@map("inventory")
 }
 
 model Payment {

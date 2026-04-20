@@ -710,6 +710,29 @@ export async function runNexaAutoActions(companyId: string, actorUserId: string)
         priority: 10,
       },
     });
+    const existingAlert = await prisma.nexaAction.findFirst({
+      where: {
+        companyId,
+        event: "INSTALLATION_DELAY_ALERT",
+        target: inst.id,
+        status: "OPEN",
+      },
+      select: { id: true },
+    });
+    if (!existingAlert) {
+      await prisma.nexaAction.create({
+        data: {
+          type: "ALERT",
+          event: "INSTALLATION_DELAY_ALERT",
+          target: inst.id,
+          status: "OPEN",
+          message: "Installation delay detected — ops escalation required.",
+          companyId,
+          actorUserId,
+          metadata: { installationId: inst.id, leadId: inst.leadId },
+        },
+      });
+    }
     actions += 1;
   }
 

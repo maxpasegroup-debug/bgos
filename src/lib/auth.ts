@@ -80,6 +80,9 @@ function payloadToUser(decoded: Record<string, unknown>): AuthUser | null {
     jobRole: m.jobRole as UserRole,
   }));
   const superBoss = decoded.superBoss === true;
+  const es = decoded.employeeSystem;
+  const ed = decoded.employeeDomain;
+  const ier = decoded.iceconnectEmployeeRole;
   return {
     sub,
     email,
@@ -89,6 +92,11 @@ function payloadToUser(decoded: Record<string, unknown>): AuthUser | null {
     workspaceReady,
     ...(memberships?.length ? { memberships } : {}),
     ...(superBoss ? { superBoss: true as const } : {}),
+    ...(es === "BGOS" || es === "ICECONNECT" ? { employeeSystem: es } : {}),
+    ...(ed === "BGOS" || ed === "SOLAR" ? { employeeDomain: ed } : {}),
+    ...(ier === "RSM" || ier === "BDM" || ier === "BDE" || ier === "TECH_EXEC"
+      ? { iceconnectEmployeeRole: ier }
+      : {}),
   };
 }
 

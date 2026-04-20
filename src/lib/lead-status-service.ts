@@ -193,6 +193,47 @@ export async function applyLeadPipelineUpdate(
             value: dealValue,
           },
         });
+
+        if (won) {
+          // Solar automation: winning a deal creates (or refreshes) downstream execution records.
+          await (tx as any).installation.upsert({
+            where: {
+              companyId_leadId: {
+                companyId,
+                leadId: updated.id,
+              },
+            },
+            update: {
+              status: "PENDING",
+              notes: "Auto-created by Nexa after deal WON",
+            },
+            create: {
+              companyId,
+              leadId: updated.id,
+              status: "PENDING",
+              notes: "Auto-created by Nexa after deal WON",
+            },
+          });
+          await (tx as any).project.upsert({
+            where: {
+              companyId_leadId: {
+                companyId,
+                leadId: updated.id,
+              },
+            },
+            update: {
+              status: "PLANNED",
+              name: `${updated.name} - Solar project`,
+            },
+            create: {
+              companyId,
+              leadId: updated.id,
+              status: "PLANNED",
+              name: `${updated.name} - Solar project`,
+              description: "Auto-created from deal WON",
+            },
+          });
+        }
       }
     }
 

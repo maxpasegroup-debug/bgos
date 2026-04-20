@@ -32,7 +32,12 @@ export async function mintSessionAccessToken(input: {
     loadMembershipsForJwt(input.userId),
     prisma.user.findUnique({
       where: { id: input.userId },
-      select: { workspaceActivatedAt: true },
+      select: {
+        workspaceActivatedAt: true,
+        employeeSystem: true,
+        employeeDomain: true,
+        iceconnectEmployeeRole: true,
+      },
     }),
   ]);
 
@@ -58,6 +63,11 @@ export async function mintSessionAccessToken(input: {
     workspaceReady,
     memberships: mems,
     ...(isSuperBossEmail(input.email) ? { superBoss: true as const } : {}),
+    ...(user.employeeSystem ? { employeeSystem: user.employeeSystem } : {}),
+    ...(user.employeeDomain ? { employeeDomain: user.employeeDomain } : {}),
+    ...(user.iceconnectEmployeeRole
+      ? { iceconnectEmployeeRole: user.iceconnectEmployeeRole }
+      : {}),
   });
 }
 
@@ -86,7 +96,12 @@ export async function mintSessionAccessTokenForUser(input: {
     loadMembershipsForJwt(input.userId),
     prisma.user.findUnique({
       where: { id: input.userId },
-      select: { workspaceActivatedAt: true },
+      select: {
+        workspaceActivatedAt: true,
+        employeeSystem: true,
+        employeeDomain: true,
+        iceconnectEmployeeRole: true,
+      },
     }),
   ]);
 
@@ -143,5 +158,10 @@ export async function mintSessionAccessTokenForUser(input: {
       subscriptionStatus: m.subscriptionStatus,
     })),
     superBoss: true as const,
+    ...(user.employeeSystem ? { employeeSystem: user.employeeSystem } : {}),
+    ...(user.employeeDomain ? { employeeDomain: user.employeeDomain } : {}),
+    ...(user.iceconnectEmployeeRole
+      ? { iceconnectEmployeeRole: user.iceconnectEmployeeRole }
+      : {}),
   });
 }
