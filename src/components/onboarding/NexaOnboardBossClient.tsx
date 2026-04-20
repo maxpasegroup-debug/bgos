@@ -193,6 +193,13 @@ export function NexaOnboardBossClient({
       const j = ((await readApiJson(res, "users-check")) ?? {}) as { success?: boolean; data?: { exists?: boolean } };
       const exists = j.success === true && j.data?.exists === true;
       setState((s) => ({ ...s, step: 3, mode: exists ? "existing" : "new", user: { ...s.user, email: email.trim() } }));
+    } catch (e) {
+      console.error("[NexaOnboardBoss] email check failed", e);
+      setBanner({
+        text: formatFetchFailure(e, "Could not verify your email"),
+        showRetry: true,
+        onRetry: () => void nextEmail(),
+      });
     } finally {
       setBusy(false);
     }

@@ -16,10 +16,12 @@ async function productionCookieDomain(): Promise<string | undefined> {
   const host = hostHeader.split(":")[0]?.toLowerCase() ?? "";
 
   if (host === "bgos.online" || host.endsWith(".bgos.online")) {
-    return process.env.AUTH_COOKIE_DOMAIN_BGOS?.trim() || ".bgos.online";
+    const configured = process.env.AUTH_COOKIE_DOMAIN_BGOS?.trim();
+    return configured && configured.length > 0 ? configured : undefined;
   }
   if (host === "iceconnect.in" || host.endsWith(".iceconnect.in")) {
-    return process.env.AUTH_COOKIE_DOMAIN_ICE?.trim() || ".iceconnect.in";
+    const configured = process.env.AUTH_COOKIE_DOMAIN_ICE?.trim();
+    return configured && configured.length > 0 ? configured : undefined;
   }
   return undefined;
 }

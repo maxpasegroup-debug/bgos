@@ -100,6 +100,7 @@ export async function POST(request: Request) {
         {
           success: false as const,
           ok: false as const,
+          message: "Too many login attempts. Please wait and try again.",
           error: "Too many login attempts. Please wait and try again.",
           code: "RATE_LIMITED" as const,
         },
@@ -150,6 +151,7 @@ export async function POST(request: Request) {
       {
         success: false as const,
         ok: false as const,
+        message: getAuthErrorMessage(AUTH_ERROR_CODES.INVALID_PASSWORD),
         error: getAuthErrorMessage(AUTH_ERROR_CODES.INVALID_PASSWORD),
         code: AUTH_ERROR_CODES.INVALID_PASSWORD,
       },
@@ -161,6 +163,7 @@ export async function POST(request: Request) {
         {
           success: false as const,
           ok: false as const,
+          message: getAuthErrorMessage(AUTH_ERROR_CODES.ACCOUNT_NOT_FOUND),
           error: getAuthErrorMessage(AUTH_ERROR_CODES.ACCOUNT_NOT_FOUND),
           code: AUTH_ERROR_CODES.ACCOUNT_NOT_FOUND,
         },
@@ -173,6 +176,7 @@ export async function POST(request: Request) {
         {
           success: false as const,
           ok: false as const,
+          message: "Your account is inactive. Contact your administrator.",
           error: "Your account is inactive. Contact your administrator.",
           code: AUTH_ERROR_CODES.ACCOUNT_DISABLED,
         },
@@ -204,6 +208,7 @@ export async function POST(request: Request) {
           {
             success: false as const,
             ok: false as const,
+            message: "No company is assigned to your account. Contact your administrator.",
             error: "No company is assigned to your account. Contact your administrator.",
             code: "CONTACT_ADMIN" as const,
           },
@@ -220,6 +225,7 @@ export async function POST(request: Request) {
           {
             success: false as const,
             ok: false as const,
+            message: "Your company record is missing. Contact your administrator.",
             error: "Your company record is missing. Contact your administrator.",
             code: "CONTACT_ADMIN" as const,
           },
@@ -260,6 +266,7 @@ export async function POST(request: Request) {
         {
           success: false as const,
           ok: false as const,
+          message: "Boss accounts sign in at bgos.online.",
           error: "Boss accounts sign in at bgos.online.",
           code: "WRONG_HOST" as const,
         },
@@ -272,6 +279,7 @@ export async function POST(request: Request) {
         {
           success: false as const,
           ok: false as const,
+          message: "This account is registered for BGOS only. Sign in at bgos.online.",
           error: "This account is registered for BGOS only. Sign in at bgos.online.",
           code: "WRONG_HOST" as const,
         },
@@ -397,6 +405,7 @@ export async function POST(request: Request) {
     const res = NextResponse.json(
       {
         success: true as const,
+        message: "Login successful",
         user: userPayload,
         ok: true as const,
         companies: companiesPayload,
@@ -434,6 +443,7 @@ export async function POST(request: Request) {
       {
         success: false as const,
         ok: false as const,
+        message: jwtHint,
         error: jwtHint,
         code: "SERVER_ERROR" as const,
       },

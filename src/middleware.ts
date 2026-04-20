@@ -57,10 +57,10 @@ function isServerActionRequest(request: NextRequest): boolean {
 }
 
 /**
- * Page routes that skip JWT enforcement here (no redirect to `/login` from middleware).
- * `/` is excluded from this list on purpose — it is handled in `app/page.tsx`.
+ * Public route prefixes that must always bypass auth redirects.
+ * Keep "/" exact-only in checks (never prefix-match "/").
  */
-const PUBLIC_ROUTES = ["/login", "/signup"] as const;
+const PUBLIC_ROUTES = ["/", "/login", "/signup", "/onboarding", "/api/auth"] as const;
 
 /** Boss activation wizard + public client onboarding fill — not `/onboarding/manage` (auth required). */
 function isOnboardingPublicPath(p: string): boolean {
@@ -74,7 +74,13 @@ function isOnboardingPublicPath(p: string): boolean {
 
 function isPublicRoute(pathname: string): boolean {
   const p = normalizePathname(pathname);
+  return p === "/login" || p.startsWith("/login/") || p === "/signup" || p.startsWith("/signup/");
+}
+
+function isPublicRouteBypass(pathname: string): boolean {
+  const p = normalizePathname(pathname);
   for (const route of PUBLIC_ROUTES) {
+    if (route === "/" && p === "/") return true;
     if (p === route || p.startsWith(`${route}/`)) return true;
   }
   return false;
@@ -311,6 +317,10 @@ export async function middleware(request: NextRequest) {
    * Let the target action and route-level auth enforce access instead.
    */
   if (serverActionRequest) {
+    return NextResponse.next();
+  }
+
+  if (isPublicRouteBypass(pathname)) {
     return NextResponse.next();
   }
 
