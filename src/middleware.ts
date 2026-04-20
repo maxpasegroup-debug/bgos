@@ -90,10 +90,23 @@ function isRootPath(pathname: string): boolean {
   return normalizePathname(pathname) === "/";
 }
 
+function isMetadataAssetPath(pathname: string): boolean {
+  const p = normalizePathname(pathname);
+  return (
+    p === "/manifest.webmanifest" ||
+    p === "/site.webmanifest" ||
+    p === "/icon" ||
+    p.startsWith("/icon/") ||
+    p === "/apple-icon" ||
+    p.startsWith("/apple-icon/")
+  );
+}
+
 /**
  * Skip session/JWT gate: marketing root, public pages, session APIs, ICECONNECT login.
  */
 function skipsMiddlewareAuth(pathname: string, method: string): boolean {
+  if (isMetadataAssetPath(pathname)) return true;
   if (isPublicRoute(pathname)) return true;
   if (isOnboardingPublicPath(pathname)) return true;
   if (pathname === "/iceconnect/login" || pathname.startsWith("/iceconnect/login/")) return true;
@@ -115,6 +128,7 @@ function skipsMiddlewareAuth(pathname: string, method: string): boolean {
 
 function isStrictAllowedPagePath(pathname: string): boolean {
   const p = normalizePathname(pathname);
+  if (isMetadataAssetPath(p)) return true;
   if (p === "/") return true;
   if (p === "/login") return true;
   if (p === "/signup") return true;
@@ -317,6 +331,10 @@ export async function middleware(request: NextRequest) {
    * Let the target action and route-level auth enforce access instead.
    */
   if (serverActionRequest) {
+    return NextResponse.next();
+  }
+
+  if (isMetadataAssetPath(pathname)) {
     return NextResponse.next();
   }
 
