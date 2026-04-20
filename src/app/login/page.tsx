@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import { z } from "zod";
 import { resolveAfterLoginNavigation } from "@/lib/cross-domain-login";
 import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
@@ -20,9 +20,11 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const submitInFlightRef = useRef(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitInFlightRef.current || pending) return;
     setError(null);
     const fields = clientLoginSchema.safeParse({ email, password });
     if (!fields.success) {
@@ -32,6 +34,7 @@ function LoginForm() {
       setError(msg);
       return;
     }
+    submitInFlightRef.current = true;
     setPending(true);
     try {
       const from = searchParams.get("from");
@@ -174,6 +177,7 @@ function LoginForm() {
       console.error("API ERROR:", e);
       setError(formatFetchFailure(e, "Sign-in request failed"));
     } finally {
+      submitInFlightRef.current = false;
       setPending(false);
     }
   }

@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch, readApiJson } from "@/lib/api-fetch";
 
 type FlowType = "readymade" | "custom";
@@ -71,6 +71,7 @@ export function NexaOnboardBossClient({
     company: {},
   });
   const [busy, setBusy] = useState(false);
+  const authSubmitInFlightRef = useRef(false);
   const [banner, setBanner] = useState<NexaBanner | null>(null);
   const [attrLeadId, setAttrLeadId] = useState(urlLeadId?.trim() ?? "");
   const [attrSalesOwnerId, setAttrSalesOwnerId] = useState(urlSalesOwnerId?.trim() ?? "");
@@ -281,11 +282,13 @@ export function NexaOnboardBossClient({
   }
 
   async function submitAccount() {
+    if (authSubmitInFlightRef.current || busy) return;
     if (!password.trim()) {
       setBanner({ text: "I need a secure password to protect your account.", showRetry: false });
       return;
     }
     setBanner(null);
+    authSubmitInFlightRef.current = true;
     setBusy(true);
     try {
       const endpoint = state.mode === "existing" ? "/api/auth/login" : "/api/auth/signup";
@@ -367,6 +370,7 @@ export function NexaOnboardBossClient({
         user: { ...s.user, id: initResult.userId },
       }));
     } finally {
+      authSubmitInFlightRef.current = false;
       setBusy(false);
     }
   }
