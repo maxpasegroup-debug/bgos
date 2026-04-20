@@ -470,6 +470,9 @@ export async function middleware(request: NextRequest) {
   stripInternalAuthHeaders(requestHeaders);
 
   const token = readToken(request);
+  if (process.env.NODE_ENV !== "production" && (pathname === "/login" || pathname === "/")) {
+    console.info("[middleware] TOKEN", { pathname, hasToken: Boolean(token) });
+  }
 
   if (!token) {
     if (pathname.startsWith("/api")) {

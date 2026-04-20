@@ -121,6 +121,9 @@ export async function POST(request: Request) {
 
     const { password, email: emailRaw } = parsed.data;
     const email = emailRaw.trim();
+    if (!IS_PRODUCTION) {
+      console.info("[auth/login] LOGIN HIT", { email });
+    }
 
     await ensureDefaultBossUser();
 

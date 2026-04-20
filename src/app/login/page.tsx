@@ -74,6 +74,9 @@ function LoginForm() {
           needsWorkspaceActivation?: boolean;
         };
       };
+      if (process.env.NODE_ENV !== "production") {
+        console.info("[login/page] LOGIN RESPONSE", { status: res.status, ok: res.ok, data });
+      }
       if (!res.ok) {
         if (data.code === "CONTACT_ADMIN" && typeof data.error === "string") {
           setError(data.error);
