@@ -44,6 +44,7 @@ import { isSuperBossEmail } from "@/lib/super-boss";
 import { BGOS_ONBOARDING_ENTRY, isSystemReadyFromJwtPayload } from "@/lib/system-readiness";
 import { iceconnectEmployeePathAllowed, iceconnectRoleHomePath } from "@/lib/iceconnect-employee";
 import type { IceconnectEmployeeRole } from "@prisma/client";
+const DEBUG_ENDPOINT = "http://127.0.0.1:7510/ingest/9e2a10db-dc92-4291-bfe3-11a810004664";
 
 function normalizePathname(pathname: string): string {
   if (pathname.length > 1 && pathname.endsWith("/")) {
@@ -488,6 +489,23 @@ export async function middleware(request: NextRequest) {
   stripInternalAuthHeaders(requestHeaders);
 
   const token = readToken(request);
+  if (pathname === "/login" || pathname === "/" || pathname === "/bgos-boss") {
+    // #region agent log
+    fetch(DEBUG_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "29b790" },
+      body: JSON.stringify({
+        sessionId: "29b790",
+        runId: "initial",
+        hypothesisId: "H5",
+        location: "src/middleware.ts:488",
+        message: "middleware_token_probe",
+        data: { pathname, hasToken: Boolean(token), tenant },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+  }
   if (process.env.NODE_ENV !== "production" && (pathname === "/login" || pathname === "/")) {
     console.info("[middleware] TOKEN", { pathname, hasToken: Boolean(token) });
   }

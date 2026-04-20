@@ -28,6 +28,7 @@ import { iceconnectRoleHomePath } from "@/lib/iceconnect-employee";
 import { SOLAR_BOSS_HOME } from "@/lib/solar-boss-config";
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const DEBUG_ENDPOINT = "http://127.0.0.1:7510/ingest/9e2a10db-dc92-4291-bfe3-11a810004664";
 
 const bodySchema = z.object({
   email: z.string().trim().min(1, "Email is required").email("Enter a valid email"),
@@ -121,6 +122,21 @@ export async function POST(request: Request) {
 
     const { password, email: emailRaw } = parsed.data;
     const email = emailRaw.trim();
+    // #region agent log
+    fetch(DEBUG_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "29b790" },
+      body: JSON.stringify({
+        sessionId: "29b790",
+        runId: "initial",
+        hypothesisId: "H1",
+        location: "src/app/api/auth/login/route.ts:125",
+        message: "login_api_entry",
+        data: { emailDomain: email.includes("@") ? email.split("@")[1] : "invalid" },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     if (!IS_PRODUCTION) {
       console.info("[auth/login] LOGIN HIT", { email });
     }
@@ -162,6 +178,21 @@ export async function POST(request: Request) {
     );
 
     if (!user) {
+      // #region agent log
+      fetch(DEBUG_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "29b790" },
+        body: JSON.stringify({
+          sessionId: "29b790",
+          runId: "initial",
+          hypothesisId: "H1",
+          location: "src/app/api/auth/login/route.ts:169",
+          message: "login_api_user_not_found",
+          data: { reason: "ACCOUNT_NOT_FOUND" },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       return NextResponse.json(
         {
           success: false as const,
@@ -195,6 +226,21 @@ export async function POST(request: Request) {
     }
     const valid = await verifyPassword(password, user.password);
     if (!valid) {
+      // #region agent log
+      fetch(DEBUG_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "29b790" },
+        body: JSON.stringify({
+          sessionId: "29b790",
+          runId: "initial",
+          hypothesisId: "H1",
+          location: "src/app/api/auth/login/route.ts:202",
+          message: "login_api_password_invalid",
+          data: { userFound: true },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       return invalidPasswordResponse;
     }
 
@@ -422,6 +468,21 @@ export async function POST(request: Request) {
       { status: 200 },
     );
     await setSessionCookie(res, token);
+    // #region agent log
+    fetch(DEBUG_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "29b790" },
+      body: JSON.stringify({
+        sessionId: "29b790",
+        runId: "initial",
+        hypothesisId: "H2",
+        location: "src/app/api/auth/login/route.ts:453",
+        message: "login_api_cookie_set_and_success",
+        data: { hasCompany: Boolean(resolvedCompanyId), nextPath: forcedNextPath },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     if (resolvedCompanyId) {
       await setActiveCompanyCookie(res, resolvedCompanyId);
     }

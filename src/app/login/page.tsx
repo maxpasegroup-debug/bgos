@@ -12,6 +12,7 @@ const clientLoginSchema = z.object({
   email: z.string().trim().min(1, "Email is required").email("Enter a valid email"),
   password: z.string().min(1, "Password is required"),
 });
+const DEBUG_ENDPOINT = "http://127.0.0.1:7510/ingest/9e2a10db-dc92-4291-bfe3-11a810004664";
 
 function LoginForm() {
   const searchParams = useSearchParams();
@@ -37,6 +38,21 @@ function LoginForm() {
     setPending(true);
     try {
       const from = searchParams.get("from");
+      // #region agent log
+      fetch(DEBUG_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "29b790" },
+        body: JSON.stringify({
+          sessionId: "29b790",
+          runId: "initial",
+          hypothesisId: "H3",
+          location: "src/app/login/page.tsx:45",
+          message: "login_client_submit",
+          data: { hasFrom: Boolean(from), emailDomain: fields.data.email.split("@")[1] ?? "invalid" },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       const res = await apiFetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -77,6 +93,21 @@ function LoginForm() {
       if (process.env.NODE_ENV !== "production") {
         console.info("[login/page] LOGIN RESPONSE", { status: res.status, ok: res.ok, data });
       }
+      // #region agent log
+      fetch(DEBUG_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "29b790" },
+        body: JSON.stringify({
+          sessionId: "29b790",
+          runId: "initial",
+          hypothesisId: "H3",
+          location: "src/app/login/page.tsx:83",
+          message: "login_client_response",
+          data: { status: res.status, ok: res.ok, code: data.code ?? null, hasNextPath: typeof data.nextPath === "string" },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       if (!res.ok) {
         if (data.code === "CONTACT_ADMIN" && typeof data.error === "string") {
           setError(data.error);
@@ -96,16 +127,26 @@ function LoginForm() {
       // Fail-loud guard: login must establish a readable session immediately.
       const meCheck = await apiFetch("/api/auth/me", { credentials: "include" });
       const meData = (await meCheck.json()) as { authenticated?: boolean };
+      // #region agent log
+      fetch(DEBUG_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "29b790" },
+        body: JSON.stringify({
+          sessionId: "29b790",
+          runId: "initial",
+          hypothesisId: "H4",
+          location: "src/app/login/page.tsx:108",
+          message: "login_client_me_check",
+          data: { meStatus: meCheck.status, authenticated: meData.authenticated === true },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       if (!meCheck.ok || meData.authenticated !== true) {
         setError("Session cookie was not established. Please disable strict tracking protection and try again.");
         return;
       }
       if (data.isSuperBoss === true) {
-        try {
-          await apiFetch("/api/auth/refresh-session", { method: "POST" }).catch(() => undefined);
-        } catch (e) {
-          console.error("API ERROR:", e);
-        }
         window.location.assign(SUPER_BOSS_HOME_PATH);
         return;
       }
@@ -148,7 +189,6 @@ function LoginForm() {
           window.location.assign("/iceconnect/select-company");
           return;
         }
-        await apiFetch("/api/auth/refresh-session", { method: "POST" }).catch(() => undefined);
       } catch (e) {
         console.error("API ERROR:", e);
       }

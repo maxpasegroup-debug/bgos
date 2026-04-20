@@ -155,13 +155,6 @@ function IceconnectLoginForm() {
           router.refresh();
           return;
         }
-        const refreshRes = await apiFetch("/api/auth/refresh-session", {
-          method: "POST",
-          credentials: "include",
-        });
-        if (!refreshRes.ok) {
-          console.warn("[iceconnect/login] refresh-session failed", refreshRes.status);
-        }
         const curJson = (await curRes.json()) as {
           ok?: boolean;
           company?: {

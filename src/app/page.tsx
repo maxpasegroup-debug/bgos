@@ -11,10 +11,26 @@ import { BGOS_ONBOARDING_ENTRY, isSystemReadyFromJwtPayload } from "@/lib/system
 export default async function Home() {
   const host = (await headers()).get("host") ?? "";
   const tenant = hostTenantFromHeader(host);
+  const jar = await cookies();
+  const token = jar.get(AUTH_COOKIE_NAME)?.value?.trim();
+
+  if (tenant === "ice") {
+    if (token) {
+      const verified = verifyAccessTokenResult(token);
+      if (verified.ok) {
+        const p = verified.payload as Record<string, unknown>;
+        const em = typeof p.email === "string" ? p.email : "";
+        const role = typeof p.role === "string" ? p.role : "";
+        if (isSuperBossEmail(em)) {
+          redirect(SUPER_BOSS_HOME_PATH);
+        }
+        redirect(getRoleHome(role));
+      }
+    }
+    redirect("/iceconnect/login");
+  }
 
   if (tenant === "bgos") {
-    const jar = await cookies();
-    const token = jar.get(AUTH_COOKIE_NAME)?.value?.trim();
     if (token) {
       const verified = verifyAccessTokenResult(token);
       if (verified.ok) {

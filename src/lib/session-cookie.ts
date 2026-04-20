@@ -44,25 +44,29 @@ async function sessionCookieOptions(maxAge: number) {
  * to the Route Handler response (avoids cases where `res.cookies` alone is dropped).
  */
 export async function setSessionCookie(_res: NextResponse, token: string): Promise<void> {
+  const options = await sessionCookieOptions(SESSION_MAX_AGE_SEC);
+  _res.cookies.set(AUTH_COOKIE_NAME, token, options);
   const jar = await cookies();
-  jar.set(AUTH_COOKIE_NAME, token, await sessionCookieOptions(SESSION_MAX_AGE_SEC));
+  jar.set(AUTH_COOKIE_NAME, token, options);
 }
 
 export async function clearSessionCookie(_res: NextResponse): Promise<void> {
+  const options = await sessionCookieOptions(0);
+  _res.cookies.set(AUTH_COOKIE_NAME, "", options);
   const jar = await cookies();
-  jar.set(AUTH_COOKIE_NAME, "", await sessionCookieOptions(0));
+  jar.set(AUTH_COOKIE_NAME, "", options);
 }
 
 export async function setActiveCompanyCookie(_res: NextResponse, companyId: string): Promise<void> {
+  const options = await sessionCookieOptions(SESSION_MAX_AGE_SEC);
+  _res.cookies.set(ACTIVE_COMPANY_COOKIE_NAME, companyId, options);
   const jar = await cookies();
-  jar.set(
-    ACTIVE_COMPANY_COOKIE_NAME,
-    companyId,
-    await sessionCookieOptions(SESSION_MAX_AGE_SEC),
-  );
+  jar.set(ACTIVE_COMPANY_COOKIE_NAME, companyId, options);
 }
 
 export async function clearActiveCompanyCookie(_res: NextResponse): Promise<void> {
+  const options = await sessionCookieOptions(0);
+  _res.cookies.set(ACTIVE_COMPANY_COOKIE_NAME, "", options);
   const jar = await cookies();
-  jar.set(ACTIVE_COMPANY_COOKIE_NAME, "", await sessionCookieOptions(0));
+  jar.set(ACTIVE_COMPANY_COOKIE_NAME, "", options);
 }
