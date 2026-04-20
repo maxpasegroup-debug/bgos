@@ -52,6 +52,10 @@ function normalizePathname(pathname: string): string {
   return pathname;
 }
 
+function isServerActionRequest(request: NextRequest): boolean {
+  return request.method === "POST" && request.headers.has("next-action");
+}
+
 /**
  * Page routes that skip JWT enforcement here (no redirect to `/login` from middleware).
  * `/` is excluded from this list on purpose — it is handled in `app/page.tsx`.
@@ -332,9 +336,10 @@ export async function middleware(request: NextRequest) {
   const method = request.method;
   const host = request.headers.get("host") || "";
   const tenant = hostTenantFromHeader(host);
+  const serverActionRequest = isServerActionRequest(request);
 
   // ── REBUILD MODE GUARD ────────────────────────────────────────────────────
-  if (REBUILD_MODE && !isRebuildModeAllowed(pathname)) {
+  if (REBUILD_MODE && !serverActionRequest && !isRebuildModeAllowed(pathname)) {
     // Authenticated boss always lands on their dashboard, never /coming-soon.
     const rebuildToken = readToken(request);
     if (rebuildToken) {
