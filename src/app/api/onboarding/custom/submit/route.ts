@@ -9,7 +9,7 @@ import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { jsonError, parseJsonBodyZod, prismaKnownErrorResponse } from "@/lib/api-response";
-import { requireAuthWithCompany } from "@/lib/auth";
+import { requireActiveCompanyMembership } from "@/lib/auth";
 import { handleApiError } from "@/lib/route-error";
 import { prisma } from "@/lib/prisma";
 import { mintSessionAccessTokenForUser } from "@/lib/mint-session-token";
@@ -35,7 +35,7 @@ function tierFromCompanyPlan(plan: CompanyPlan): OnboardingWorkflowPlanTier {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await requireAuthWithCompany(request);
+  const session = await requireActiveCompanyMembership(request);
   if (session instanceof NextResponse) return session;
 
   const parsed = await parseJsonBodyZod(request, bodySchema);

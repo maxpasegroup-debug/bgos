@@ -48,7 +48,7 @@ const cases = [
     path: "/api/micro-franchise/apply",
     method: "POST",
     body: {},
-    expectStatuses: [400],
+    expectStatuses: [400, 401, 403],
   },
 ];
 

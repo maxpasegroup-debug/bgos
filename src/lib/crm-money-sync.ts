@@ -2,6 +2,7 @@ import "server-only";
 
 import { DealStatus, LeadStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { touchCompanyUsageAfterLimitsOrPlanChange } from "@/lib/usage-metrics-engine";
 
 /**
  * When a quotation is marked APPROVED, move the linked lead to Proposal Won (unless closed).
@@ -55,4 +56,7 @@ export async function syncLeadAndDealOnInvoicePaid(
       },
     });
   }
+  void touchCompanyUsageAfterLimitsOrPlanChange(companyId).catch((e) => {
+    console.error("[usage-metrics] failed after invoice/deal sync", e);
+  });
 }

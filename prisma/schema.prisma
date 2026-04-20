@@ -442,6 +442,8 @@ model Company {
   onboardingSubmissions        OnboardingSubmission[]
   onboardingSessions           OnboardingSession[]
   onboardingRecords            Onboarding[]
+  onboardingPipeline           OnboardingPipeline[]
+  ownershipClaims             OwnershipClaim[]
   launchChannelPartner         LaunchChannelPartner?             @relation("LaunchPartnerCompany", fields: [launchChannelPartnerId], references: [id], onDelete: SetNull)
   microFranchisePartner        MicroFranchisePartner?            @relation(fields: [microFranchisePartnerId], references: [id], onDelete: SetNull)
   microFranchiseCommissionTxs  CommissionTransaction[]
@@ -1147,6 +1149,8 @@ model User {
   nexaTasks                         NexaTask[]
   assignedLeads                     Lead[]                        @relation("LeadAssignee")
   leadsCreated                      Lead[]                        @relation("LeadCreator")
+  leadsOwned                        Lead[]                        @relation("LeadOwner")
+  leadsSourced                      Lead[]                        @relation("LeadSourceUser")
   tasks                             Task[]
   activityLogs                      ActivityLog[]
   assignedInstallations             Installation[]                @relation("InstallationAssignee")
@@ -1206,6 +1210,12 @@ model User {
 
   onboardingRequestsCreated OnboardingRequest[] @relation("OnboardingRequestCreator")
   onboardingRequestBossFor  OnboardingRequest[] @relation("OnboardingRequestBossUser")
+  onboardingPipelineSource  OnboardingPipeline[] @relation("OnboardingPipelineSource")
+  onboardingPipelineAsRsm   OnboardingPipeline[] @relation("OnboardingPipelineAssignedRsm")
+  onboardingPipelineAsBdm   OnboardingPipeline[] @relation("OnboardingPipelineAssignedBdm")
+  onboardingPipelineAsBde   OnboardingPipeline[] @relation("OnboardingPipelineAssignedBde")
+  ownershipClaimsRequested  OwnershipClaim[]      @relation("OwnershipClaimRequester")
+  ownershipClaimsAsOwner    OwnershipClaim[]      @relation("OwnershipClaimCurrentOwner")
   usageFlagsHandled         UsageFlag[]           @relation("UsageFlagHandledBy")
   usageCapacityNotifications UsageCapacityNotification[]
   bdeMissions                BdeMission[]
@@ -1475,6 +1485,40 @@ enum OnboardingRequestStatus {
   COMPLETED
 }
 
+enum OnboardingPipelineSourceType {
+  INBOUND
+  BDE
+  BDM
+  RSM
+}
+
+enum OnboardingPipelineStatus {
+  NEW
+  ASSIGNED
+  IN_PROGRESS
+  SENT_TO_TECH
+  COMPLETED
+}
+
+enum LeadOwnershipRole {
+  BDE
+  BDM
+  RSM
+}
+
+enum LeadSourceType {
+  INBOUND
+  BDE
+  BDM
+  RSM
+}
+
+enum OwnershipClaimStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model OnboardingRequest {
   id              String                         @id @default(cuid())
   createdByUserId String
@@ -1500,6 +1544,34 @@ model OnboardingRequest {
   @@index([createdByUserId])
   @@index([status])
   @@map("onboarding_requests")
+}
+
+model OnboardingPipeline {
+  id             String                       @id @default(cuid())
+  companyId      String?                      @map("company_id")
+  companyName    String                       @map("company_name")
+  sourceType     OnboardingPipelineSourceType @map("source_type")
+  sourceUserId   String?                      @map("source_user_id")
+  assignedRsmId  String?                      @map("assigned_rsm_id")
+  assignedBdmId  String?                      @map("assigned_bdm_id")
+  assignedBdeId  String?                      @map("assigned_bde_id")
+  status         OnboardingPipelineStatus     @default(NEW)
+  notes          String?                      @db.Text
+  createdAt      DateTime                     @default(now()) @map("created_at")
+  updatedAt      DateTime                     @updatedAt @map("updated_at")
+
+  company     Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  sourceUser  User?    @relation("OnboardingPipelineSource", fields: [sourceUserId], references: [id], onDelete: SetNull)
+  assignedRsm User?    @relation("OnboardingPipelineAssignedRsm", fields: [assignedRsmId], references: [id], onDelete: SetNull)
+  assignedBdm User?    @relation("OnboardingPipelineAssignedBdm", fields: [assignedBdmId], references: [id], onDelete: SetNull)
+  assignedBde User?    @relation("OnboardingPipelineAssignedBde", fields: [assignedBdeId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([status, createdAt])
+  @@index([assignedRsmId, status, createdAt])
+  @@index([assignedBdmId, status, createdAt])
+  @@index([assignedBdeId, status, createdAt])
+  @@map("onboarding_pipeline")
 }
 
 /**
@@ -1726,6 +1798,10 @@ model Lead {
    * User who created the lead in BGOS (audit / “boss vs team” views).
    */
   createdByUserId String?
+  ownerUserId     String?            @map("owner_user_id")
+  ownerRole       LeadOwnershipRole? @map("owner_role")
+  sourceType      LeadSourceType?    @map("source_type")
+  sourceUserId    String?            @map("source_user_id")
   partnerId       String?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
@@ -1733,6 +1809,8 @@ model Lead {
   company        Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   assignee       User?               @relation("LeadAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
   creator        User?               @relation("LeadCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  owner          User?               @relation("LeadOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  sourceUser     User?               @relation("LeadSourceUser", fields: [sourceUserId], references: [id], onDelete: SetNull)
   partner        ChannelPartner?     @relation(fields: [partnerId], references: [id], onDelete: SetNull)
   deals          Deal[]
   tasks          Task[]
@@ -1797,6 +1875,7 @@ model Lead {
   onboardingWorkflowSubmission OnboardingSubmission?
   onboardingSessions           OnboardingSession[]
   onboardingRecords            Onboarding[]
+  ownershipClaims              OwnershipClaim[]
   internalLeadActivities       InternalLeadActivity[]
   nexaSupportTickets           InternalNexaSupportTicket[]
 
@@ -1804,10 +1883,32 @@ model Lead {
   @@index([status])
   @@index([assignedTo])
   @@index([createdByUserId])
+  @@index([ownerUserId, ownerRole])
   @@index([partnerId])
   @@index([phone])
   @@index([companyId, email])
+  @@index([companyId, phone])
   @@index([companyId, assignedTo, iceconnectMetroStage])
+}
+
+model OwnershipClaim {
+  id             String               @id @default(cuid())
+  companyId      String               @map("company_id")
+  leadId         String?              @map("lead_id")
+  requestedBy    String               @map("requested_by")
+  currentOwnerId String?              @map("current_owner_id")
+  status         OwnershipClaimStatus @default(PENDING)
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+
+  company      Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead         Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  requester    User    @relation("OwnershipClaimRequester", fields: [requestedBy], references: [id], onDelete: Cascade)
+  currentOwner User?   @relation("OwnershipClaimCurrentOwner", fields: [currentOwnerId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, status, createdAt])
+  @@index([leadId, status])
+  @@map("ownership_claims")
 }
 
 model Onboarding {

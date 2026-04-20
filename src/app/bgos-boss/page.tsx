@@ -348,7 +348,7 @@ export default async function BgosBossPage() {
           </div>
         </section>
 
-        <section>
+        <section id="command-center">
           <SectionLabel>Command Center</SectionLabel>
           <div style={glassCard}>
             <CommandCenter />

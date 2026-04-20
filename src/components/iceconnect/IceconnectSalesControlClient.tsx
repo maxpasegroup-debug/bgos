@@ -18,10 +18,12 @@ type FlagRow = {
 export function IceconnectSalesControlClient() {
   const [flags, setFlags] = useState<FlagRow[]>([]);
   const [err, setErr] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setErr(null);
+    setInfo(null);
     try {
       const res = await apiFetch("/api/iceconnect/usage/control", { credentials: "include" });
       const j = (await res.json()) as { ok?: boolean; flags?: FlagRow[]; error?: string };
@@ -86,6 +88,7 @@ export function IceconnectSalesControlClient() {
         HIGH USAGE ALERTS
       </p>
       {err ? <p style={{ color: "#f87171", fontSize: 14, marginBottom: 12 }}>{err}</p> : null}
+      {info ? <p style={{ color: "#34D399", fontSize: 14, marginBottom: 12 }}>{info}</p> : null}
 
       {flags.length === 0 ? (
         <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 14 }}>No active capacity alerts.</p>
@@ -114,8 +117,10 @@ export function IceconnectSalesControlClient() {
                 type="button"
                 disabled={busy === f.id}
                 onClick={() => {
-                  void navigator.clipboard?.writeText(f.company_name);
-                  alert("Company name copied — dial from your phone or CRM.");
+                  void navigator.clipboard
+                    ?.writeText(f.company_name)
+                    .then(() => setInfo(`Copied "${f.company_name}" to clipboard.`))
+                    .catch(() => setInfo(`Use this company name for your CRM call: ${f.company_name}`));
                 }}
                 style={btnOutline}
               >

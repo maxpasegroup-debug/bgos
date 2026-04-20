@@ -54,8 +54,8 @@ function mergeCookieJar(prev, res) {
   return [...cookies.entries()].map(([k, v]) => `${k}=${v}`).join("; ");
 }
 
-async function req(path, { method = "GET", jar = "", body } = {}) {
-  const headers = { ...(body ? { "Content-Type": "application/json" } : {}) };
+async function req(path, { method = "GET", jar = "", body, headers: extraHeaders = {} } = {}) {
+  const headers = { ...(body ? { "Content-Type": "application/json" } : {}), ...extraHeaders };
   if (jar) headers.cookie = jar;
   const res = await e2eFetch(`${BASE}${path}`, {
     method,
@@ -109,7 +109,7 @@ async function main() {
     const { res, json } = await req("/api/company/create", {
       method: "POST",
       jar: bossJar,
-      body: { name: `E2E Company A ${t}`, industry: "SOLAR" },
+      body: { name: `E2E Company A ${t}`, industry: "SOLAR", source: "NEXA_ENGINE" },
     });
     if (!res.ok || !json.ok) fail("company/create (A)", `status ${res.status}`, json);
     companyAId = json.companyId;
@@ -179,16 +179,20 @@ async function main() {
     }
   }
 
-  // 8) Second business
+  // 8) Second business (Nexa launch endpoint)
   {
-    const { res, json } = await req("/api/company/create", {
+    const { res, json } = await req("/api/onboarding/launch", {
       method: "POST",
       jar: bossJar,
-      body: { name: `E2E Company B ${t}`, industry: "SOLAR" },
+      body: {
+        source: "NEXA_ENGINE",
+        companyName: `E2E Company B ${t}`,
+        industry: "SOLAR",
+      },
     });
-    if (!res.ok || !json.ok) fail("company/create (B)", `status ${res.status}`, json);
-    companyBId = json.companyId;
-    if (!companyBId || companyBId === companyAId) fail("company/create (B)", "bad companyId", json);
+    if (!res.ok || !json.ok) fail("onboarding/launch (B)", `status ${res.status}`, json);
+    companyBId = json.companyId ?? json.company_id;
+    if (!companyBId || companyBId === companyAId) fail("onboarding/launch (B)", "bad companyId", json);
     bossJar = mergeCookieJar(bossJar, res);
   }
 

@@ -60,7 +60,7 @@ function isServerActionRequest(request: NextRequest): boolean {
  * Page routes that skip JWT enforcement here (no redirect to `/login` from middleware).
  * `/` is excluded from this list on purpose — it is handled in `app/page.tsx`.
  */
-const PUBLIC_ROUTES = ["/login", "/signup", "/iceconnect/customer-login"] as const;
+const PUBLIC_ROUTES = ["/login"] as const;
 
 /** Boss activation wizard + public client onboarding fill — not `/onboarding/manage` (auth required). */
 function isOnboardingPublicPath(p: string): boolean {
@@ -74,11 +74,6 @@ function isOnboardingPublicPath(p: string): boolean {
 
 function isPublicRoute(pathname: string): boolean {
   const p = normalizePathname(pathname);
-  if (p === "/coming-soon") return true;
-  if (isOnboardingPublicPath(p)) return true;
-  if (p === "/micro-franchise/apply" || p.startsWith("/micro-franchise/apply")) return true;
-  if (p === "/contact" || p === "/privacy" || p === "/terms") return true;
-  if (p === "/legal" || p.startsWith("/legal/")) return true;
   for (const route of PUBLIC_ROUTES) {
     if (p === route || p.startsWith(`${route}/`)) return true;
   }
@@ -93,17 +88,9 @@ function isRootPath(pathname: string): boolean {
  * Skip session/JWT gate: marketing root, public pages, session APIs, ICECONNECT login.
  */
 function skipsMiddlewareAuth(pathname: string, method: string): boolean {
-  if (isRootPath(pathname)) return true;
-  if (normalizePathname(pathname) === "/lead") return true;
-  if (pathname === "/api/internal-sales/public/lead" && method === "POST") return true;
-  if (pathname === "/api/micro-franchise/apply" && method === "POST") return true;
-  if (pathname === "/api/internal-sales/cron/automation" && method === "POST") return true;
-  if (pathname === "/api/internal/cron/sales-hierarchy" && method === "POST") return true;
-  if (pathname.startsWith("/api/onboarding/workflow/public/")) return true;
   if (isPublicRoute(pathname)) return true;
-  if (pathname === "/iceconnect/login") return true;
-  if (pathname === "/iceconnect/customer-login" || pathname === "/iceconnect/customer") return true;
-  if (pathname === "/internal/login" || pathname.startsWith("/internal/login/")) return true;
+  if (isOnboardingPublicPath(pathname)) return true;
+  if (pathname === "/iceconnect/login" || pathname.startsWith("/iceconnect/login/")) return true;
   if (
     pathname === "/api/auth/login" ||
     pathname === "/api/auth/signup" ||
@@ -112,13 +99,30 @@ function skipsMiddlewareAuth(pathname: string, method: string): boolean {
   ) {
     return true;
   }
+  if (pathname === "/api/auth/refresh-session" && method === "POST") return true;
   if (pathname === "/api/users/check" && method === "GET") return true;
   if (pathname === "/api/categories" && method === "GET") return true;
-  if (pathname.startsWith("/api/customer/")) return true;
-  if (pathname === "/api/auth/refresh-session" && method === "POST") return true;
   if (pathname === "/api/payment/webhook" && method === "POST") return true;
   if (pathname === "/api/payment/razorpay/webhook" && method === "POST") return true;
   return false;
+}
+
+function isStrictAllowedPagePath(pathname: string): boolean {
+  const p = normalizePathname(pathname);
+  if (p === "/login") return true;
+  if (p === "/onboarding" || p.startsWith("/onboarding/")) return true;
+  if (p === "/bgos-boss") return true;
+  if (p === "/solar-boss" || p.startsWith("/solar-boss/")) return true;
+  if (p === "/iceconnect" || p.startsWith("/iceconnect/")) return true;
+  return false;
+}
+
+function strictSurfacePath(pathname: string): string {
+  const p = normalizePathname(pathname);
+  if (p === "/bgos-boss") return "/bgos-boss";
+  if (p === "/solar-boss" || p.startsWith("/solar-boss/")) return pathname;
+  if (p === "/iceconnect" || p.startsWith("/iceconnect/")) return pathname;
+  return "/iceconnect";
 }
 
 /** Domain-based login: bgos.online → `/login`, iceconnect.in → `/iceconnect/login`, dev → `/login`. */
@@ -140,7 +144,6 @@ function loginRedirectUrl(request: NextRequest, pathname: string, tenant: HostTe
 function bgosAllowsPagePath(pathname: string): boolean {
   /** `/` is handled in `app/page.tsx` (logged in → `/bgos`, else → `/login`). */
   if (pathname === "/") return true;
-  if (normalizePathname(pathname) === "/coming-soon") return true;
   if (normalizePathname(pathname) === "/bgos-boss") return true;
   if (normalizePathname(pathname) === "/solar-boss" || pathname.startsWith("/solar-boss/")) return true;
   if (normalizePathname(pathname) === "/lead") return true;
@@ -155,7 +158,6 @@ function bgosAllowsPagePath(pathname: string): boolean {
 
 function iceAllowsPagePath(pathname: string): boolean {
   const p = normalizePathname(pathname);
-  if (p === "/coming-soon") return true;
   if (p === "/lead") return true;
   /** Onboarding runs on the same app; ICECONNECT host must not force login for these paths. */
   if (p === "/onboarding" || p.startsWith("/onboarding/")) return true;
@@ -293,44 +295,6 @@ function readToken(request: NextRequest): string | null {
   return null;
 }
 
-// ---------------------------------------------------------------------------
-// REBUILD MODE — set to false when new dashboards are ready to ship.
-// Allows only auth pages, /coming-soon, and all API routes through.
-// Everything else (any dashboard, any workspace) is redirected to /coming-soon.
-// ---------------------------------------------------------------------------
-const REBUILD_MODE = true;
-
-function isRebuildModeAllowed(pathname: string): boolean {
-  if (pathname.startsWith("/api/")) return true;          // all APIs stay live
-  if (pathname.startsWith("/_next/")) return true;        // Next.js assets
-  const p = normalizePathname(pathname);
-  return (
-    p === "/" ||
-    p === "/login" ||
-    p === "/signup" ||
-    p === "/coming-soon" ||
-    p === "/bgos-boss" ||                                 // boss dashboard always reachable
-    p === "/solar-boss" ||
-    p.startsWith("/solar-boss/") ||
-    p === "/iceconnect/rsm" ||
-    p === "/iceconnect/bdm" ||
-    p === "/iceconnect/bde" ||
-    p === "/iceconnect/onboard" ||
-    p === "/iceconnect/sales/onboarding" ||
-    p.startsWith("/iceconnect/sales/onboarding/") ||
-    p === "/iceconnect/tech" ||
-    p.startsWith("/iceconnect/tech/") ||
-    p === "/iceconnect/login" ||
-    p === "/iceconnect/customer-login" ||
-    p === "/internal/login" ||
-    p === "/legal" ||
-    p.startsWith("/legal/") ||
-    p === "/contact" ||
-    p === "/privacy" ||
-    p === "/terms"
-  );
-}
-
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const method = request.method;
@@ -338,29 +302,12 @@ export async function middleware(request: NextRequest) {
   const tenant = hostTenantFromHeader(host);
   const serverActionRequest = isServerActionRequest(request);
 
-  // ── REBUILD MODE GUARD ────────────────────────────────────────────────────
-  if (REBUILD_MODE && !serverActionRequest && !isRebuildModeAllowed(pathname)) {
-    // Authenticated boss always lands on their dashboard, never /coming-soon.
-    const rebuildToken = readToken(request);
-    if (rebuildToken) {
-      const rebuildVerified = await verifyJwtEdge(rebuildToken);
-      if (rebuildVerified.ok) {
-        const rebuildEmail = typeof rebuildVerified.payload.email === "string"
-          ? rebuildVerified.payload.email : "";
-        if (isSuperBossEmail(rebuildEmail)) {
-          return NextResponse.redirect(new URL("/bgos-boss", request.url));
-        }
-      }
-    }
-    if (process.env.NODE_ENV !== "production") {
-      console.warn(`[rebuild-mode] Blocked: ${pathname} → /coming-soon`);
-    }
-    return NextResponse.redirect(new URL("/coming-soon", request.url));
+  if (!pathname.startsWith("/api") && !isStrictAllowedPagePath(pathname)) {
+    return NextResponse.redirect(new URL("/login", request.url));
   }
-  // ─────────────────────────────────────────────────────────────────────────
 
   // ── BOSS-ONLY ROUTE GUARD (/bgos-boss) ───────────────────────────────────
-  // Defense-in-depth: even if REBUILD_MODE is off, only boss@bgos.online enters.
+  // Defense-in-depth: only boss@bgos.online enters.
   if (normalizePathname(pathname) === "/bgos-boss" && !pathname.startsWith("/api")) {
     const bossToken = readToken(request);
     if (!bossToken) {
@@ -473,10 +420,6 @@ export async function middleware(request: NextRequest) {
           if (isSuperBossEmail(em)) {
             return NextResponse.redirect(new URL("/bgos-boss", request.url));
           }
-          // In rebuild mode, everyone else lands on /coming-soon after login.
-          if (REBUILD_MODE) {
-            return NextResponse.redirect(new URL("/coming-soon", request.url));
-          }
           const sb = p.superBoss === true && isSuperBossEmail(em);
           const activeCo = request.cookies.get(ACTIVE_COMPANY_COOKIE_NAME)?.value;
           const ready = isSystemReadyFromJwtPayload(p, activeCo ?? undefined);
@@ -491,8 +434,10 @@ export async function middleware(request: NextRequest) {
               ? "/solar-boss"
               : ready
                 ? getRoleHome(roleStr)
-                : BGOS_ONBOARDING_ENTRY;
-          return NextResponse.redirect(absoluteRoleHomeUrl(tenant, homePath, request.url));
+                : "/iceconnect";
+          return NextResponse.redirect(
+            absoluteRoleHomeUrl(tenant, strictSurfacePath(homePath), request.url),
+          );
         }
       }
     }
@@ -506,9 +451,6 @@ export async function middleware(request: NextRequest) {
 
   if (!token) {
     if (pathname.startsWith("/api")) {
-      if (process.env.DEBUG_AUTH === "1" || process.env.NODE_ENV === "development") {
-        console.warn("[middleware] NO_TOKEN", pathname, "cookie:", AUTH_COOKIE_NAME);
-      }
       return authErrorResponse(AUTH_ERROR_CODES.NO_TOKEN);
     }
     return NextResponse.redirect(loginRedirectUrl(request, pathname, tenant));
@@ -593,7 +535,7 @@ export async function middleware(request: NextRequest) {
     const jobRole = String(verified.payload.role ?? "");
     const domain = verified.payload.employeeDomain;
     if (jobRole !== "ADMIN" || domain !== "SOLAR") {
-      return NextResponse.redirect(new URL("/bgos/dashboard", request.url));
+      return NextResponse.redirect(new URL("/login", request.url));
     }
   }
 
@@ -683,6 +625,16 @@ export async function middleware(request: NextRequest) {
       );
     }
     if (!isActivatePost) {
+      const isCustomOnboardingStatusGet =
+        normalizedPath === "/api/onboarding/custom/status" && request.method === "GET";
+      const isCustomOnboardingStartPost =
+        normalizedPath === "/api/onboarding/custom/start" && request.method === "POST";
+      const isCustomOnboardingSubmitPost =
+        normalizedPath === "/api/onboarding/custom/submit" && request.method === "POST";
+      const isRazorpayOrderPost =
+        normalizedPath === "/api/payment/razorpay/order" && request.method === "POST";
+      const isRazorpayVerifyPost =
+        normalizedPath === "/api/payment/razorpay/verify" && request.method === "POST";
       const allowedActivation =
         normalizedPath === "/onboarding" ||
         normalizedPath.startsWith("/onboarding/") ||
@@ -700,6 +652,11 @@ export async function middleware(request: NextRequest) {
         isUsersSearchGet ||
         isRoleAssignPost ||
         isSystemInitPost ||
+        isCustomOnboardingStatusGet ||
+        isCustomOnboardingStartPost ||
+        isCustomOnboardingSubmitPost ||
+        isRazorpayOrderPost ||
+        isRazorpayVerifyPost ||
         isOnboardingPipelineGet ||
         isCompanyBuildingStatusGet ||
         isBossBuildingDashboardGet ||
@@ -769,7 +726,9 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname === "/iceconnect" || pathname === "/iceconnect/") {
-    const homePath = edgeSuperBoss ? SUPER_BOSS_HOME_PATH : getRoleHome(role);
+    const homePath = strictSurfacePath(
+      edgeSuperBoss ? SUPER_BOSS_HOME_PATH : getRoleHome(role),
+    );
     if (normalizePathname(homePath) !== normalizePathname(pathname)) {
       return NextResponse.redirect(absoluteRoleHomeUrl(tenant, homePath, request.url));
     }

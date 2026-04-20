@@ -22,7 +22,7 @@ export default async function SolarBossLayout({ children }: { children: React.Re
     redirect("/login?from=/solar-boss");
   }
   if (user.role !== UserRole.ADMIN || user.employeeDomain !== EmployeeDomain.SOLAR) {
-    redirect("/bgos/dashboard");
+    redirect("/login?reason=unauthorized");
   }
   return <SolarBossShell>{children}</SolarBossShell>;
 }

@@ -20,6 +20,10 @@ export type LeadWithAssignee = {
   companyId: string;
   assignedTo: string | null;
   createdByUserId?: string | null;
+  ownerUserId?: string | null;
+  ownerRole?: string | null;
+  sourceType?: string | null;
+  sourceUserId?: string | null;
   createdAt: Date;
   updatedAt: Date;
   assignee: { id: string; name: string; email: string } | null;
@@ -46,6 +50,10 @@ export function serializeLead(lead: LeadWithAssignee) {
     companyId: lead.companyId,
     assignedTo: lead.assignedTo,
     createdByUserId: lead.createdByUserId,
+    ownerUserId: lead.ownerUserId ?? null,
+    ownerRole: lead.ownerRole ?? null,
+    sourceType: lead.sourceType ?? null,
+    sourceUserId: lead.sourceUserId ?? null,
     createdAt: lead.createdAt.toISOString(),
     updatedAt: lead.updatedAt.toISOString(),
     assignee: lead.assignee,

@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
       return jsonError(403, "ORDER_MISMATCH", "Order does not belong to this session.");
     }
 
-    const expectedAmount = razorpayAmountForPlan(notes.plan);
+    const expectedAmount = notes.expectedAmountPaise ?? razorpayAmountForPlan(notes.plan);
     const orderAmount = typeof order.amount === "number" ? order.amount : Number(order.amount);
     if (!Number.isFinite(orderAmount) || orderAmount !== expectedAmount) {
       return jsonError(400, "AMOUNT_MISMATCH", "Order amount does not match plan price.");
@@ -92,6 +92,7 @@ export async function POST(request: NextRequest) {
       razorpayOrderId: razorpay_order_id,
       razorpayPaymentId: razorpay_payment_id,
       amountPaise: orderAmount,
+      expectedAmountPaise: expectedAmount,
       currency: typeof order.currency === "string" ? order.currency : "INR",
     });
 

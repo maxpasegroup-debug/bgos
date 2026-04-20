@@ -1,7 +1,12 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { OnboardingRequestDashboardType, OnboardingRequestStatus } from "@prisma/client";
+import {
+  OnboardingPipelineSourceType,
+  OnboardingPipelineStatus,
+  OnboardingRequestDashboardType,
+  OnboardingRequestStatus,
+} from "@prisma/client";
 import { parseJsonBody, zodValidationErrorResponse } from "@/lib/api-response";
 import { requireAuth } from "@/lib/auth";
 import { handleApiError } from "@/lib/route-error";
@@ -56,6 +61,17 @@ export async function POST(request: NextRequest) {
         id: true,
         status: true,
         createdAt: true,
+      },
+    });
+
+    await prisma.onboardingPipeline.create({
+      data: {
+        companyName: company_name,
+        sourceType: OnboardingPipelineSourceType.BDE,
+        sourceUserId: session.sub,
+        assignedBdeId: session.sub,
+        status: OnboardingPipelineStatus.NEW,
+        notes: `Onboarding request linked: ${row.id}`,
       },
     });
 

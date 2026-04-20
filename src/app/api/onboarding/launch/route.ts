@@ -7,6 +7,8 @@ import { requireOnboardingLaunchSession } from "@/lib/auth";
 import { mapRoles, parseTeamInput, type NexaMappedMember } from "@/lib/nexa-intelligence";
 import { runOnboardingLaunch } from "@/lib/onboarding-launch-engine";
 import { setActiveCompanyCookie, setSessionCookie } from "@/lib/session-cookie";
+import { normalizeEmail, normalizePhone } from "@/lib/lead-ownership";
+import { prisma } from "@/lib/prisma";
 
 const ALLOWED: UserRole[] = [
   UserRole.ADMIN,
@@ -71,6 +73,37 @@ export async function POST(request: NextRequest) {
       parsed.data.parsedTeam && parsed.data.parsedTeam.length > 0
         ? parsed.data.parsedTeam.map(withDashboardDefaults)
         : teamFromRaw;
+
+    const emailNorm = normalizeEmail(parsed.data.companyEmail || null);
+    const phoneNorm = normalizePhone(parsed.data.companyPhone || null);
+    if (emailNorm || phoneNorm) {
+      const existingCompany = await prisma.company.findFirst({
+        where: {
+          OR: [
+            ...(emailNorm ? [{ companyEmail: emailNorm }] : []),
+            ...(phoneNorm ? [{ companyPhone: phoneNorm }] : []),
+          ],
+        },
+        select: { id: true, name: true, owner: { select: { id: true, name: true, email: true } } },
+      });
+      if (existingCompany) {
+        return NextResponse.json(
+          {
+            ok: false as const,
+            success: false as const,
+            code: "COMPANY_EXISTS" as const,
+            error: "Company already exists",
+            existing: {
+              companyId: existingCompany.id,
+              companyName: existingCompany.name,
+              owner: existingCompany.owner,
+            },
+            options: ["view_existing", "request_ownership"] as const,
+          },
+          { status: 409 },
+        );
+      }
+    }
 
     const launch = await runOnboardingLaunch({
       ownerUserId: actor.user.sub,

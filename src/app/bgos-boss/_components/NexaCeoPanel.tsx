@@ -22,10 +22,10 @@ export function NexaCeoPanel({
   alerts,
 }: NexaCeoPanelProps) {
   function handleCampaign() {
-    alert("Launch Campaign — connect to /api/bgos/control/performance-engine");
+    window.open("/api/bgos/control/performance-engine", "_blank", "noopener,noreferrer");
   }
   function handleAnnouncement() {
-    alert("Send Announcement — connect to /api/nexa/announcements");
+    window.location.assign("/bgos-boss#command-center");
   }
 
   return (

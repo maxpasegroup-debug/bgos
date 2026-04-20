@@ -1,4 +1,4 @@
-import { LeadStatus, TaskStatus } from "@prisma/client";
+import { LeadStatus, LeadSourceType, TaskStatus } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -17,10 +17,21 @@ import { runAutomationExecution } from "@/lib/automation-execution";
 import { createLeadTask, dueDateCallLead, taskTitleCallLead } from "@/lib/task-engine";
 import { findUserInCompany } from "@/lib/user-company";
 import { isCompanyBasicTrialExpired, trialExpiredJsonResponse } from "@/lib/trial";
+import { checkCompanyLimit } from "@/lib/company-limits";
+import { touchCompanyUsageAfterLimitsOrPlanChange } from "@/lib/usage-metrics-engine";
+import {
+  duplicateIdentityResponse,
+  findLeadByIdentity,
+  normalizeEmail,
+  normalizePhone,
+  ownershipRoleFromEmployeeRole,
+  sourceTypeFromRole,
+} from "@/lib/lead-ownership";
 
 const bodySchema = z.object({
   name: z.string().trim().min(1).max(200),
   phone: z.string().trim().min(1).max(32),
+  email: z.union([z.literal(""), z.string().trim().email().max(320)]).optional(),
   company: z.string().trim().max(200).optional(),
   industry: z.string().trim().max(120).optional(),
   value: z.number().nonnegative().optional(),
@@ -40,9 +51,23 @@ export async function POST(request: NextRequest) {
   const parsed = await parseJsonBodyZod(request, bodySchema);
   if (!parsed.ok) return parsed.response;
 
-  const { name, phone, company, industry, value, assignedToUserId, partnerId, automationAction } = parsed.data;
+  const { name, phone, email, company, industry, value, assignedToUserId, partnerId, automationAction } = parsed.data;
   const companyId = session.companyId;
   const actorId = session.sub;
+  const normalizedPhone = normalizePhone(phone);
+  const normalizedEmail = normalizeEmail(email ?? null);
+  const dup = await findLeadByIdentity({
+    companyId,
+    phone: normalizedPhone,
+    email: normalizedEmail,
+  });
+  if (dup) {
+    return NextResponse.json(duplicateIdentityResponse(dup), { status: 409 });
+  }
+  const leadLimit = await checkCompanyLimit(companyId, "lead");
+  if (!leadLimit.ok) {
+    return jsonError(403, "LIMIT_REACHED", leadLimit.message);
+  }
 
   let assigneeId = actorId;
   if (assignedToUserId !== undefined) {
@@ -67,13 +92,20 @@ export async function POST(request: NextRequest) {
     const created = await tx.lead.create({
       data: {
         name,
-        phone,
+        phone: normalizedPhone ?? phone,
+        email: normalizedEmail,
         value: value ?? null,
         leadCompanyName: company?.trim() || null,
         businessType: industry?.trim() || null,
         companyId,
         createdByUserId: actorId,
         assignedTo: assigneeId,
+        ownerUserId: assigneeId,
+        ownerRole:
+          ownershipRoleFromEmployeeRole(session.iceconnectEmployeeRole) ??
+          ownershipRoleFromEmployeeRole(session.role),
+        sourceType: sourceTypeFromRole(session.iceconnectEmployeeRole, LeadSourceType.INBOUND),
+        sourceUserId: actorId,
         ...(partnerId ? { partnerId } : {}),
         status: LeadStatus.NEW,
       },
@@ -182,6 +214,9 @@ export async function POST(request: NextRequest) {
   if (!lead) {
     return jsonError(500, "INTERNAL", "Lead not found after create");
   }
+  void touchCompanyUsageAfterLimitsOrPlanChange(companyId).catch((e) => {
+    console.error("[usage-metrics] failed after lead create", e);
+  });
 
   return jsonSuccess({ lead: serializeLead(lead) }, 201);
 }

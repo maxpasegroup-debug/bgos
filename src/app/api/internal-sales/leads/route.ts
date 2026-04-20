@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import type { Prisma } from "@prisma/client";
+import { NextResponse } from "next/server";
 import {
   InternalCallStatus,
   InternalOnboardingApprovalStatus,
@@ -29,6 +30,13 @@ import { notifyInternalUsers } from "@/lib/internal-sales-notifications";
 import { prisma } from "@/lib/prisma";
 import { findUserInCompany, getUserCompanyMembership } from "@/lib/user-company";
 import { isCompanyBasicTrialExpired, trialExpiredJsonResponse } from "@/lib/trial";
+import { checkCompanyLimit } from "@/lib/company-limits";
+import { touchCompanyUsageAfterLimitsOrPlanChange } from "@/lib/usage-metrics-engine";
+import {
+  duplicateIdentityResponse,
+  ownershipRoleFromEmployeeRole,
+  sourceTypeFromRole,
+} from "@/lib/lead-ownership";
 
 function serializeLead(
   lead: {
@@ -47,9 +55,12 @@ function serializeLead(
     lastContactedAt: Date | null;
     nextFollowUpAt: Date | null;
     assignedTo: string | null;
+    ownerUserId: string | null;
+    ownerRole: string | null;
     createdAt: Date;
     updatedAt: Date;
     assignee: { id: string; name: string; email: string } | null;
+    owner: { id: string; name: string; email: string } | null;
   },
   onboardingTask: { status: OnboardingTaskStatus } | null,
 ) {
@@ -70,6 +81,9 @@ function serializeLead(
     lastContactedAt: lead.lastContactedAt?.toISOString() ?? null,
     nextFollowUpAt: lead.nextFollowUpAt?.toISOString() ?? null,
     assignedTo: lead.assignedTo,
+    ownerUserId: lead.ownerUserId,
+    ownerRole: lead.ownerRole,
+    owner: lead.owner,
     assignee: lead.assignee,
     createdAt: lead.createdAt.toISOString(),
     updatedAt: lead.updatedAt.toISOString(),
@@ -121,7 +135,10 @@ export async function GET(request: NextRequest) {
 
   const leads = await prisma.lead.findMany({
     where,
-    include: { assignee: { select: { id: true, name: true, email: true } } },
+    include: {
+      assignee: { select: { id: true, name: true, email: true } },
+      owner: { select: { id: true, name: true, email: true } },
+    },
     orderBy: { updatedAt: "desc" },
   });
 
@@ -170,6 +187,10 @@ export async function POST(request: NextRequest) {
 
   const parsed = await parseJsonBodyZod(request, createSchema);
   if (!parsed.ok) return parsed.response;
+  const leadLimit = await checkCompanyLimit(ctx.companyId, "lead");
+  if (!leadLimit.ok) {
+    return jsonError(403, "LIMIT_REACHED", leadLimit.message);
+  }
 
   const normalized = normalizeInternalSalesPhone(parsed.data.phone);
   if (!normalized) {
@@ -185,10 +206,13 @@ export async function POST(request: NextRequest) {
     normalizedEmail: emailNorm,
   });
   if (dup) {
-    return jsonError(409, "DUPLICATE", "Lead already exists", {
-      match: dup.match,
-      existingLead: { id: dup.id, name: dup.name, phone: dup.phone, email: dup.email },
-    });
+    return NextResponse.json(
+      {
+        ...duplicateIdentityResponse({ id: dup.id, name: dup.name }),
+        details: { match: dup.match, phone: dup.phone, email: dup.email },
+      },
+      { status: 409 },
+    );
   }
 
   let assignedTo: string | null = session.sub;
@@ -224,12 +248,21 @@ export async function POST(request: NextRequest) {
       assignedTo,
       createdByUserId: session.sub,
       source: "internal",
+      ownerUserId: assignedTo ?? session.sub,
+      ownerRole:
+        ownershipRoleFromEmployeeRole(session.iceconnectEmployeeRole) ??
+        ownershipRoleFromEmployeeRole(session.role),
+      sourceType: sourceTypeFromRole(session.iceconnectEmployeeRole),
+      sourceUserId: session.sub,
       status: internalStageToLeadStatus(InternalSalesStage.LEAD_ADDED),
       internalSalesStage: InternalSalesStage.LEAD_ADDED,
       internalCallStatus: InternalCallStatus.NOT_CALLED,
       internalStageUpdatedAt: new Date(),
     },
-    include: { assignee: { select: { id: true, name: true, email: true } } },
+    include: {
+      assignee: { select: { id: true, name: true, email: true } },
+      owner: { select: { id: true, name: true, email: true } },
+    },
   });
 
   await logInternalLeadActivity({
@@ -250,6 +283,9 @@ export async function POST(request: NextRequest) {
       dedupeKey: `assign:${lead.id}:${assignedTo}`,
     });
   }
+  void touchCompanyUsageAfterLimitsOrPlanChange(ctx.companyId).catch((e) => {
+    console.error("[usage-metrics] failed after internal lead create", e);
+  });
 
   return jsonSuccess({ lead: serializeLead(lead, null) }, 201);
 }

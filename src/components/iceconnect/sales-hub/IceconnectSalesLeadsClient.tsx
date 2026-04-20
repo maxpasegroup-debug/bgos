@@ -26,6 +26,10 @@ type LeadItem = {
   nextFollowUpAt: string | null;
   assigneeName: string;
   assigneeId: string | null;
+  ownerUserId?: string | null;
+  ownerRole?: string | null;
+  ownerName?: string | null;
+  ownerEmail?: string | null;
   iceconnectMetroStage?: IceconnectMetroStage;
   canEdit: boolean;
   won: boolean;
@@ -105,6 +109,7 @@ export function IceconnectSalesLeadsClient() {
   const [editIndustry, setEditIndustry] = useState("");
   const [editLocation, setEditLocation] = useState("");
   const [editNotes, setEditNotes] = useState("");
+  const [duplicateLead, setDuplicateLead] = useState<{ id: string; name: string; owner?: { id?: string; name?: string; email?: string } | null } | null>(null);
 
   const load = useCallback(async () => {
     setErr(null);
@@ -175,6 +180,7 @@ export function IceconnectSalesLeadsClient() {
     e.preventDefault();
     setBusy("create");
     setErr(null);
+    setDuplicateLead(null);
     try {
       const res = await apiFetch("/api/iceconnect/executive/leads", {
         method: "POST",
@@ -182,9 +188,19 @@ export function IceconnectSalesLeadsClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, phone, location, industry, notes }),
       });
-      const j = (await res.json()) as { ok?: boolean; error?: string; code?: string };
+      const j = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        code?: string;
+        existing?: { id?: string; name?: string; owner?: { id?: string; name?: string; email?: string } | null };
+      };
       if (!res.ok || !j.ok) {
-        setErr(j.error ?? "Could not create lead");
+        if (j.code === "COMPANY_EXISTS" && j.existing?.id) {
+          setDuplicateLead({ id: j.existing.id, name: j.existing.name ?? "Existing lead", owner: j.existing.owner ?? null });
+          setErr("Company already exists");
+        } else {
+          setErr(j.error ?? "Could not create lead");
+        }
         return;
       }
       setName("");
@@ -197,6 +213,31 @@ export function IceconnectSalesLeadsClient() {
     } catch (e) {
       console.error("API ERROR:", e);
       setErr(formatFetchFailure(e, "Request failed"));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function requestOwnership() {
+    if (!duplicateLead) return;
+    setBusy("claim");
+    setErr(null);
+    try {
+      const res = await apiFetch("/api/ownership-claims", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadId: duplicateLead.id }),
+      });
+      const j = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !j.ok) {
+        setErr(j.error ?? "Could not request ownership");
+        return;
+      }
+      setErr("Ownership request sent to RSM.");
+      setDuplicateLead(null);
+    } catch (e) {
+      setErr(formatFetchFailure(e, "Could not request ownership"));
     } finally {
       setBusy(null);
     }
@@ -567,6 +608,9 @@ export function IceconnectSalesLeadsClient() {
                         {l.companyName ? <p className="mt-1 text-xs text-gray-600">Co: {l.companyName}</p> : null}
                         {l.industry ? <p className="text-xs text-indigo-700">Industry: {l.industry}</p> : null}
                         {l.location ? <p className="text-xs text-gray-500">{l.location}</p> : null}
+                        <p className="text-[11px] text-gray-500">
+                          Owned by: {l.ownerName ?? l.assigneeName} {l.ownerRole ? `(${l.ownerRole})` : ""}
+                        </p>
                       </button>
 
                       {l.canEdit ? (
@@ -653,6 +697,21 @@ export function IceconnectSalesLeadsClient() {
                   />
                   <p className="mt-1 text-[11px] text-gray-500">Must be unique for your workspace.</p>
                 </div>
+                {duplicateLead ? (
+                  <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+                    Company already exists: <strong>{duplicateLead.name}</strong>
+                    <br />
+                    Owned by: {duplicateLead.owner?.name ?? duplicateLead.owner?.email ?? "Existing owner"}
+                    <div className="mt-2 flex gap-2">
+                      <Link href={`/iceconnect/leads?leadId=${duplicateLead.id}`} className="rounded-lg border border-amber-300 px-2 py-1 font-semibold">
+                        View existing
+                      </Link>
+                      <button type="button" onClick={() => void requestOwnership()} className="rounded-lg bg-amber-600 px-2 py-1 font-semibold text-white">
+                        {busy === "claim" ? "Sending..." : "Request ownership"}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
                 <div>
                   <label className="text-xs font-medium text-gray-600">Industry</label>
                   <input

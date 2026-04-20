@@ -106,12 +106,15 @@ function IceconnectSalesHubChrome({
     const load = async () => {
       try {
         const res = await apiFetch("/api/nexa/next-action", { credentials: "include" });
-        if (!res.ok) return;
+        if (!res.ok) {
+          setBadgeCount(0);
+          return;
+        }
         const j = (await res.json()) as { ok?: boolean; badgeCount?: number };
         if (cancelled || j.ok !== true) return;
         setBadgeCount(typeof j.badgeCount === "number" ? Math.max(0, j.badgeCount) : 0);
       } catch {
-        /* ignore */
+        setBadgeCount(0);
       }
     };
     void load();
@@ -239,7 +242,12 @@ function IceconnectClassicChrome({
     const load = async () => {
       try {
         const res = await apiFetch("/api/nexa/next-action", { credentials: "include" });
-        if (!res.ok) return;
+        if (!res.ok) {
+          setNextAction("Nexa is syncing. Review your assigned queue.");
+          setNextActionCta({ label: "Open Leads", href: "/iceconnect/leads" });
+          setBadgeCount(0);
+          return;
+        }
         const j = (await res.json()) as {
           ok?: boolean;
           nextAction?: string;
@@ -260,7 +268,9 @@ function IceconnectClassicChrome({
           setToastShownOnce(true);
         }
       } catch {
-        /* ignore */
+        setNextAction("Nexa is syncing. Review your assigned queue.");
+        setNextActionCta({ label: "Open Leads", href: "/iceconnect/leads" });
+        setBadgeCount(0);
       }
     };
     void load();

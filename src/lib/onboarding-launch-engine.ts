@@ -32,6 +32,7 @@ import { companyMembershipClass } from "@/lib/user-company";
 import { publicBgosOrigin, publicIceconnectOrigin } from "@/lib/host-routing";
 import { mapTeamEntries } from "@/lib/nexa-onboarding-engine";
 import { sendAccountReadyEmail } from "@/lib/account-ready-email";
+import { createInboundOnboardingPipeline } from "@/lib/onboarding-pipeline";
 
 export type OnboardingLaunchIndustry = LaunchIndustry;
 
@@ -464,6 +465,13 @@ export async function runOnboardingLaunch(input: RunOnboardingLaunchInput): Prom
         });
         co = created;
       }
+
+      await createInboundOnboardingPipeline({
+        tx,
+        companyId: co.id,
+        companyName: name,
+        sourceUserId: input.ownerUserId,
+      });
 
       await tx.userCompany.create({
         data: {

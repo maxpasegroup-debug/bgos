@@ -6,26 +6,14 @@ import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 type Row = {
   id: string;
   company_name: string;
-  boss_email: string;
-  dashboard_type: string;
-  template: string;
   status: string;
-  created_by: { name: string; email: string };
-  created_at: string;
-};
-
-type Detail = Row & {
   notes: string | null;
-  sales_questionnaire: Record<string, unknown> | null;
-  tech_template: string | null;
-  tech_notes: string | null;
 };
 
 export function IceconnectTechOnboardingRequestsClient() {
   const [rows, setRows] = useState<Row[]>([]);
   const [err, setErr] = useState<string | null>(null);
-  const [selected, setSelected] = useState<Detail | null>(null);
-  const [techTemplate, setTechTemplate] = useState("");
+  const [selected, setSelected] = useState<Row | null>(null);
   const [techNotes, setTechNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -33,13 +21,13 @@ export function IceconnectTechOnboardingRequestsClient() {
   const load = useCallback(async () => {
     setErr(null);
     try {
-      const res = await apiFetch("/api/onboarding-requests?scope=tech", { credentials: "include" });
-      const j = (await res.json()) as { ok?: boolean; requests?: Row[]; error?: string };
+      const res = await apiFetch("/api/onboarding/pipeline", { credentials: "include" });
+      const j = (await res.json()) as { ok?: boolean; data?: Row[]; error?: string };
       if (!res.ok || !j.ok) {
         setErr(j.error ?? "Could not load");
         return;
       }
-      setRows(j.requests ?? []);
+      setRows((j.data ?? []).filter((r) => r.status === "sent_to_tech"));
     } catch (e) {
       setErr(formatFetchFailure(e, "Request failed"));
     }
@@ -49,35 +37,22 @@ export function IceconnectTechOnboardingRequestsClient() {
     void load();
   }, [load]);
 
-  async function openDetail(id: string) {
-    setErr(null);
-    try {
-      const res = await apiFetch(`/api/onboarding-requests/${id}`, { credentials: "include" });
-      const j = (await res.json()) as { ok?: boolean; request?: Detail; error?: string };
-      if (!res.ok || !j.ok || !j.request) {
-        setErr(j.error ?? "Could not open");
-        return;
-      }
-      setSelected(j.request);
-      setTechTemplate(j.request.tech_template ?? j.request.dashboard_type);
-      setTechNotes(j.request.tech_notes ?? "");
-    } catch (e) {
-      setErr(formatFetchFailure(e, "Request failed"));
-    }
+  function openDetail(row: Row) {
+    setSelected(row);
+    setTechNotes("");
   }
 
-  async function saveTech() {
+  async function saveTechStructure() {
     if (!selected) return;
     setBusy(true);
     try {
-      const res = await apiFetch(`/api/onboarding-requests/${selected.id}`, {
+      const res = await apiFetch(`/api/onboarding/pipeline/${selected.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
           action: "tech_update",
-          tech_template: techTemplate,
-          tech_notes: techNotes,
+          notes: techNotes,
         }),
       });
       const j = (await res.json()) as { ok?: boolean; error?: string };
@@ -100,11 +75,11 @@ export function IceconnectTechOnboardingRequestsClient() {
     setErr(null);
     setSuccessMsg(null);
     try {
-      const res = await apiFetch(`/api/onboarding-requests/${selected.id}`, {
+      const res = await apiFetch(`/api/onboarding/pipeline/${selected.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ action: "tech_complete" }),
+        body: JSON.stringify({ action: "tech_complete", notes: techNotes }),
       });
       const j = (await res.json()) as { ok?: boolean; error?: string; message?: string };
       if (!res.ok || !j.ok) {
@@ -140,7 +115,7 @@ export function IceconnectTechOnboardingRequestsClient() {
     <div style={{ maxWidth: 720, margin: "0 auto", padding: "8px 0 32px" }}>
       <h1 style={{ fontSize: 22, fontWeight: 800, margin: "0 0 6px" }}>Tech · Onboarding</h1>
       <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: "0 0 18px" }}>
-        Approved requests — configure, then provision the dashboard (creates company + boss).
+        Pending onboarding queue from sales. Add structure notes and complete provisioning.
       </p>
       {successMsg ? (
         <p style={{ color: "#6ee7b7", fontSize: 14, marginBottom: 12, whiteSpace: "pre-line" }}>
@@ -153,10 +128,10 @@ export function IceconnectTechOnboardingRequestsClient() {
         <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
           {rows.map((r) => (
             <li key={r.id}>
-              <button type="button" style={card} onClick={() => void openDetail(r.id)}>
+              <button type="button" style={card} onClick={() => openDetail(r)}>
                 <strong>{r.company_name}</strong>
                 <span style={{ display: "block", fontSize: 12, color: "rgba(255,255,255,0.45)", marginTop: 4 }}>
-                  {r.template} · {r.dashboard_type} · {r.boss_email}
+                  {r.status.replace(/_/g, " ")}
                 </span>
               </button>
             </li>
@@ -185,45 +160,20 @@ export function IceconnectTechOnboardingRequestsClient() {
           </button>
           <div style={{ ...card, cursor: "default" }}>
             <p style={{ margin: "0 0 8px", fontSize: 16 }}>{selected.company_name}</p>
-            <p style={{ margin: 0, fontSize: 13, color: "rgba(255,255,255,0.55)" }}>{selected.boss_email}</p>
+            <p style={{ margin: 0, fontSize: 13, color: "rgba(255,255,255,0.55)" }}>
+              Status: {selected.status.replace(/_/g, " ")}
+            </p>
           </div>
-          {selected.sales_questionnaire ? (
-            <pre
-              style={{
-                marginTop: 12,
-                padding: 12,
-                borderRadius: 12,
-                background: "rgba(0,0,0,0.25)",
-                fontSize: 12,
-                color: "rgba(255,255,255,0.65)",
-                overflow: "auto",
-              }}
-            >
-              {JSON.stringify(selected.sales_questionnaire, null, 2)}
-            </pre>
+          {selected.notes ? (
+            <p style={{ marginTop: 12, fontSize: 12, color: "rgba(255,255,255,0.58)", whiteSpace: "pre-wrap" }}>
+              {selected.notes}
+            </p>
           ) : null}
 
           <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", color: "rgba(255,255,255,0.35)", margin: "16px 0 8px" }}>
             PROVISIONING
           </p>
-          <label style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>Template / preset</label>
-          <input
-            value={techTemplate}
-            onChange={(e) => setTechTemplate(e.target.value)}
-            style={{
-              width: "100%",
-              boxSizing: "border-box",
-              marginTop: 6,
-              marginBottom: 12,
-              padding: "12px 14px",
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.12)",
-              background: "rgba(0,0,0,0.2)",
-              color: "white",
-              fontSize: 15,
-            }}
-          />
-          <label style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>Notes</label>
+          <label style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>Structure / provisioning notes</label>
           <textarea
             value={techNotes}
             onChange={(e) => setTechNotes(e.target.value)}
@@ -240,11 +190,11 @@ export function IceconnectTechOnboardingRequestsClient() {
               marginTop: 6,
             }}
           />
-          <button type="button" disabled={busy} onClick={() => void saveTech()} style={btnSecondary}>
-            Save config
+          <button type="button" disabled={busy || techNotes.trim().length === 0} onClick={() => void saveTechStructure()} style={btnSecondary}>
+            Assign structure
           </button>
           <button type="button" disabled={busy} onClick={() => void provisionDashboard()} style={btnPrimary}>
-            Provision Dashboard
+            Provision dashboard & mark completed
           </button>
         </div>
       )}

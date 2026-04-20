@@ -109,7 +109,7 @@ async function main() {
     const { res, json } = await req("/api/company/create", {
       method: "POST",
       jar: bossJar,
-      body: { name: `E2E Co ${t}`, industry: "SOLAR" },
+      body: { name: `E2E Co ${t}`, industry: "SOLAR", source: "NEXA_ENGINE" },
     });
     if (!res.ok || !json.ok) fail("company/create", `status ${res.status}`, json);
     bossJar = mergeCookieJar(bossJar, res);

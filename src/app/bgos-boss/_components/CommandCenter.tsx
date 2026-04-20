@@ -10,6 +10,7 @@ type ActiveForm = "announcement" | "campaign" | "competition" | null;
 
 export function CommandCenter() {
   const [active, setActive] = useState<ActiveForm>(null);
+  const [notice, setNotice] = useState<{ type: "ok" | "error"; text: string } | null>(null);
 
   function toggle(form: ActiveForm) {
     setActive((prev) => (prev === form ? null : form));
@@ -17,6 +18,22 @@ export function CommandCenter() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {notice ? (
+        <p
+          style={{
+            margin: 0,
+            padding: "10px 12px",
+            borderRadius: 10,
+            fontSize: 12,
+            color: notice.type === "ok" ? "#34D399" : "#F87171",
+            background: notice.type === "ok" ? "rgba(52,211,153,0.08)" : "rgba(248,113,113,0.08)",
+            border: `1px solid ${notice.type === "ok" ? "rgba(52,211,153,0.22)" : "rgba(248,113,113,0.22)"}`,
+          }}
+        >
+          {notice.text}
+        </p>
+      ) : null}
+
       {/* Action cards row */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
         <ActionCard
@@ -50,9 +67,24 @@ export function CommandCenter() {
         <InlineForm
           title="Send Announcement"
           onClose={() => setActive(null)}
-          onSubmit={(data) => {
-            console.log("announcement →", data);
-            alert(`Announcement queued: "${data.title}"\n\nConnect to POST /api/nexa/announcements`);
+          onSubmit={async (data) => {
+            setNotice(null);
+            const res = await fetch("/api/nexa/announcements", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                title: data.title,
+                message: data.message,
+                kind: "GENERAL",
+                scope: "ALL",
+              }),
+            });
+            const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+            if (!res.ok || body.ok !== true) {
+              setNotice({ type: "error", text: body.error ?? "Could not send announcement." });
+              return;
+            }
+            setNotice({ type: "ok", text: "Announcement sent successfully." });
             setActive(null);
           }}
           fields={[
@@ -68,9 +100,13 @@ export function CommandCenter() {
         <InlineForm
           title="Launch Campaign"
           onClose={() => setActive(null)}
-          onSubmit={(data) => {
-            console.log("campaign →", data);
-            alert(`Campaign queued: "${data.title}"\n\nConnect to POST /api/bgos/control/performance-engine`);
+          onSubmit={async () => {
+            setNotice(null);
+            window.open("/api/bgos/control/performance-engine", "_blank", "noopener,noreferrer");
+            setNotice({
+              type: "ok",
+              text: "Opened campaign control panel in a new tab.",
+            });
             setActive(null);
           }}
           fields={[
@@ -87,9 +123,36 @@ export function CommandCenter() {
         <InlineForm
           title="Start Competition"
           onClose={() => setActive(null)}
-          onSubmit={(data) => {
-            console.log("competition →", data);
-            alert(`Competition queued: "${data.title}"\n\nConnect to POST /api/internal/rewards/competitions`);
+          onSubmit={async (data) => {
+            setNotice(null);
+            const target = Number(data.target || "0");
+            const reward = Number(data.reward || "0");
+            const start = new Date();
+            const end = data.ends ? new Date(`${data.ends}T23:59:59.999Z`) : null;
+            if (!Number.isFinite(target) || target <= 0 || !end || Number.isNaN(end.getTime())) {
+              setNotice({ type: "error", text: "Enter a valid target and end date." });
+              return;
+            }
+            const res = await fetch("/api/internal/rewards/competitions", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                title: data.title,
+                description: data.title,
+                target_type: "POINTS",
+                target_value: target,
+                reward_type: "CASH",
+                reward_value: Number.isFinite(reward) ? Math.max(0, reward) : 0,
+                start_date: start.toISOString(),
+                end_date: end.toISOString(),
+              }),
+            });
+            const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+            if (!res.ok || body.ok !== true) {
+              setNotice({ type: "error", text: body.error ?? "Could not create competition." });
+              return;
+            }
+            setNotice({ type: "ok", text: "Competition created successfully." });
             setActive(null);
           }}
           fields={[
@@ -158,7 +221,7 @@ function InlineForm({
 }: {
   title: string;
   onClose: () => void;
-  onSubmit: (data: Record<string, string>) => void;
+  onSubmit: (data: Record<string, string>) => Promise<void>;
   fields: FieldDef[];
   submitLabel: string;
   accent: string;
@@ -244,7 +307,9 @@ function InlineForm({
       {/* Submit */}
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <button
-          onClick={() => onSubmit(values)}
+          onClick={() => {
+            void onSubmit(values);
+          }}
           style={{
             padding: "9px 20px",
             borderRadius: 10,

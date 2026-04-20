@@ -74,6 +74,7 @@ type OrderNotes = {
   userId: string;
   companyId: string;
   plan: CompanyPlan;
+  expectedAmountPaise?: number;
   pricingVersion?: string;
 };
 
@@ -93,7 +94,13 @@ function parseOrderNotes(notes: unknown): OrderNotes | null {
           : null;
   if (!userId || !companyId || !plan) return null;
   const pricingVersion = typeof o.pricingVersion === "string" ? o.pricingVersion.trim() : "";
-  return { userId, companyId, plan, pricingVersion: pricingVersion || undefined };
+  const expectedAmountRaw =
+    typeof o.expectedAmountPaise === "string" || typeof o.expectedAmountPaise === "number"
+      ? Number(o.expectedAmountPaise)
+      : Number.NaN;
+  const expectedAmountPaise =
+    Number.isFinite(expectedAmountRaw) && expectedAmountRaw > 0 ? expectedAmountRaw : undefined;
+  return { userId, companyId, plan, expectedAmountPaise, pricingVersion: pricingVersion || undefined };
 }
 
 /**
@@ -106,6 +113,7 @@ export async function applySuccessfulRazorpayPayment(input: {
   razorpayOrderId: string;
   razorpayPaymentId: string;
   amountPaise: number;
+  expectedAmountPaise?: number;
   currency: string;
 }): Promise<{ applied: boolean }> {
   let applied = false;
@@ -125,7 +133,15 @@ export async function applySuccessfulRazorpayPayment(input: {
     }
 
     const now = new Date();
-    validatePaymentAmountOrThrow(input.targetPlan, input.amountPaise);
+    if (typeof input.expectedAmountPaise === "number") {
+      if (input.amountPaise !== input.expectedAmountPaise) {
+        throw new Error(
+          `PRICING_MISMATCH:expected:${input.expectedAmountPaise}:actual:${input.amountPaise}`,
+        );
+      }
+    } else {
+      validatePaymentAmountOrThrow(input.targetPlan, input.amountPaise);
+    }
     const base =
       company.subscriptionPeriodEnd && company.subscriptionPeriodEnd.getTime() > now.getTime()
         ? company.subscriptionPeriodEnd

@@ -7,7 +7,6 @@ import {
   type NexaDecisionInput,
 } from "@/lib/nexa-decision-engine";
 import { prisma } from "@/lib/prisma";
-import { handleApiError } from "@/lib/route-error";
 
 export async function GET(request: Request) {
   const user = await requireAuthWithCompany(request);
@@ -118,6 +117,26 @@ export async function GET(request: Request) {
       monthlyNudge: decision.monthlyNudge,
     });
   } catch (e) {
-    return handleApiError("GET /api/nexa/next-action", e);
+    console.error("GET /api/nexa/next-action", e);
+    return jsonSuccess({
+      nextAction: "Nexa is syncing your workspace. Review assigned leads and pending tasks.",
+      badgeCount: 0,
+      userState: "OPERATOR",
+      actions: [
+        {
+          id: "fallback-review-queue",
+          title: "Review queue",
+          message: "Check pending leads and onboarding tasks for updates.",
+          ctaLabel: "Open Leads",
+          ctaHref: "/iceconnect/leads",
+          priority: 1,
+          reasonCode: "FALLBACK",
+        },
+      ],
+      dailyNudge: "Keep momentum: update lead stages and follow-ups.",
+      weeklyNudge: "Close pending onboarding blockers this week.",
+      monthlyNudge: "Track conversion trend and team throughput.",
+      degraded: true as const,
+    });
   }
 }

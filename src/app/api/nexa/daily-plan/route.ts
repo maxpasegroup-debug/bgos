@@ -63,9 +63,34 @@ export async function GET(request: NextRequest) {
     });
   } catch (e) {
     logCaughtError("nexa-daily-plan", e);
-    return NextResponse.json(
-      { ok: false as const, error: "Failed to build daily plan", code: "INTERNAL" as const },
-      { status: 500 },
-    );
+    return NextResponse.json({
+      ok: true as const,
+      degraded: true as const,
+      user_id: null,
+      nexa_mode: "fallback",
+      tone_profile: "steady",
+      voice_version: "fallback",
+      nexa_messages: [
+        {
+          kind: "fallback",
+          text: "Nexa is syncing your data. Use the fallback game plan below.",
+        },
+      ],
+      tasks: [
+        "Review your top 5 active leads and update stage.",
+        "Close pending follow-ups scheduled for today.",
+        "Escalate blockers to your manager/tech queue.",
+      ],
+      insights: [
+        "Keep pipeline hygiene tight while Nexa refreshes context.",
+        "Prioritize tasks with customer deadlines first.",
+      ],
+      urgency_level: "normal",
+      promotion_nudges: [],
+      performance_triggers: [],
+      persuasion: {
+        smart_nudge: "Progress compounds. Finish one critical task now.",
+      },
+    });
   }
 }

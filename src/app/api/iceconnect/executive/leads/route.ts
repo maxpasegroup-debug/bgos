@@ -1,4 +1,10 @@
-import { CompanyPlan, IceconnectMetroStage, LeadStatus, UserRole } from "@prisma/client";
+import {
+  CompanyPlan,
+  IceconnectMetroStage,
+  LeadSourceType,
+  LeadStatus,
+  UserRole,
+} from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -11,6 +17,16 @@ import { currentPeriod, monthBoundsUTC } from "@/lib/iceconnect-sales-hub";
 import { isIceconnectPrivileged } from "@/lib/iceconnect-scope";
 import { prisma } from "@/lib/prisma";
 import { assertIceconnectInternalSalesOrg } from "@/lib/require-iceconnect-internal-org";
+import { checkCompanyLimit } from "@/lib/company-limits";
+import { touchCompanyUsageAfterLimitsOrPlanChange } from "@/lib/usage-metrics-engine";
+import {
+  duplicateIdentityResponse,
+  findLeadByIdentity,
+  normalizeEmail,
+  normalizePhone,
+  ownershipRoleFromEmployeeRole,
+  sourceTypeFromRole,
+} from "@/lib/lead-ownership";
 
 const ROLES: UserRole[] = [
   UserRole.SALES_EXECUTIVE,
@@ -23,6 +39,7 @@ const ROLES: UserRole[] = [
 const createSchema = z.object({
   name: z.string().trim().min(1).max(200),
   phone: z.string().trim().min(5).max(32),
+  email: z.union([z.literal(""), z.string().trim().email().max(320)]).optional(),
   location: z.string().trim().max(500).optional(),
   industry: z.string().trim().max(120).optional(),
   notes: z.string().trim().max(5000).optional(),
@@ -89,7 +106,11 @@ export async function GET(request: NextRequest) {
     range = rangeFromPreset(preset);
   }
 
-  const assigneeScope = isIceconnectPrivileged(session.role) ? {} : { assignedTo: session.sub };
+  const workforceManager =
+    session.employeeSystem === "ICECONNECT" &&
+    (session.iceconnectEmployeeRole === "RSM" || session.iceconnectEmployeeRole === "BDM");
+  const managerScope = isIceconnectPrivileged(session.role) || session.role === UserRole.MANAGER || workforceManager;
+  const assigneeScope = managerScope ? {} : { assignedTo: session.sub };
 
   const baseWhere = {
     companyId: session.companyId,
@@ -149,6 +170,9 @@ export async function GET(request: NextRequest) {
           createdAt: true,
           updatedAt: true,
           assignedTo: true,
+          ownerUserId: true,
+          ownerRole: true,
+          owner: { select: { id: true, name: true, email: true } },
           assignee: { select: { id: true, name: true } },
           onboardingRecords: {
             orderBy: { createdAt: "desc" },
@@ -214,6 +238,10 @@ export async function GET(request: NextRequest) {
         updatedAt: l.updatedAt.toISOString(),
         assigneeName: l.assignee?.name?.trim() || "—",
         assigneeId: l.assignedTo,
+        ownerUserId: l.ownerUserId,
+        ownerRole: l.ownerRole,
+        ownerName: l.owner?.name ?? null,
+        ownerEmail: l.owner?.email ?? null,
         iceconnectMetroStage: effectiveDbStage,
         canEdit,
         won: stageKey === "SUBSCRIPTION",
@@ -234,7 +262,7 @@ export async function GET(request: NextRequest) {
     });
 
     let assignees: { id: string; name: string | null; email: string }[] | undefined;
-    if (isIceconnectPrivileged(session.role)) {
+    if (managerScope) {
       const memberships = await prisma.userCompany.findMany({
         where: {
           companyId: session.companyId,
@@ -260,7 +288,7 @@ export async function GET(request: NextRequest) {
         conversionPct,
       },
       view: {
-        manager: isIceconnectPrivileged(session.role),
+        manager: managerScope,
         assignees,
       },
     });
@@ -280,25 +308,41 @@ export async function POST(request: NextRequest) {
 
   const parsed = await parseJsonBodyZod(request, createSchema);
   if (!parsed.ok) return parsed.response;
+  const leadLimit = await checkCompanyLimit(session.companyId, "lead");
+  if (!leadLimit.ok) {
+    return jsonError(403, "LIMIT_REACHED", leadLimit.message);
+  }
 
-  const { name, phone, location, industry, notes } = parsed.data;
+  const { name, phone, email, location, industry, notes } = parsed.data;
 
   try {
-    const peers = await prisma.lead.findMany({
-      where: { companyId: session.companyId },
-      select: { phone: true },
+    const normalizedPhone = normalizePhone(phone) ?? phone;
+    const normalizedEmail = normalizeEmail(email ?? null);
+    const exactDup = await findLeadByIdentity({
+      companyId: session.companyId,
+      phone: normalizedPhone,
+      email: normalizedEmail,
     });
-    if (peers.some((p) => leadPhonesDuplicate(p.phone, phone))) {
-      return jsonError(409, "DUPLICATE_PHONE", "A lead with this phone number already exists.");
+    if (exactDup) {
+      return NextResponse.json(duplicateIdentityResponse(exactDup), { status: 409 });
+    }
+    const peers = await prisma.lead.findMany({ where: { companyId: session.companyId }, select: { phone: true } });
+    if (peers.some((p) => leadPhonesDuplicate(p.phone, normalizedPhone))) {
+      return jsonError(409, "DUPLICATE_PHONE", "Company already exists");
     }
 
     const lead = await prisma.lead.create({
       data: {
         name,
-        phone,
+        phone: normalizedPhone,
+        email: normalizedEmail,
         companyId: session.companyId,
         assignedTo: session.sub,
         createdByUserId: session.sub,
+        ownerUserId: session.sub,
+        ownerRole: ownershipRoleFromEmployeeRole(session.iceconnectEmployeeRole),
+        sourceType: sourceTypeFromRole(session.iceconnectEmployeeRole, LeadSourceType.INBOUND),
+        sourceUserId: session.sub,
         status: LeadStatus.NEW,
         iceconnectMetroStage: IceconnectMetroStage.LEAD_CREATED,
         businessType: industry?.trim() ? industry.trim() : null,
@@ -315,11 +359,17 @@ export async function POST(request: NextRequest) {
         iceconnectMetroStage: true,
         createdAt: true,
         assignedTo: true,
+        ownerUserId: true,
+        ownerRole: true,
+        owner: { select: { name: true, email: true } },
         assignee: { select: { name: true } },
       },
     });
 
     const stage = flowV3StageFromDb(lead.iceconnectMetroStage ?? IceconnectMetroStage.LEAD_CREATED);
+    void touchCompanyUsageAfterLimitsOrPlanChange(session.companyId).catch((e) => {
+      console.error("[usage-metrics] failed after executive lead create", e);
+    });
 
     return NextResponse.json(
       {
@@ -340,6 +390,10 @@ export async function POST(request: NextRequest) {
           nextFollowUpAt: null,
           assigneeName: lead.assignee?.name?.trim() || "—",
           assigneeId: lead.assignedTo,
+          ownerUserId: lead.ownerUserId,
+          ownerRole: lead.ownerRole,
+          ownerName: lead.owner?.name ?? null,
+          ownerEmail: lead.owner?.email ?? null,
           iceconnectMetroStage: lead.iceconnectMetroStage ?? IceconnectMetroStage.LEAD_CREATED,
           canEdit: true,
           won: false,

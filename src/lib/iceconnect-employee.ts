@@ -74,6 +74,34 @@ export function iceconnectEmployeePathAllowed(
 ): "allow" | "deny" | "legacy" {
   const p = pathname.replace(/\/+$/, "") || "/";
 
+  if (p === "/iceconnect/sales/control" || p.startsWith("/iceconnect/sales/control/")) {
+    return iceconnectStrictRole(payload, ["RSM", "BDM", "BDE"]);
+  }
+  if (p === "/iceconnect/sales/report" || p.startsWith("/iceconnect/sales/report/")) {
+    return iceconnectStrictRole(payload, ["RSM", "BDM"]);
+  }
+  if (p === "/api/iceconnect/sales/report" || p.startsWith("/api/iceconnect/sales/report/")) {
+    return iceconnectStrictRole(payload, ["RSM", "BDM"]);
+  }
+  if (p === "/api/onboarding-requests" || p.startsWith("/api/onboarding-requests/")) {
+    return iceconnectStrictRole(payload, ["RSM", "BDM", "BDE", "TECH_EXEC"]);
+  }
+  if (p === "/api/iceconnect/bde" || p.startsWith("/api/iceconnect/bde/")) {
+    return iceconnectStrictRole(payload, "BDE");
+  }
+  if (p === "/api/iceconnect/usage/control" || p.startsWith("/api/iceconnect/usage/control/")) {
+    return iceconnectStrictRole(payload, ["RSM", "BDM", "BDE"]);
+  }
+  if (p === "/api/iceconnect/usage/flags" || p.startsWith("/api/iceconnect/usage/flags/")) {
+    return iceconnectStrictRole(payload, ["RSM", "BDM", "BDE"]);
+  }
+  if (p === "/api/iceconnect/usage/rsm-overview" || p.startsWith("/api/iceconnect/usage/rsm-overview/")) {
+    return iceconnectStrictRole(payload, "RSM");
+  }
+  if (p === "/api/iceconnect/usage/bde-alerts" || p.startsWith("/api/iceconnect/usage/bde-alerts/")) {
+    return iceconnectStrictRole(payload, "BDE");
+  }
+
   if (p === "/iceconnect/onboard") {
     return iceconnectStrictRole(payload, "BDE");
   }

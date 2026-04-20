@@ -11,6 +11,7 @@ import {
   getRazorpayServerConfig,
   parsePaymentCapturedPayload,
   parsePaymentFailedPayload,
+  razorpayAmountForPlan,
   recordRazorpayPaymentFailed,
   recordRazorpayWebhookDedup,
   verifyRazorpayWebhookSignature,
@@ -96,6 +97,10 @@ export async function POST(request: NextRequest) {
     if (!notes) {
       return NextResponse.json({ received: true, skipped: "notes" });
     }
+    const expectedAmount = notes.expectedAmountPaise ?? razorpayAmountForPlan(notes.plan);
+    if (normalized.amountPaise !== expectedAmount) {
+      return NextResponse.json({ received: true, skipped: "amount_mismatch" });
+    }
 
     const company = await prisma.company.findUnique({
       where: { id: notes.companyId },
@@ -114,6 +119,7 @@ export async function POST(request: NextRequest) {
       razorpayOrderId: normalized.orderId,
       razorpayPaymentId: normalized.paymentId,
       amountPaise: normalized.amountPaise,
+      expectedAmountPaise: expectedAmount,
       currency: normalized.currency,
     });
 

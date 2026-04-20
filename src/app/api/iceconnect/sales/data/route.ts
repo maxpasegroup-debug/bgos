@@ -1,4 +1,5 @@
-import { TaskStatus, UserRole } from "@prisma/client";
+import { IceconnectEmployeeRole, TaskStatus, UserRole } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { prismaKnownErrorResponse } from "@/lib/api-response";
@@ -16,6 +17,53 @@ const include = {
   lead: { select: { id: true, name: true, status: true, companyId: true } as const },
 } as const;
 
+async function hierarchyUserIdsForScope(input: {
+  companyId: string;
+  userId: string;
+  iceRole: IceconnectEmployeeRole | null | undefined;
+}): Promise<string[]> {
+  if (input.iceRole === IceconnectEmployeeRole.BDM) {
+    const bdes = await prisma.user.findMany({
+      where: {
+        parentId: input.userId,
+        iceconnectEmployeeRole: IceconnectEmployeeRole.BDE,
+        memberships: { some: { companyId: input.companyId, archivedAt: null } },
+      },
+      select: { id: true },
+    });
+    return bdes.map((u) => u.id);
+  }
+
+  if (input.iceRole === IceconnectEmployeeRole.RSM) {
+    const direct = await prisma.user.findMany({
+      where: {
+        parentId: input.userId,
+        iceconnectEmployeeRole: { in: [IceconnectEmployeeRole.BDM, IceconnectEmployeeRole.BDE] },
+        memberships: { some: { companyId: input.companyId, archivedAt: null } },
+      },
+      select: { id: true, iceconnectEmployeeRole: true },
+    });
+    const bdmIds = direct
+      .filter((u) => u.iceconnectEmployeeRole === IceconnectEmployeeRole.BDM)
+      .map((u) => u.id);
+    const directBdeIds = direct
+      .filter((u) => u.iceconnectEmployeeRole === IceconnectEmployeeRole.BDE)
+      .map((u) => u.id);
+    if (bdmIds.length === 0) return directBdeIds;
+    const nestedBdes = await prisma.user.findMany({
+      where: {
+        parentId: { in: bdmIds },
+        iceconnectEmployeeRole: IceconnectEmployeeRole.BDE,
+        memberships: { some: { companyId: input.companyId, archivedAt: null } },
+      },
+      select: { id: true },
+    });
+    return [...new Set([...directBdeIds, ...nestedBdes.map((u) => u.id)])];
+  }
+
+  return [];
+}
+
 export async function GET(request: NextRequest) {
   const session = await requireIceconnectRole(request, [
     UserRole.SALES_EXECUTIVE,
@@ -24,15 +72,29 @@ export async function GET(request: NextRequest) {
   if (session instanceof NextResponse) return session;
 
   const companyId = session.companyId;
-  /** Sales dashboard: only leads assigned to the current user (no company-wide list here). */
-  const leadWhere = {
+  const hierarchyUserIds = await hierarchyUserIdsForScope({
     companyId,
-    assignedTo: session.sub,
+    userId: session.sub,
+    iceRole: session.iceconnectEmployeeRole ?? null,
+  });
+
+  const leadOwnershipScope: Prisma.LeadWhereInput[] = [
+    { assignedTo: session.sub },
+    { ownerUserId: session.sub },
+    ...(hierarchyUserIds.length > 0
+      ? [{ assignedTo: { in: hierarchyUserIds } }, { ownerUserId: { in: hierarchyUserIds } }]
+      : []),
+  ];
+  const leadWhere: Prisma.LeadWhereInput = {
+    companyId,
+    OR: leadOwnershipScope,
   };
 
-  const taskWhere = isIceconnectPrivileged(session.role)
+  const taskWhere: Prisma.TaskWhereInput = isIceconnectPrivileged(session.role)
     ? { companyId }
-    : { companyId, userId: session.sub };
+    : hierarchyUserIds.length > 0
+      ? { companyId, OR: [{ userId: session.sub }, { userId: { in: hierarchyUserIds } }] }
+      : { companyId, userId: session.sub };
 
   const now = new Date();
 

@@ -14,6 +14,7 @@ import {
   taskTitleAfterStatusChange,
 } from "@/lib/task-engine";
 import { findUserInCompany } from "@/lib/user-company";
+import { touchCompanyUsageAfterLimitsOrPlanChange } from "@/lib/usage-metrics-engine";
 
 const assignInclude = {
   assignee: { select: { id: true, name: true, email: true } as const },
@@ -353,6 +354,9 @@ export async function applyLeadPipelineUpdate(
       assignedTo: lead.assignedTo,
     });
   }
+  void touchCompanyUsageAfterLimitsOrPlanChange(companyId).catch((e) => {
+    console.error("[usage-metrics] failed after lead pipeline update", e);
+  });
 
   return { ok: true, lead: serializeLead(lead) };
 }

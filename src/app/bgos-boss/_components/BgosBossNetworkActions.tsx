@@ -30,7 +30,9 @@ export function BgosBossNetworkActions() {
       </a>
       <button
         type="button"
-        onClick={() => alert("Add RSM — connect to POST /api/internal/team")}
+        onClick={() => {
+          window.location.assign("/iceconnect/sales/onboarding");
+        }}
         style={outlineBtn("#7C5CFF")}
       >
         Add RSM

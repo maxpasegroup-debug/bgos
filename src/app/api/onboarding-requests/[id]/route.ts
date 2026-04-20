@@ -1,10 +1,11 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { OnboardingRequestStatus } from "@prisma/client";
+import { OnboardingPipelineStatus, OnboardingRequestStatus } from "@prisma/client";
 import { parseJsonBody, zodValidationErrorResponse } from "@/lib/api-response";
 import { requireAuth } from "@/lib/auth";
 import { handleApiError } from "@/lib/route-error";
+import { markCompanyOnboardingCompleted } from "@/lib/onboarding-pipeline";
 import {
   requireBde,
   requireSalesReviewer,
@@ -181,6 +182,10 @@ export async function PATCH(
         where: { id },
         data: { status: OnboardingRequestStatus.TECH_QUEUE },
       });
+      await prisma.onboardingPipeline.updateMany({
+        where: { notes: { contains: id } },
+        data: { status: OnboardingPipelineStatus.SENT_TO_TECH },
+      });
       return NextResponse.json({ ok: true as const, status: "tech_queue" });
     }
 
@@ -224,6 +229,14 @@ export async function PATCH(
           techTemplate: templateLabel,
         },
       });
+      await prisma.onboardingPipeline.updateMany({
+        where: { notes: { contains: id } },
+        data: {
+          companyId: provision.companyId,
+          status: OnboardingPipelineStatus.COMPLETED,
+        },
+      });
+      await markCompanyOnboardingCompleted(provision.companyId);
 
       return NextResponse.json({
         ok: true as const,

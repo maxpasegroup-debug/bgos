@@ -1,31 +1,92 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
 
 type TaskRow = {
   id: string;
   company: string;
   task: string;
-  status: "new" | "progress" | "done";
+  priority: "HIGH" | "MEDIUM" | "LOW";
+  status: "pending" | "in_progress" | "done";
 };
 
-const PLACEHOLDER: TaskRow[] = [
-  { id: "1", company: "Sunrise Solar", task: "API handoff checklist", status: "new" },
-  { id: "2", company: "BlueGrid Energy", task: "Validate monitoring feed", status: "progress" },
-  { id: "3", company: "GreenLeaf Rooftop", task: "Close automation loop", status: "done" },
-];
+type RequestsResponse = {
+  ok?: boolean;
+  error?: string;
+  requests?: Array<{
+    id: string;
+    roleName: string;
+    description: string | null;
+    companyName: string | null;
+    priority: "HIGH" | "MEDIUM" | "LOW";
+    status: "pending" | "in_progress" | "done";
+  }>;
+};
 
-/** Mobile tech_exec dashboard — connect to /api/tech/requests */
+/** Mobile tech_exec dashboard — live tasks from `/api/tech/requests`. */
 export function IceconnectTechExecMobileDashboard() {
-  const [rows, setRows] = useState<TaskRow[]>(PLACEHOLDER);
+  const [rows, setRows] = useState<TaskRow[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
 
-  function setStatus(id: string, status: TaskRow["status"]) {
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
+  const load = useCallback(async () => {
+    setErr(null);
+    try {
+      const res = await apiFetch("/api/tech/requests", { credentials: "include" });
+      const data = (await res.json()) as RequestsResponse;
+      if (!res.ok || !data.ok) {
+        setErr(data.error ?? "Could not load tech tasks.");
+        return;
+      }
+      const mapped = (data.requests ?? []).map((r) => ({
+        id: r.id,
+        company: r.companyName ?? "Unassigned company",
+        task: r.description?.trim() || r.roleName,
+        priority: r.priority,
+        status: r.status,
+      }));
+      setRows(mapped);
+    } catch (e) {
+      setErr(formatFetchFailure(e, "Could not load tech tasks."));
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function setStatus(id: string, status: TaskRow["status"]) {
+    setBusy(id);
+    setErr(null);
+    try {
+      const res = await apiFetch("/api/tech/requests", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, status }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        setErr(data.error ?? "Could not update task status.");
+        return;
+      }
+      setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
+    } catch (e) {
+      setErr(formatFetchFailure(e, "Could not update task status."));
+    } finally {
+      setBusy(null);
+    }
   }
 
-  const pending = rows.filter((r) => r.status === "new").length;
-  const progress = rows.filter((r) => r.status === "progress").length;
+  const pending = rows.filter((r) => r.status === "pending").length;
+  const progress = rows.filter((r) => r.status === "in_progress").length;
   const done = rows.filter((r) => r.status === "done").length;
+  const avgCompletionLabel = useMemo(() => {
+    if (rows.length === 0) return "No completed tasks yet";
+    const pct = Math.round((done / rows.length) * 100);
+    return `${pct}% completed`;
+  }, [done, rows.length]);
 
   const card: React.CSSProperties = {
     padding: "14px 16px",
@@ -51,14 +112,25 @@ export function IceconnectTechExecMobileDashboard() {
       </div>
 
       <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", color: "rgba(255,255,255,0.25)", margin: 0 }}>
-        AVG COMPLETION (PLACEHOLDER)
+        COMPLETION SNAPSHOT
       </p>
-      <p style={{ fontSize: 18, fontWeight: 700, color: "#4FD1FF", margin: "0 0 16px" }}>1.4 days</p>
+      <p style={{ fontSize: 18, fontWeight: 700, color: "#4FD1FF", margin: "0 0 16px" }}>{avgCompletionLabel}</p>
+
+      {err ? <p style={{ color: "#f87171", fontSize: 13, margin: "0 0 10px" }}>{err}</p> : null}
+
+      {rows.length === 0 ? (
+        <div style={card}>
+          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", margin: 0 }}>No tech requests assigned yet.</p>
+        </div>
+      ) : null}
 
       {rows.map((r) => (
         <div key={r.id} style={card}>
           <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", margin: "0 0 4px" }}>{r.company}</p>
           <p style={{ fontSize: 14, fontWeight: 600, margin: "0 0 10px" }}>{r.task}</p>
+          <p style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", margin: "0 0 8px" }}>
+            Priority: {r.priority}
+          </p>
           <span
             style={{
               fontSize: 10,
@@ -68,32 +140,34 @@ export function IceconnectTechExecMobileDashboard() {
               background:
                 r.status === "done"
                   ? "rgba(52,211,153,0.15)"
-                  : r.status === "progress"
+                  : r.status === "in_progress"
                     ? "rgba(79,209,255,0.15)"
                     : "rgba(245,158,11,0.15)",
               color:
-                r.status === "done" ? "#34D399" : r.status === "progress" ? "#4FD1FF" : "#F59E0B",
+                r.status === "done" ? "#34D399" : r.status === "in_progress" ? "#4FD1FF" : "#F59E0B",
             }}
           >
-            {r.status === "new" ? "NEW" : r.status === "progress" ? "IN PROGRESS" : "DONE"}
+            {r.status === "pending" ? "PENDING" : r.status === "in_progress" ? "IN PROGRESS" : "DONE"}
           </span>
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-            {r.status !== "progress" && r.status !== "done" && (
+            {r.status !== "in_progress" && r.status !== "done" && (
               <button
                 type="button"
-                onClick={() => setStatus(r.id, "progress")}
+                disabled={busy === r.id}
+                onClick={() => void setStatus(r.id, "in_progress")}
                 style={btnOutline}
               >
-                Start
+                {busy === r.id ? "Updating..." : "Start"}
               </button>
             )}
-            {r.status === "progress" && (
+            {r.status === "in_progress" && (
               <button
                 type="button"
-                onClick={() => setStatus(r.id, "done")}
+                disabled={busy === r.id}
+                onClick={() => void setStatus(r.id, "done")}
                 style={btnPrimary}
               >
-                Complete
+                {busy === r.id ? "Updating..." : "Complete"}
               </button>
             )}
           </div>

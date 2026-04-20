@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BdeOnboardingPipelineSection } from "@/components/iceconnect/BdeOnboardingPipelineSection";
 import { BdeGrowingAccountsSection } from "@/components/iceconnect/BdeGrowingAccountsSection";
 import { BdeMyOnboardingRequests } from "@/components/iceconnect/BdeMyOnboardingRequests";
 import { BdeNexaDashboard } from "@/components/iceconnect/BdeNexaDashboard";
@@ -22,6 +23,7 @@ export default function IceconnectBdeHomePage() {
       <BdeNexaDashboard />
 
       <BdeMyOnboardingRequests />
+      <BdeOnboardingPipelineSection />
 
       <BdeGrowingAccountsSection />
 

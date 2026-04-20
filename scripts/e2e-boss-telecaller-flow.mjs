@@ -93,6 +93,7 @@ async function main() {
       body: {
         name: `E2E Co ${t}`,
         industry: "SOLAR",
+        source: "NEXA_ENGINE",
       },
     });
     if (!res.ok || !json.ok) fail("company/create", `status ${res.status}`, json);

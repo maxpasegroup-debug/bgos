@@ -22,7 +22,12 @@ export async function GET(request: NextRequest) {
   const session = await requireIceconnectRole(request, MANAGER_ROLES);
   if (session instanceof NextResponse) return session;
 
-  if (!isIceconnectPrivileged(session.role)) {
+  const workforceManager =
+    session.employeeSystem === "ICECONNECT" &&
+    (session.iceconnectEmployeeRole === "RSM" || session.iceconnectEmployeeRole === "BDM");
+  const canManageTeam =
+    isIceconnectPrivileged(session.role) || session.role === UserRole.MANAGER || workforceManager;
+  if (!canManageTeam) {
     return NextResponse.json({ ok: false, error: "Forbidden", code: "FORBIDDEN" }, { status: 403 });
   }
 

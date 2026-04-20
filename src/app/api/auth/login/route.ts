@@ -27,6 +27,8 @@ import { isSuperBossEmail } from "@/lib/super-boss";
 import { iceconnectRoleHomePath } from "@/lib/iceconnect-employee";
 import { SOLAR_BOSS_HOME } from "@/lib/solar-boss-config";
 
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+
 const bodySchema = z.object({
   email: z.string().trim().min(1, "Email is required").email("Enter a valid email"),
   password: z.string().min(1, "Password is required"),
@@ -178,10 +180,12 @@ export async function POST(request: Request) {
       );
     }
 
-    console.info("[auth/login] Before password check", {
-      userId: user.id,
-      hasMembership: user.memberships.length > 0,
-    });
+    if (!IS_PRODUCTION) {
+      console.info("[auth/login] Before password check", {
+        userId: user.id,
+        hasMembership: user.memberships.length > 0,
+      });
+    }
     const valid = await verifyPassword(password, user.password);
     if (!valid) {
       return invalidPasswordResponse;
@@ -329,18 +333,20 @@ export async function POST(request: Request) {
           }),
     };
 
-    console.info("[auth/login] session-routing", {
-      userId: user.id,
-      email: user.email,
-      sessionRole,
-      effectiveRole,
-      companyId,
-      membershipCount: user.memberships.length,
-      needsOnboarding,
-      workspaceActivatedAt: workspaceActivatedAt?.toISOString() ?? null,
-      isSuperBoss: boss,
-      companyPlan,
-    });
+    if (!IS_PRODUCTION) {
+      console.info("[auth/login] session-routing", {
+        userId: user.id,
+        email: user.email,
+        sessionRole,
+        effectiveRole,
+        companyId,
+        membershipCount: user.memberships.length,
+        needsOnboarding,
+        workspaceActivatedAt: workspaceActivatedAt?.toISOString() ?? null,
+        isSuperBoss: boss,
+        companyPlan,
+      });
+    }
 
     const hostHeader = request.headers.get("host");
     const needsCrossDomainHandoff = crossDomainLoginRequired(hostHeader, effectiveRole);
@@ -407,14 +413,16 @@ export async function POST(request: Request) {
     if (resolvedCompanyId) {
       await setActiveCompanyCookie(res, resolvedCompanyId);
     }
-    console.info("[auth/login] response", {
-      userId: user.id,
-      nextPath: forcedNextPath,
-      needsCrossDomainHandoff,
-      userPayloadRole: userPayload.role,
-      userPayloadCompanyId: userPayload.companyId,
-      userPayloadKeys: Object.keys(userPayload),
-    });
+    if (!IS_PRODUCTION) {
+      console.info("[auth/login] response", {
+        userId: user.id,
+        nextPath: forcedNextPath,
+        needsCrossDomainHandoff,
+        userPayloadRole: userPayload.role,
+        userPayloadCompanyId: userPayload.companyId,
+        userPayloadKeys: Object.keys(userPayload),
+      });
+    }
     return res;
   } catch (e) {
     console.error("[auth/login] Unhandled error", e);

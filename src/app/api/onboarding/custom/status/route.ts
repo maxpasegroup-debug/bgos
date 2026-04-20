@@ -1,12 +1,12 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { jsonSuccess } from "@/lib/api-response";
-import { requireAuthWithCompany } from "@/lib/auth";
+import { requireActiveCompanyMembership } from "@/lib/auth";
 import { handleApiError } from "@/lib/route-error";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
-  const session = await requireAuthWithCompany(request);
+  const session = await requireActiveCompanyMembership(request);
   if (session instanceof NextResponse) return session;
 
   try {

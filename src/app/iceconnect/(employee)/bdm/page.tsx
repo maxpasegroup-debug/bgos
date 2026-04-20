@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 /** BDM dashboard — mid-level team control (placeholder). */
 export default function BdmHomePage() {
   const glass: React.CSSProperties = {
@@ -46,9 +48,12 @@ export default function BdmHomePage() {
         <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", margin: "6px 0 0" }}>No breakdown — summary only</p>
       </div>
 
-      <button
-        type="button"
+      <Link
+        href="/iceconnect/sales/onboarding"
         style={{
+          display: "block",
+          textAlign: "center",
+          textDecoration: "none",
           width: "100%",
           marginTop: 12,
           padding: "14px",
@@ -61,10 +66,9 @@ export default function BdmHomePage() {
           cursor: "pointer",
           fontFamily: "inherit",
         }}
-        onClick={() => alert("Invite BDE — wire API")}
       >
         + Add BDE
-      </button>
+      </Link>
     </div>
   );
 }

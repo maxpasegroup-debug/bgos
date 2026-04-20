@@ -1,5 +1,6 @@
 import "server-only";
 
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export type CompanyLimitsDto = {
@@ -28,16 +29,25 @@ export type CompanyLimitCheck =
  * Ensures a {@link CompanyLimit} row exists (defaults applied on first access).
  */
 export async function ensureCompanyLimits(companyId: string) {
-  return prisma.companyLimit.upsert({
-    where: { companyId },
-    create: {
-      companyId,
-      maxUsers: 12,
-      maxLeads: 300,
-      maxProjects: 50,
-    },
-    update: {},
-  });
+  try {
+    return await prisma.companyLimit.upsert({
+      where: { companyId },
+      create: {
+        companyId,
+        maxUsers: 12,
+        maxLeads: 300,
+        maxProjects: 50,
+      },
+      update: {},
+    });
+  } catch (e) {
+    // Concurrent onboarding/lead creation can race on first row insert.
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      const existing = await prisma.companyLimit.findUnique({ where: { companyId } });
+      if (existing) return existing;
+    }
+    throw e;
+  }
 }
 
 export async function getCompanyUsage(companyId: string) {

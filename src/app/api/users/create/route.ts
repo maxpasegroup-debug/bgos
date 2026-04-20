@@ -23,6 +23,7 @@ import {
   jsonErrorForUserUniqueViolation,
 } from "@/lib/user-email-availability";
 import { EMAIL_ALREADY_IN_USE_MESSAGE } from "@/lib/user-identity-messages";
+import { touchCompanyUsageAfterLimitsOrPlanChange } from "@/lib/usage-metrics-engine";
 
 const createBodySchema = z
   .object({
@@ -111,6 +112,9 @@ export async function POST(request: NextRequest) {
         },
       });
       return { user: u, membership: mem };
+    });
+    void touchCompanyUsageAfterLimitsOrPlanChange(session.companyId).catch((e) => {
+      console.error("[usage-metrics] failed after user create", e);
     });
 
     return NextResponse.json(

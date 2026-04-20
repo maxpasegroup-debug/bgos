@@ -137,6 +137,7 @@ export function BdeNexaDashboard() {
 
   async function loadAssist() {
     setBusy(true);
+    setErr(null);
     try {
       const res = await apiFetch("/api/nexa/sales-assist", {
         method: "POST",
@@ -144,8 +145,23 @@ export function BdeNexaDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stage: assist }),
       });
-      const j = (await res.json()) as { ok?: boolean; script?: string };
-      if (res.ok && j.script) setAssistScript(j.script);
+      const j = (await res.json()) as { ok?: boolean; script?: string; error?: string };
+      if (!res.ok || !j.ok) {
+        setErr(j.error ?? "Nexa assistant is temporarily unavailable.");
+        setAssistScript(
+          "Use this fallback: ask one clear need, confirm timeline, and propose a short live demo.",
+        );
+        return;
+      }
+      setAssistScript(
+        j.script ??
+          "Use this fallback: ask one clear need, confirm timeline, and propose a short live demo.",
+      );
+    } catch (e) {
+      setErr(formatFetchFailure(e, "Nexa assistant is temporarily unavailable."));
+      setAssistScript(
+        "Use this fallback: ask one clear need, confirm timeline, and propose a short live demo.",
+      );
     } finally {
       setBusy(false);
     }

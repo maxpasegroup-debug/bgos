@@ -58,11 +58,22 @@ export async function POST(request: Request) {
   const email = parsed.data.email.trim().toLowerCase();
 
   if (await isUserEmailAlreadyRegistered(email)) {
+    const existingOwner = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: "insensitive" } },
+      select: { id: true, name: true, email: true },
+    });
     return NextResponse.json(
       {
         ok: false as const,
-        error: EMAIL_ALREADY_IN_USE_MESSAGE,
+        error: "Company already exists",
         code: AUTH_ERROR_CODES.EMAIL_IN_USE,
+        existing: existingOwner
+          ? {
+              owner: existingOwner,
+            }
+          : null,
+        options: ["view_existing", "request_ownership"] as const,
+        message: EMAIL_ALREADY_IN_USE_MESSAGE,
       },
       { status: 409 },
     );

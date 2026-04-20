@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { RsmOnboardingControlSection } from "@/components/iceconnect/RsmOnboardingControlSection";
 import { RsmUsageOverviewPanel } from "@/components/iceconnect/RsmUsageOverviewPanel";
 
 /** RSM dashboard — territory metrics + capacity overview */
@@ -16,6 +17,7 @@ export default function RsmHomePage() {
   return (
     <div>
       <RsmUsageOverviewPanel />
+      <RsmOnboardingControlSection />
 
       <Link href="/iceconnect/sales/report" style={{ textDecoration: "none", color: "inherit" }}>
         <div
@@ -83,12 +85,12 @@ export default function RsmHomePage() {
         ACTIONS
       </p>
       <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
-        <button type="button" style={btn()} onClick={() => alert("Add BDE — wire API")}>
+        <Link href="/iceconnect/sales/onboarding" style={{ ...btn(), textDecoration: "none", textAlign: "center" }}>
           Add BDE
-        </button>
-        <button type="button" style={btn()} onClick={() => alert("Assign leads — wire API")}>
+        </Link>
+        <Link href="/iceconnect/sales/control" style={{ ...btn(), textDecoration: "none", textAlign: "center" }}>
           Assign leads
-        </button>
+        </Link>
       </div>
 
       <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", color: "rgba(255,255,255,0.25)", margin: "0 0 10px" }}>

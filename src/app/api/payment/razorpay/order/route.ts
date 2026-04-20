@@ -6,7 +6,7 @@ import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { PRICING_VERSION, RAZORPAY_PLAN_IDS, applyDiscountToPlanInr, inrToPaise } from "@/config/pricing";
 import { jsonError, jsonSuccess, parseJsonBodyZod } from "@/lib/api-response";
-import { requireAuthWithRoles } from "@/lib/auth";
+import { requireActiveCompanyMembership } from "@/lib/auth";
 import { handleApiError } from "@/lib/route-error";
 import { prisma } from "@/lib/prisma";
 import { razorpayAmountForPlan } from "@/lib/razorpay-billing";
@@ -30,8 +30,11 @@ export async function POST(request: NextRequest) {
   const httpsBlock = razorpayLiveRequiresHttpsOr400(request);
   if (httpsBlock) return httpsBlock;
 
-  const session = await requireAuthWithRoles(request, USER_ADMIN_ROLES);
+  const session = await requireActiveCompanyMembership(request);
   if (session instanceof NextResponse) return session;
+  if (!USER_ADMIN_ROLES.includes(session.role)) {
+    return jsonError(403, "FORBIDDEN", "You are not allowed to create payment orders.");
+  }
 
   if (!session.companyId) {
     return jsonError(400, "NEEDS_COMPANY", "Create a company before purchasing a plan.");
@@ -97,6 +100,7 @@ export async function POST(request: NextRequest) {
         userId: session.sub,
         companyId: session.companyId,
         plan: String(targetPlan),
+        expectedAmountPaise: String(amount),
         pricingVersion: PRICING_VERSION,
         razorpayPlanId: razorpayPlanId || "",
         discountCode: pricing.appliedDiscountCode || "",

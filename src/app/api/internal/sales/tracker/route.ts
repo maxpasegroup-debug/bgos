@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const sp = request.nextUrl.searchParams;
-    let targetUserId = sp.get("userId")?.trim() ?? session.userId;
+    const targetUserId = sp.get("userId")?.trim() ?? session.userId;
 
     // Ensure the caller has scope over the requested user
     if (targetUserId !== session.userId) {

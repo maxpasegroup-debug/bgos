@@ -12,18 +12,23 @@ const DATA: Lead[] = [
 ];
 
 export default function BdeLeadsPage() {
+  const [leads, setLeads] = useState<Lead[]>(DATA);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<string | "all">("all");
 
   const rows = useMemo(() => {
-    let r = DATA;
+    let r = leads;
     if (filter !== "all") r = r.filter((x) => x.status === filter);
     if (q.trim()) {
       const s = q.toLowerCase();
       r = r.filter((x) => x.name.toLowerCase().includes(s) || x.phone.includes(s));
     }
     return r;
-  }, [q, filter]);
+  }, [q, filter, leads]);
+
+  function markClosed(id: string) {
+    setLeads((prev) => prev.map((lead) => (lead.id === id ? { ...lead, status: "Closed" } : lead)));
+  }
 
   const glass: React.CSSProperties = {
     padding: "14px 16px",
@@ -97,7 +102,12 @@ export default function BdeLeadsPage() {
             >
               WhatsApp
             </a>
-            <button type="button" style={btn("#F87171")} onClick={() => alert("Mark closed — wire PATCH")}>
+            <button
+              type="button"
+              style={btn("#F87171")}
+              onClick={() => markClosed(L.id)}
+              disabled={L.status === "Closed"}
+            >
               Close
             </button>
           </div>
