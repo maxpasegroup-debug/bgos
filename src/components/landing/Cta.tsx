@@ -33,8 +33,14 @@ export function Cta() {
             variants={staggerItem}
             className="relative mx-auto max-w-3xl text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-[2.5rem] lg:leading-tight"
           >
-            Take Control of Your Business Today
+            Let&apos;s Build Your Business Growth System
           </motion.h2>
+          <motion.p
+            variants={staggerItem}
+            className="relative mx-auto mt-4 max-w-2xl text-sm text-white/75 sm:text-base"
+          >
+            Start today. Let Nexa guide your business forward.
+          </motion.p>
           <motion.div
             variants={staggerItem}
             className="relative mt-9 flex flex-col justify-center gap-3 sm:mt-10 sm:flex-row"
@@ -53,7 +59,7 @@ export function Cta() {
               >
                 <span className="animate-btn-shine absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/35 to-transparent" />
               </span>
-              <span className="relative z-10">Start Free Trial</span>
+              <span className="relative z-10">Activate BGOS</span>
             </MotionLink>
             <motion.div
               whileHover={{ scale: 1.03 }}

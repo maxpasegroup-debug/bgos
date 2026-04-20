@@ -8,10 +8,10 @@ import { blockGap, sectionDivider, sectionY } from "./spacing";
 import type { ComponentType } from "react";
 
 const problems = [
-  "Leads come in... but no proper follow-up",
-  "Team does not know who is handling what",
-  "Deals get delayed or lost",
-  "No clear view of revenue",
+  "Start Your Business System",
+  "Nexa Sets Direction",
+  "Your Team Executes",
+  "You Track Growth",
 ] as const;
 
 export function BusinessShowers() {
@@ -30,7 +30,7 @@ export function BusinessShowers() {
             variants={staggerItem}
             className="text-center text-3xl font-bold tracking-tight text-white sm:text-4xl"
           >
-            Where Most Businesses Lose Money
+            How It Works
           </motion.h2>
         </motion.div>
 
@@ -39,7 +39,7 @@ export function BusinessShowers() {
             <ProblemCard key={line} index={i} text={line} />
           ))}
         </div>
-        <p className="mt-8 text-center text-lg font-semibold text-indigo-200">BGOS fixes this completely.</p>
+        <p className="mt-8 text-center text-lg font-semibold text-indigo-200">Clarity. Control. Growth.</p>
       </Container>
     </SectionReveal>
   );

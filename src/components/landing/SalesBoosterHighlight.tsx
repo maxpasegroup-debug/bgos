@@ -47,25 +47,25 @@ const channels: ChannelCard[] = [
   },
 ];
 const benefits = [
-  "Auto lead capture",
-  "Auto follow-ups",
-  "No missed enquiries",
-  "Smart routing",
+  "Lead to conversion flow",
+  "Team execution clarity",
+  "Real-time tracking",
+  "Growth acceleration",
 ] as const;
 
 export function SalesBoosterHighlight() {
   return (
-    <SectionReveal id="sales-booster" className={`${sectionDivider} ${sectionY}`}>
+    <SectionReveal id="growth-engine" className={`${sectionDivider} ${sectionY}`}>
       <Container>
         <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[#111827] via-[#121821] to-[#1f1b3a] p-8 shadow-[0_0_70px_-20px_rgba(99,102,241,0.45)] sm:p-10">
           <div className="pointer-events-none absolute -right-28 -top-28 h-64 w-64 rounded-full bg-indigo-500/30 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-20 -left-16 h-56 w-56 rounded-full bg-violet-500/25 blur-3xl" />
 
           <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            Your Sales Engine, Running 24/7
+            Your Growth Engine
           </h2>
           <p className="mt-4 max-w-3xl text-base leading-relaxed text-white/70 sm:text-lg">
-            Connect WhatsApp, Instagram, Facebook and more. BGOS captures leads, assigns them, and follows up automatically using Nexa.
+            This is where your business comes alive. From leads to execution to results - everything flows through one intelligent system guided by Nexa.
           </p>
 
           <div className={`grid gap-4 sm:grid-cols-2 lg:grid-cols-5 ${blockGap}`}>
@@ -82,14 +82,14 @@ export function SalesBoosterHighlight() {
                   </div>
                   <div className="text-left">
                     <p className="text-sm font-semibold text-white">{channel.name}</p>
-                    <p className="text-xs text-white/55">Ready to connect</p>
+                    <p className="text-xs text-white/55">Ready for growth</p>
                   </div>
                 </div>
                 <button
                   type="button"
                   className="mt-4 inline-flex min-h-[34px] w-full items-center justify-center rounded-lg border border-white/15 bg-white/[0.03] px-3 text-xs font-medium text-white/85 transition hover:bg-white/[0.08]"
                 >
-                  Connect
+                  Activate
                 </button>
               </motion.div>
             ))}
@@ -105,10 +105,10 @@ export function SalesBoosterHighlight() {
 
           <div className="mt-8">
             <Link
-              href="/sales-booster"
+              href="/onboarding/nexa"
               className="inline-flex min-h-[48px] items-center justify-center rounded-xl bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] px-7 text-sm font-semibold tracking-wide text-white shadow-lg shadow-indigo-500/25 transition hover:brightness-110"
             >
-              Explore Sales Booster
+              Explore Your Growth Engine
             </Link>
           </div>
         </div>

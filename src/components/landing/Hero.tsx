@@ -138,20 +138,23 @@ export function Hero() {
               transition={{ duration: 0.6, delay: 0.08 }}
             className="text-xs font-semibold tracking-wide text-white/55 sm:text-sm"
             >
-              BGOS – Business Growth Operating System
+              ⚡ Built for Real Business Growth
             </motion.p>
             <h1 className="mt-4 text-4xl font-bold leading-[1.12] tracking-tight text-white sm:text-5xl">
-              Turn More Enquiries Into Confirmed Jobs - Without Chasing Every Lead
+              Run Your Business Like a CEO - Every Day
             </h1>
             <p className="mx-auto mt-6 max-w-lg text-base font-normal leading-relaxed text-white/70 sm:text-lg lg:mx-0">
-              BGOS brings your leads, follow-ups, team, and revenue into one simple system - so nothing gets missed.
+              BGOS is your Business Growth Operating System powered by Nexa - your virtual CEO for planning, execution, and growth.
             </p>
             <div className="mt-9 flex w-full max-w-md flex-col gap-3 sm:max-w-none sm:flex-row sm:items-center lg:mx-0">
               <div className="relative z-30 w-full sm:w-auto">
-                <OnboardBossButton className="relative min-h-[46px] w-full px-8 py-3.5 text-sm font-bold tracking-wide sm:w-auto" />
+                <OnboardBossButton
+                  label="Start Your Growth System"
+                  className="relative min-h-[46px] w-full px-8 py-3.5 text-sm font-bold tracking-wide sm:w-auto"
+                />
               </div>
               <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.99 }}>
-                <Link href="#solution" className={outlineCta}>
+                <Link href="#problem" className={outlineCta}>
                   See How It Works
                 </Link>
               </motion.div>

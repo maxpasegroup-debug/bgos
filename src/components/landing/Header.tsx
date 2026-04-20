@@ -22,11 +22,11 @@ export function Header() {
           <span className="text-sm font-bold tracking-tight text-white sm:text-base">BGOS</span>
         </Link>
         <nav className="flex items-center gap-4 sm:gap-6">
-          <Link href="#features" className="hidden text-sm font-medium text-white/70 transition-colors hover:text-white sm:inline">
-            Features
+          <Link href="/" className="hidden text-sm font-medium text-white/70 transition-colors hover:text-white sm:inline">
+            Home
           </Link>
-          <Link href="#sales-booster" className="hidden text-sm font-medium text-white/70 transition-colors hover:text-white sm:inline">
-            Sales Booster
+          <Link href="#problem" className="hidden text-sm font-medium text-white/70 transition-colors hover:text-white sm:inline">
+            How it Works
           </Link>
           <Link href="#pricing" className="hidden text-sm font-medium text-white/70 transition-colors hover:text-white sm:inline">
             Pricing
@@ -50,7 +50,7 @@ export function Header() {
             >
               <span className="animate-btn-shine absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
             </span>
-            <span className="relative z-10">Start Free</span>
+            <span className="relative z-10">Get Started</span>
           </MotionLink>
         </nav>
       </Container>

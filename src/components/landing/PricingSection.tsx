@@ -15,24 +15,38 @@ export function PricingSection() {
     <SectionReveal id="pricing" className={`${sectionDivider} ${sectionY}`}>
       <Container>
         <h2 className="text-center text-3xl font-bold tracking-tight text-white sm:text-4xl">
-          Simple Plans That Grow With You
+          Pricing for Your Business Operating System
         </h2>
         <p className="mt-4 text-center text-sm text-white/65 sm:text-base">
-          Start free. Upgrade anytime.
+          Choose the plan that matches your structure and growth stage.
         </p>
 
         <div className={`grid gap-6 lg:grid-cols-3 ${blockGap}`}>
           <PlanCard
-            title="Basic"
+            title="Starter"
             price={`₹${PRICING.BASIC.price}/month`}
-            points={["Manage your business"]}
-            ctaLabel="Start Free Trial"
+            label="For growing businesses getting started"
+            points={[
+              "Business Growth OS access",
+              "Nexa guidance",
+              "Core dashboard (sales + operations)",
+              "Limited team access (12 staff)",
+              "Lead management (up to 300)",
+            ]}
+            ctaLabel="Start with BGOS"
             ctaHref="/onboarding/nexa"
           />
           <PlanCard
             title="Pro"
             price={`₹${PRICING.PRO.price}/month`}
-            points={["Everything in Basic", "Sales Booster included"]}
+            label="For scaling businesses"
+            points={[
+              "Everything in Starter",
+              "Expanded team capacity",
+              "Advanced tracking and performance insights",
+              "Priority onboarding support",
+              "Growth optimization features",
+            ]}
             ctaLabel="Upgrade to Pro"
             ctaHref="/onboarding/nexa"
             highlight
@@ -41,12 +55,22 @@ export function PricingSection() {
           <PlanCard
             title="Enterprise"
             price="Custom"
-            points={["Multi-business expansion", "Custom setup"]}
-            ctaLabel="Contact Sales"
+            label="For structured organizations"
+            points={[
+              "Custom structure setup",
+              "Dedicated onboarding support",
+              "Advanced workflows",
+              "Higher limits based on business size",
+              "Direct Nexa-assisted planning",
+            ]}
+            ctaLabel="Request Setup"
             ctaHref={WA_LINK}
             external
           />
         </div>
+        <p className="mt-6 text-center text-sm text-white/65 sm:text-base">
+          Plans are designed based on your business structure and usage. Our team helps you activate the right setup.
+        </p>
       </Container>
     </SectionReveal>
   );
@@ -56,6 +80,7 @@ function PlanCard({
   title,
   price,
   points,
+  label,
   ctaLabel,
   ctaHref,
   highlight,
@@ -64,6 +89,7 @@ function PlanCard({
 }: {
   title: string;
   price: string;
+  label: string;
   points: string[];
   ctaLabel: string;
   ctaHref: string;
@@ -88,6 +114,7 @@ function PlanCard({
         </span>
       ) : null}
       <h3 className="text-xl font-semibold text-white">{title}</h3>
+      <p className="mt-2 text-sm text-white/65">{label}</p>
       <p className="mt-3 text-3xl font-bold tracking-tight text-white">{price}</p>
       <ul className="mt-5 space-y-2 text-sm text-white/70">
         {points.map((p) => (

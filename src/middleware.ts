@@ -60,7 +60,7 @@ function isServerActionRequest(request: NextRequest): boolean {
  * Page routes that skip JWT enforcement here (no redirect to `/login` from middleware).
  * `/` is excluded from this list on purpose — it is handled in `app/page.tsx`.
  */
-const PUBLIC_ROUTES = ["/login"] as const;
+const PUBLIC_ROUTES = ["/login", "/signup"] as const;
 
 /** Boss activation wizard + public client onboarding fill — not `/onboarding/manage` (auth required). */
 function isOnboardingPublicPath(p: string): boolean {
@@ -110,6 +110,7 @@ function skipsMiddlewareAuth(pathname: string, method: string): boolean {
 function isStrictAllowedPagePath(pathname: string): boolean {
   const p = normalizePathname(pathname);
   if (p === "/login") return true;
+  if (p === "/signup") return true;
   if (p === "/onboarding" || p.startsWith("/onboarding/")) return true;
   if (p === "/bgos-boss") return true;
   if (p === "/solar-boss" || p.startsWith("/solar-boss/")) return true;

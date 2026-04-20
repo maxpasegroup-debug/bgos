@@ -8,9 +8,9 @@
  *
  * Sections:
  *   1. Hero
- *   2. How It Works (3 steps)
- *   3. Earn ₹30K+
- *   4. Features (cards)
+ *   2. How It Works
+ *   3. Nexa
+ *   4. Core Benefits (cards)
  *   5. CTA
  */
 
@@ -86,12 +86,12 @@ function HeroSection() {
         className="inline-block rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] mb-6"
         style={{ borderColor: `${CYAN}30`, color: CYAN, background: `${CYAN}10` }}
       >
-        Business Growth OS
+        ⚡ Built for Real Business Growth
       </span>
 
       {/* Headline */}
       <h1 className="text-[38px] font-extrabold leading-[1.1] tracking-tight text-white mb-4">
-        Close Deals.{" "}
+        Run Your Business Like{" "}
         <span
           className="block"
           style={{
@@ -100,13 +100,13 @@ function HeroSection() {
             WebkitTextFillColor: "transparent",
           }}
         >
-          Earn More.
+          a CEO — Every Day
         </span>
       </h1>
 
       {/* Subtext */}
       <p className="text-[16px] leading-relaxed text-white/55 max-w-[300px] mx-auto mb-10">
-        BGOS gives your sales team leads, tracking, and earnings — all in one app.
+        BGOS is your Business Growth Operating System powered by Nexa — your virtual CEO that plans, tracks, and drives your entire business.
       </p>
 
       {/* CTA buttons */}
@@ -116,7 +116,7 @@ function HeroSection() {
           className="flex h-[52px] items-center justify-center rounded-2xl text-[15px] font-bold text-white tracking-wide shadow-lg active:scale-95 transition-transform"
           style={{ background: `linear-gradient(135deg, ${CYAN}, ${VIO})` }}
         >
-          Get Started Free
+          Start Your Growth System
         </Link>
         <a
           href="https://wa.me/918089239823?text=Hi%20I%20want%20BGOS"
@@ -126,7 +126,7 @@ function HeroSection() {
           style={{ borderColor: "rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.04)" }}
         >
           <IcoWhatsapp />
-          Talk to Team
+          Explore How It Works
         </a>
       </div>
 
@@ -142,7 +142,7 @@ function HeroSection() {
           ))}
         </div>
         <p className="text-[12px] text-white/35">
-          500+ businesses running on BGOS
+          Freedom for business owners. Clarity for teams. Growth for companies.
         </p>
       </div>
     </section>
@@ -157,23 +157,30 @@ const STEPS = [
   {
     n: "01",
     icon: IcoUserPlus,
-    title: "Join & Get Set Up",
-    desc: "Your account, team, and leads are ready in minutes.",
+    title: "Start Your Business System",
+    desc: "Set your growth system in motion in minutes.",
     color: CYAN,
   },
   {
     n: "02",
     icon: IcoPhone,
-    title: "Work Your Pipeline",
-    desc: "Call, track, and close deals from your phone.",
+    title: "Nexa Sets the Direction",
+    desc: "Your virtual CEO guides the next best moves daily.",
     color: VIO,
   },
   {
     n: "03",
     icon: IcoWallet,
-    title: "Get Paid",
-    desc: "Earnings credited automatically. Withdraw anytime.",
+    title: "Your Team Executes Clearly",
+    desc: "Everyone moves with clarity, priorities, and focus.",
     color: "#22C55E",
+  },
+  {
+    n: "04",
+    icon: IcoWallet,
+    title: "Track Growth in Real Time",
+    desc: "See performance, momentum, and risks as they happen.",
+    color: "#F59E0B",
   },
 ];
 
@@ -188,7 +195,7 @@ function HowItWorksSection() {
         How It Works
       </p>
       <h2 className="text-[28px] font-bold text-white text-center leading-tight mb-10">
-        Three steps to success
+        How BGOS Works
       </h2>
 
       {/* Steps */}
@@ -231,9 +238,9 @@ function HowItWorksSection() {
 
 function EarnSection() {
   const tiers = [
-    { role: "Sales Exec",   range: "₹15K – ₹30K", note: "Per month · direct commissions",  accent: "#22C55E" },
-    { role: "Team Lead",    range: "₹30K – ₹60K", note: "Per month · team + overrides",     accent: CYAN     },
-    { role: "Region Head",  range: "₹60K+",        note: "Per month · network earnings",     accent: VIO      },
+    { role: "Daily guidance", range: "01", note: "Nexa keeps your day focused on outcomes.", accent: "#22C55E" },
+    { role: "Smart decisions", range: "02", note: "Make faster calls with confidence and clarity.", accent: CYAN },
+    { role: "Team alignment", range: "03", note: "Your team stays aligned around growth priorities.", accent: VIO },
   ];
 
   return (
@@ -250,11 +257,11 @@ function EarnSection() {
         className="text-[11px] font-semibold uppercase tracking-[0.18em] mb-2"
         style={{ color: "#F59E0B" }}
       >
-        Earn With BGOS
+        Meet Nexa
       </p>
 
       <h2 className="text-[32px] font-extrabold text-white leading-tight mb-2">
-        Earn{" "}
+        Meet Nexa —{" "}
         <span
           style={{
             background: "linear-gradient(90deg, #F59E0B, #EF4444)",
@@ -262,11 +269,11 @@ function EarnSection() {
             WebkitTextFillColor: "transparent",
           }}
         >
-          ₹30,000+
+          Your Virtual CEO
         </span>
       </h2>
       <p className="text-[15px] text-white/50 leading-relaxed mb-8 max-w-[300px]">
-        Build your pipeline, close deals, and unlock recurring monthly bonuses.
+        Nexa guides your business daily — from planning to execution to growth decisions. No guesswork. No confusion. Just clarity and action.
       </p>
 
       {/* Tier cards */}
@@ -292,7 +299,7 @@ function EarnSection() {
       </div>
 
       <p className="text-[11px] text-white/20 mt-4 text-center">
-        Earnings vary based on performance and plan type
+        Built for founders who want more
       </p>
     </section>
   );
@@ -304,33 +311,33 @@ function EarnSection() {
 
 const FEATURES = [
   {
-    icon: "🎯",
-    title: "Lead Tracking",
-    desc: "Every enquiry captured, assigned, and followed up automatically.",
+    icon: "🧭",
+    title: "Plan Like a CEO",
+    desc: "Nexa helps you think, decide, and act at management level.",
     glow: CYAN,
   },
   {
-    icon: "💸",
-    title: "Live Wallet",
-    desc: "Watch your earnings grow in real time and withdraw on demand.",
+    icon: "⚙️",
+    title: "Execute Without Chaos",
+    desc: "Your team works with clarity, not confusion.",
     glow: "#22C55E",
   },
   {
-    icon: "⚡",
-    title: "Nexa AI Nudges",
-    desc: "Daily micro-prompts keep you on track and closing more deals.",
+    icon: "📈",
+    title: "Track What Matters",
+    desc: "Know performance, growth, and risks in real time.",
     glow: "#F59E0B",
   },
   {
-    icon: "👥",
-    title: "Team Network",
-    desc: "Build your BDM/RSM network and earn on every deal they close.",
+    icon: "⏱️",
+    title: "Save Time. Gain Control.",
+    desc: "Less firefighting, more leadership.",
     glow: VIO,
   },
   {
-    icon: "📊",
-    title: "Performance Reports",
-    desc: "See your progress, milestones, and rankings at a glance.",
+    icon: "🚀",
+    title: "Scale With Confidence",
+    desc: "Systems that grow with your business.",
     glow: "#EC4899",
   },
 ];
@@ -343,10 +350,10 @@ function FeaturesSection() {
         className="text-[11px] font-semibold uppercase tracking-[0.18em] mb-2 text-center"
         style={{ color: VIO }}
       >
-        Platform
+        Core Benefits
       </p>
       <h2 className="text-[28px] font-bold text-white text-center leading-tight mb-10">
-        Everything you need
+        Clarity. Control. Growth.
       </h2>
 
       {/* Feature cards grid */}
@@ -389,11 +396,11 @@ function CtaSection() {
       />
 
       <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-white/35 mb-3">
-        Ready to start?
+        Less stress. More clarity. Real growth.
       </p>
 
       <h2 className="text-[30px] font-extrabold text-white leading-tight mb-3">
-        Build your sales empire{" "}
+        Let’s Build Your{" "}
         <span
           style={{
             background: `linear-gradient(90deg, ${CYAN}, ${VIO})`,
@@ -401,12 +408,12 @@ function CtaSection() {
             WebkitTextFillColor: "transparent",
           }}
         >
-          this month
+          Business Growth System
         </span>
       </h2>
 
       <p className="text-[15px] text-white/40 max-w-[280px] mx-auto mb-10 leading-relaxed">
-        Join hundreds of businesses already running on BGOS.
+        Start today. Let Nexa guide your business forward. Designed for real-world growth.
       </p>
 
       <div className="flex flex-col gap-3 max-w-[300px] mx-auto">
@@ -421,7 +428,7 @@ function CtaSection() {
             style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)" }}
             aria-hidden
           />
-          <span className="relative">Start Now →</span>
+          <span className="relative">Activate BGOS</span>
         </Link>
 
         <a
@@ -432,7 +439,7 @@ function CtaSection() {
           style={{ borderColor: "rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.03)" }}
         >
           <IcoWhatsapp />
-          Talk to Team on WhatsApp
+          Stop managing chaos. Start leading growth.
         </a>
       </div>
     </section>

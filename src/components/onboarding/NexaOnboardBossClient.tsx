@@ -309,6 +309,14 @@ export function NexaOnboardBossClient({
         details?: unknown;
       };
       if (!res.ok || (j.ok !== true && j.success !== true)) {
+        if (state.mode === "new" && res.status === 409 && j.code === "EMAIL_IN_USE") {
+          setState((s) => ({ ...s, mode: "existing", step: 3 }));
+          setBanner({
+            text: "This email already has an account. Enter the same password to continue onboarding.",
+            showRetry: false,
+          });
+          return;
+        }
         const text = messageFromApiFailure(j, res.status);
         console.error("[NexaOnboardBoss] auth failed", { status: res.status, ...j });
         setBanner({

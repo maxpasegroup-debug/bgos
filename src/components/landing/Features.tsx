@@ -9,28 +9,28 @@ import { useId, type ComponentType } from "react";
 
 const features = [
   {
-    title: "Track every enquiry",
-    desc: "Keep every lead in one clear list.",
+    title: "Plan Like a CEO",
+    desc: "Think, decide, and act with Nexa guidance.",
     icon: LeadIcon,
   },
   {
-    title: "Respond faster",
-    desc: "Automated reminders help your team reply quickly.",
+    title: "Execute Without Chaos",
+    desc: "Your team executes with clarity, not confusion.",
     icon: AiIcon,
   },
   {
-    title: "See your deals clearly",
-    desc: "Know what is pending, moving, or won.",
+    title: "Track What Matters",
+    desc: "See growth, performance, and risks in real time.",
     icon: PipelineIcon,
   },
   {
-    title: "Save time daily",
-    desc: "Simple automation handles repeated work.",
+    title: "Save Time. Gain Control.",
+    desc: "Less firefighting. More leadership.",
     icon: CampaignIcon,
   },
   {
-    title: "Keep your team aligned",
-    desc: "Everyone knows who owns each lead.",
+    title: "Scale With Confidence",
+    desc: "Systems that grow with your business.",
     icon: ReportIcon,
   },
 ] as const;
@@ -230,7 +230,7 @@ export function Features() {
             variants={staggerItem}
             className="text-center text-3xl font-bold tracking-tight text-white sm:text-4xl"
           >
-            What You Get
+            Core Benefits
           </motion.h2>
 
           <div className={`grid gap-6 sm:grid-cols-2 lg:grid-cols-3 ${blockGap}`}>

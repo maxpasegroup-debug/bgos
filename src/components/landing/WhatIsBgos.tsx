@@ -23,13 +23,13 @@ export function WhatIsBgos() {
             variants={staggerItem}
             className="text-center text-3xl font-bold tracking-tight text-white sm:text-4xl"
           >
-            One System. Total Control.
+            Meet Nexa - Your Virtual CEO
           </motion.h2>
           <motion.p
             variants={staggerItem}
             className="mx-auto mt-5 max-w-3xl text-center text-base font-normal leading-relaxed text-white/70 sm:mt-6 sm:text-lg"
           >
-            BGOS connects your leads, team, sales, and operations into one place - so your business runs smoothly without constant follow-ups.
+            Nexa guides your business daily - from planning to execution to growth decisions. No guesswork. Just clarity and action.
           </motion.p>
         </motion.div>
 
@@ -40,9 +40,9 @@ export function WhatIsBgos() {
           viewport={{ once: true, margin: "-10%" }}
           variants={staggerContainer}
         >
-          <FlowNode label="Capture" sub="Catch every enquiry" />
-          <FlowNode label="Manage" sub="Track every deal" highlight />
-          <FlowNode label="Grow" sub="Increase conversions" />
+          <FlowNode label="Daily direction" sub="Know what matters first" />
+          <FlowNode label="Smart decisions" sub="Move with confidence" highlight />
+          <FlowNode label="Team alignment" sub="Keep everyone on one path" />
         </motion.div>
       </Container>
     </SectionReveal>
