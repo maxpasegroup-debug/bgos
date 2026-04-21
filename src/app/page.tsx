@@ -1,6 +1,14 @@
 import Link from "next/link";
+import { headers } from "next/headers";
+import { isIceconnectInHost } from "@/lib/host-routing";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const host = (await headers()).get("host") ?? "";
+  if (isIceconnectInHost(host)) {
+    const { default: IceconnectLoginPage } = await import("@/app/iceconnect/login/page");
+    return <IceconnectLoginPage />;
+  }
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-[#0B0F19] px-6 text-white">
       <div className="max-w-2xl text-center">

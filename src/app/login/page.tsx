@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { isIceconnectInHost } from "@/lib/host-routing";
 
 function isBossRole(role: unknown): boolean {
   return role === "BOSS" || role === "ADMIN";
@@ -60,6 +61,13 @@ export default function LoginPage() {
       const { user } = meJson;
       const role = user.role;
       const employeeDomain = user.employeeDomain;
+      const isIceDomain =
+        typeof window !== "undefined" && isIceconnectInHost(window.location.host ?? "");
+
+      if (isIceDomain) {
+        router.replace("/iceconnect");
+        return;
+      }
 
       if (role === "BOSS") {
         if (employeeDomain === "SOLAR") {
