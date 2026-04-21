@@ -5,30 +5,20 @@
 
 /** Platform owner (`BGOS_BOSS_EMAIL` + JWT `superBoss`) — internal control plane, not tenant solar dashboard. */
 export const SUPER_BOSS_HOME_PATH = "/bgos/control/v4";
-export const TECH_EXEC_HOME_PATH = "/iceconnect/tech";
+export const TECH_EXEC_HOME_PATH = "/iceconnect/sde";
 export const MICRO_FRANCHISE_HOME_PATH = "/iceconnect/micro-franchise";
 
-export const ROLE_HOME: Readonly<Record<string, string>> = {
-  /** Company boss — Nexa Command Center (`/bgos/control/v4`). Solar CRM lives under `/bgos/sales` etc. */
-  ADMIN: "/bgos/control/v4",
-  MANAGER: "/iceconnect/manager",
-  SALES_EXECUTIVE: "/iceconnect/sales",
-  TELECALLER: "/iceconnect/leads",
-  TECH_HEAD: "/iceconnect/technical",
-  TECH_EXECUTIVE: "/iceconnect/technical",
-  SALES_HEAD: "/iceconnect/sales-head",
-  CHANNEL_PARTNER: "/iceconnect/partner",
-  MICRO_FRANCHISE: MICRO_FRANCHISE_HOME_PATH,
-  OPERATIONS_HEAD: "/iceconnect/operations",
-  /** Field tech roles default to internal workspace when using BGOS Internal; adjust if you need classic field dashboards. */
-  SITE_ENGINEER: "/iceconnect/internal-sales",
-  PRO: "/iceconnect/internal-sales",
-  INSTALLATION_TEAM: "/iceconnect/internal-sales",
-  SERVICE_TEAM: "/iceconnect/service",
-  INVENTORY_MANAGER: "/iceconnect/inventory",
-  ACCOUNTANT: "/iceconnect/accounts",
-  LCO: "/iceconnect/loan",
-  HR_MANAGER: "/iceconnect/hr",
+export const ROLE_HOME: Record<string, string> = {
+  // Boss roles -> BGOS dashboard
+  ADMIN: "/bgos/dashboard",
+  MANAGER: "/bgos/dashboard",
+
+  // BGOS Employee roles -> ICECONNECT dashboards
+  SALES_HEAD: "/iceconnect/rsm",
+  SALES_EXECUTIVE: "/iceconnect/bdm",
+  TELECALLER: "/iceconnect/bde",
+  TECH_EXECUTIVE: TECH_EXEC_HOME_PATH,
+  TECH_HEAD: TECH_EXEC_HOME_PATH,
 };
 
 /** Roles that may use the company document vault (BGOS + `/iceconnect/documents` + `/api/document/*`). */
@@ -53,8 +43,6 @@ export const DOCUMENT_VAULT_ROLES = new Set<string>(DOCUMENT_VAULT_ROLES_LIST);
 
 /** ICECONNECT sales workspace (leads/customers/wallet). */
 const ICE_SALES_HUB = new Set<string>(["SALES_EXECUTIVE", "TELECALLER"]);
-/** ICECONNECT technical workspace. */
-const ICE_TECH_HUB = new Set<string>(["TECH_HEAD", "TECH_EXECUTIVE"]);
 
 /** BGOS onboarding workflow engine (forms, tech queue, delivery). */
 const ONBOARDING_WORKFLOW_ROLES = new Set<string>([
@@ -73,69 +61,10 @@ const PAGE_RULES: RouteRule[] = [
   { prefix: "/solar-boss", roles: new Set(["ADMIN"]) },
   { prefix: "/bgos", roles: new Set(["ADMIN", "MANAGER"]) },
   { prefix: "/sales-booster", roles: new Set(["ADMIN", "MANAGER"]) },
-  { prefix: "/iceconnect/manager", roles: new Set(["MANAGER"]) },
-  {
-    prefix: "/iceconnect/sales/onboarding",
-    roles: new Set(["SALES_EXECUTIVE", "TELECALLER", "SALES_HEAD", "ADMIN"]),
-  },
-  { prefix: "/iceconnect/sales", roles: new Set(["SALES_EXECUTIVE", "TELECALLER", "ADMIN"]) },
-  { prefix: "/iceconnect/sales-head", roles: new Set(["SALES_HEAD", "ADMIN"]) },
-  { prefix: "/iceconnect/partner", roles: new Set(["CHANNEL_PARTNER", "ADMIN"]) },
-  { prefix: "/iceconnect/operations", roles: new Set(["OPERATIONS_HEAD", "ADMIN"]) },
-  { prefix: "/iceconnect/site", roles: new Set(["SITE_ENGINEER", "ADMIN"]) },
-  { prefix: "/iceconnect/pro", roles: new Set(["PRO", "ADMIN"]) },
-  { prefix: "/iceconnect/install", roles: new Set(["INSTALLATION_TEAM", "ADMIN"]) },
-  { prefix: "/iceconnect/service", roles: new Set(["SERVICE_TEAM", "ADMIN"]) },
-  { prefix: "/iceconnect/inventory", roles: new Set(["INVENTORY_MANAGER", "ADMIN"]) },
-  { prefix: "/iceconnect/accounts", roles: new Set(["ACCOUNTANT", "ADMIN"]) },
-  { prefix: "/iceconnect/loan", roles: new Set(["LCO", "ADMIN"]) },
-  { prefix: "/iceconnect/hr", roles: new Set(["HR_MANAGER", "ADMIN"]) },
-  { prefix: "/iceconnect/my-journey", roles: ICE_SALES_HUB },
-  { prefix: "/iceconnect/leads", roles: ICE_SALES_HUB },
-  { prefix: "/iceconnect/onboarding", roles: ICE_SALES_HUB },
-  { prefix: "/iceconnect/customers", roles: ICE_SALES_HUB },
-  { prefix: "/iceconnect/wallet", roles: ICE_SALES_HUB },
-  { prefix: "/iceconnect/micro-franchise", roles: new Set(["MICRO_FRANCHISE"]) },
-  { prefix: "/iceconnect/notifications", roles: ICE_SALES_HUB },
-  {
-    prefix: "/iceconnect/profile",
-    roles: new Set([...ICE_SALES_HUB, "MICRO_FRANCHISE"]),
-  },
-  { prefix: "/iceconnect/tech", roles: ICE_TECH_HUB },
-  { prefix: "/iceconnect/technical", roles: ICE_TECH_HUB },
-  { prefix: "/onboarding/manage", roles: ONBOARDING_WORKFLOW_ROLES },
-  {
-    prefix: "/iceconnect/tech/onboarding",
-    roles: new Set(["TECH_HEAD", "TECH_EXECUTIVE", "ADMIN"]),
-  },
-  {
-    prefix: "/iceconnect/internal-sales",
-    roles: new Set(["SALES_EXECUTIVE", "TELECALLER", "ADMIN", "TECH_HEAD"]),
-  },
-  {
-    prefix: "/iceconnect/internal-tech",
-    roles: new Set(["TECH_HEAD", "TECH_EXECUTIVE", "ADMIN"]),
-  },
-  {
-    prefix: "/bgos/internal-tech",
-    roles: new Set(["TECH_HEAD", "TECH_EXECUTIVE", "ADMIN", "MANAGER"]),
-  },
-  {
-    prefix: "/iceconnect/internal-onboarding",
-    roles: new Set(["OPERATIONS_HEAD", "SITE_ENGINEER", "PRO", "INSTALLATION_TEAM"]),
-  },
-  {
-    prefix: "/bgos/internal-onboarding",
-    roles: new Set([
-      "ADMIN",
-      "MANAGER",
-      "OPERATIONS_HEAD",
-      "SITE_ENGINEER",
-      "PRO",
-      "INSTALLATION_TEAM",
-    ]),
-  },
-  { prefix: "/iceconnect/documents", roles: DOCUMENT_VAULT_ROLES },
+  { prefix: "/iceconnect/rsm", roles: new Set(["RSM"]) },
+  { prefix: "/iceconnect/bdm", roles: new Set(["BDM"]) },
+  { prefix: "/iceconnect/bde", roles: new Set(["BDE"]) },
+  { prefix: "/iceconnect/sde", roles: new Set(["TECH_EXECUTIVE", "TECH_HEAD", "ADMIN"]) },
 ];
 
 const API_RULES: RouteRule[] = [
@@ -462,34 +391,10 @@ export function postLoginDestination(
 
 /** Path segment after `/iceconnect/` → roles allowed on that dashboard. */
 export const ICECONNECT_DASHBOARD_ROLES: Record<string, readonly string[]> = {
-  manager: ["MANAGER"],
-  "my-journey": ["SALES_EXECUTIVE", "TELECALLER"],
-  leads: ["SALES_EXECUTIVE", "TELECALLER"],
-  onboarding: ["SALES_EXECUTIVE", "TELECALLER"],
-  customers: ["SALES_EXECUTIVE", "TELECALLER"],
-  wallet: ["SALES_EXECUTIVE", "TELECALLER"],
-  notifications: ["SALES_EXECUTIVE", "TELECALLER"],
-  profile: ["SALES_EXECUTIVE", "TELECALLER", "MICRO_FRANCHISE"],
-  "micro-franchise": ["MICRO_FRANCHISE"],
-  tech: ["TECH_HEAD", "TECH_EXECUTIVE"],
-  technical: ["TECH_HEAD", "TECH_EXECUTIVE"],
-  "tech-onboarding": ["TECH_HEAD", "TECH_EXECUTIVE"],
-  sales: ["SALES_EXECUTIVE", "TELECALLER"],
-  "sales-head": ["SALES_HEAD"],
-  partner: ["CHANNEL_PARTNER"],
-  operations: ["OPERATIONS_HEAD"],
-  site: ["SITE_ENGINEER"],
-  pro: ["PRO"],
-  install: ["INSTALLATION_TEAM"],
-  service: ["SERVICE_TEAM"],
-  inventory: ["INVENTORY_MANAGER"],
-  accounts: ["ACCOUNTANT"],
-  loan: ["LCO"],
-  hr: ["HR_MANAGER"],
-  "internal-sales": ["SALES_EXECUTIVE", "TELECALLER", "TECH_HEAD"],
-  "internal-tech": ["TECH_HEAD", "TECH_EXECUTIVE"],
-  "internal-onboarding": ["OPERATIONS_HEAD", "SITE_ENGINEER", "PRO", "INSTALLATION_TEAM"],
-  documents: [...DOCUMENT_VAULT_ROLES_LIST],
+  rsm: ["RSM"],
+  bdm: ["BDM"],
+  bde: ["BDE"],
+  sde: ["TECH_EXECUTIVE", "TECH_HEAD", "ADMIN"],
 };
 
 export function canAccessIceconnectDashboard(segment: string, role: string): boolean {

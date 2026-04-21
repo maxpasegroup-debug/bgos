@@ -44,9 +44,9 @@ export function BgosSidebar() {
     { id: "pipeline", label: "Pipeline", href: "/bgos/sales", icon: SalesIcon },
     { id: "installations", label: "Installations", href: "/bgos/operations", icon: OpsIcon },
     { id: "inventory", label: "Inventory", href: "/bgos/inventory", icon: InventoryIcon },
-    { id: "team", label: "Team", href: "/bgos/team", icon: TeamIcon },
+    { id: "team", label: "Team", href: "/bgos/hr", icon: TeamIcon },
     { id: "finance", label: "Finance", href: "/bgos/money", icon: RevenueIcon },
-    { id: "reports", label: "Reports", href: "/bgos/revenue", icon: ChartReportIcon },
+    { id: "reports", label: "Reports", href: "/bgos/dashboard", icon: ChartReportIcon },
     { id: "settings", label: "Settings", href: "/bgos/settings", icon: SettingsIcon },
   ];
 

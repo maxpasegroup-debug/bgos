@@ -41,12 +41,11 @@ async function verifyCookieJwt(token: string): Promise<CookieSessionClaims | nul
 
 /** Explicit page rules requested by product/security. */
 function passesExplicitPageRules(pathname: string, role: string): boolean | null {
-  if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) {
-    // Any authenticated role.
-    return true;
-  }
   if (pathname === "/solar-boss" || pathname.startsWith("/solar-boss/")) {
     return role === "ADMIN";
+  }
+  if (pathname === "/iceconnect/sde" || pathname.startsWith("/iceconnect/sde/")) {
+    return role === "TECH_EXECUTIVE" || role === "TECH_HEAD" || role === "ADMIN";
   }
   if (pathname === "/solar" || pathname.startsWith("/solar/")) {
     return role === "ADMIN" || role === "MANAGER";
@@ -116,7 +115,7 @@ export function middleware(req: NextRequest) {
       return NextResponse.redirect(new URL("/login", req.url));
     }
 
-    // Explicit rules first (/dashboard, /solar/*, /solar-boss/*).
+    // Explicit rules first (/solar/*, /solar-boss/*).
     const explicit = passesExplicitPageRules(pathname, role);
     if (explicit === false) {
       if (pathname.startsWith("/api")) {

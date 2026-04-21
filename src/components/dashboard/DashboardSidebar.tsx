@@ -18,10 +18,10 @@ const navItems = [
   {
     id: "revenue",
     label: "Revenue",
-    href: "/bgos/revenue",
+    href: "/bgos/dashboard",
     icon: RevenueIcon,
   },
-  { id: "risks", label: "Risks", href: "/bgos/risks", icon: RisksIcon },
+  { id: "risks", label: "Risks", href: "/bgos/dashboard", icon: RisksIcon },
   { id: "nexa", label: "NEXA", href: "/bgos/nexa", icon: NexaIcon },
 ] as const;
 

@@ -8,7 +8,7 @@ export const ICECONNECT_EMPLOYEE_PATH: Record<IceconnectEmployeeRole, string> = 
   RSM:       "/iceconnect/rsm",
   BDM:       "/iceconnect/bdm",
   BDE:       "/iceconnect/bde",
-  TECH_EXEC: "/iceconnect/tech",
+  TECH_EXEC: "/iceconnect/sde",
 };
 
 export function iceconnectRoleHomePath(
@@ -31,8 +31,8 @@ export function requiresIceconnectSystemForPath(pathname: string): boolean {
     p === "/iceconnect/onboard" ||
     p === "/iceconnect/sales/onboarding" ||
     p.startsWith("/iceconnect/sales/onboarding/") ||
-    p === "/iceconnect/tech" ||
-    p.startsWith("/iceconnect/tech/")
+    p === "/iceconnect/sde" ||
+    p.startsWith("/iceconnect/sde/")
   );
 }
 
@@ -44,7 +44,7 @@ export function expectedRoleForIceconnectPath(
   if (p === "/iceconnect/rsm") return "RSM";
   if (p === "/iceconnect/bdm") return "BDM";
   if (p === "/iceconnect/bde") return "BDE";
-  if (p === "/iceconnect/tech" || p.startsWith("/iceconnect/tech/")) return "TECH_EXEC";
+  if (p === "/iceconnect/sde" || p.startsWith("/iceconnect/sde/")) return "TECH_EXEC";
   return null;
 }
 

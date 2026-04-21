@@ -3,10 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { isIceconnectInHost } from "@/lib/host-routing";
-
-function isBossRole(role: unknown): boolean {
-  return role === "BOSS" || role === "ADMIN";
-}
+import { getRoleHome } from "@/lib/role-routing";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -35,12 +32,12 @@ export default function LoginPage() {
 
       const meRes = await fetch("/api/auth/me", { credentials: "include" });
       let meJson: {
-        user?: { role?: string; employeeDomain?: "BGOS" | "SOLAR" } | null;
+        user?: { role?: string; employeeDomain?: "BGOS" | "SOLAR"; superBoss?: boolean } | null;
         requiresRelogin?: boolean;
       };
       try {
         meJson = (await meRes.json()) as {
-          user?: { role?: string; employeeDomain?: "BGOS" | "SOLAR" } | null;
+          user?: { role?: string; employeeDomain?: "BGOS" | "SOLAR"; superBoss?: boolean } | null;
           requiresRelogin?: boolean;
         };
       } catch {
@@ -58,36 +55,35 @@ export default function LoginPage() {
         return;
       }
 
-      const { user } = meJson;
-      const role = user.role;
-      const employeeDomain = user.employeeDomain;
+      const role = meJson?.user?.role ?? "";
+      const employeeDomain = meJson?.user?.employeeDomain ?? "";
+      const superBoss = meJson?.user?.superBoss === true;
       const isIceDomain =
         typeof window !== "undefined" && isIceconnectInHost(window.location.host ?? "");
 
+      // Super boss always goes to control
+      if (superBoss) {
+        router.replace("/bgos/control");
+        return;
+      }
+
       if (isIceDomain) {
-        router.replace("/iceconnect");
+        const home = getRoleHome(role);
+        router.replace(home || "/login");
         return;
       }
 
-      if (role === "BOSS") {
+      if (role === "ADMIN" || role === "MANAGER") {
         if (employeeDomain === "SOLAR") {
-          router.replace("/solar/dashboard");
+          router.replace("/solar-boss");
         } else {
-          router.replace("/dashboard");
+          router.replace("/bgos/dashboard");
         }
         return;
       }
 
-      if (isBossRole(role)) {
-        if (employeeDomain === "SOLAR") {
-          router.replace("/solar/dashboard");
-        } else {
-          router.replace("/dashboard");
-        }
-        return;
-      }
-
-      router.replace("/dashboard");
+      const home = getRoleHome(role);
+      router.replace(home || "/login");
     } catch {
       setError("Login failed. Please try again.");
     } finally {
