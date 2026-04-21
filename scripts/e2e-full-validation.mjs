@@ -22,6 +22,7 @@ if (fs.existsSync(envPath)) {
     const idx = t.indexOf("=");
     if (idx < 1) continue;
     const key = t.slice(0, idx).trim();
+    if (!key) continue;
     const val = t.slice(idx + 1).trim().replace(/^"(.*)"$/, "$1");
     if (!(key in process.env)) process.env[key] = val;
   }
