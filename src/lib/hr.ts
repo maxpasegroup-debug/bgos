@@ -1,7 +1,6 @@
 import { UserRole } from "@prisma/client";
 
 export const HR_MANAGER_ROLES: UserRole[] = [
-  UserRole.HR_MANAGER,
   UserRole.ADMIN,
   UserRole.MANAGER,
 ];

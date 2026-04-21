@@ -9,7 +9,6 @@ import { useEffect, useMemo, useState } from "react";
 
 const MotionLink = motion(Link);
 import { DashboardSurface } from "@/components/dashboard/DashboardSurface";
-import { BgosAddEmployeeForm } from "./BgosAddEmployeeForm";
 import { BgosAnalyticsTrendChart } from "./BgosAnalyticsTrendChart";
 import { BgosFinancialOverview } from "./BgosFinancialOverview";
 import { BgosLeadsAssignmentPanel } from "./BgosLeadsAssignmentPanel";
@@ -758,8 +757,7 @@ function TeamPanel({
             <h2 className="mt-1 text-base font-semibold tracking-tight text-white sm:text-lg">
               Add employee
             </h2>
-            <p className="mt-1 text-xs text-white/45">New company login — share credentials securely.</p>
-            <BgosAddEmployeeForm />
+            <p className="mt-1 text-xs text-white/45">Employee creation module has been deprecated.</p>
           </DashboardSurface>
         </motion.div>
       ) : null}

@@ -107,7 +107,7 @@ async function main() {
     return u;
   }
 
-  const telecaller = await member("Sales TC", "9111111111", "telecaller@iceconnect.demo", UserRole.TELECALLER);
+  const telecaller = await member("Sales TC", "9111111111", "telecaller@iceconnect.demo", UserRole.BDM);
 
   const internalCompany = await prisma.company.create({
     data: {
@@ -133,23 +133,23 @@ async function main() {
     data: {
       userId: telecaller.id,
       companyId: internalCompany.id,
-      role: companyMembershipClass(UserRole.SALES_EXECUTIVE),
-      jobRole: UserRole.SALES_EXECUTIVE,
+      role: companyMembershipClass(UserRole.BDM),
+      jobRole: UserRole.BDM,
     },
   });
 
-  const engineer = await member("Field Engineer", "9222222222", "engineer@iceconnect.demo", UserRole.SITE_ENGINEER);
+  const engineer = await member("Field Engineer", "9222222222", "engineer@iceconnect.demo", UserRole.TECH_EXECUTIVE);
   await prisma.userCompany.create({
     data: {
       userId: engineer.id,
       companyId: internalCompany.id,
-      role: companyMembershipClass(UserRole.SITE_ENGINEER),
-      jobRole: UserRole.SITE_ENGINEER,
+      role: companyMembershipClass(UserRole.TECH_EXECUTIVE),
+      jobRole: UserRole.TECH_EXECUTIVE,
     },
   });
-  const installer = await member("Lead Installer", "9333333333", "installer@iceconnect.demo", UserRole.INSTALLATION_TEAM);
-  const accounts = await member("Accounts", "9444444444", "accounts@iceconnect.demo", UserRole.ACCOUNTANT);
-  const service = await member("Service Desk", "9555555555", "service@iceconnect.demo", UserRole.SERVICE_TEAM);
+  const installer = await member("Lead Installer", "9333333333", "installer@iceconnect.demo", UserRole.TECH_EXECUTIVE);
+  const accounts = await member("Accounts", "9444444444", "accounts@iceconnect.demo", UserRole.MANAGER);
+  const service = await member("Service Desk", "9555555555", "service@iceconnect.demo", UserRole.TECH_EXECUTIVE);
 
   await prisma.lead.create({
     data: {

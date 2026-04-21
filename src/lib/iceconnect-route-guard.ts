@@ -16,7 +16,7 @@ function workforceRoleAllowedByLegacySet(
     allowedIceRoles.add("RSM");
     allowedIceRoles.add("BDM");
   }
-  if (allowedRoles.includes("SALES_EXECUTIVE") || allowedRoles.includes("TELECALLER")) {
+  if (allowedRoles.includes("BDM")) {
     allowedIceRoles.add("BDE");
   }
   if (allowedRoles.includes("TECH_HEAD") || allowedRoles.includes("TECH_EXECUTIVE")) {

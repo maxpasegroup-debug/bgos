@@ -15,7 +15,7 @@ function mapRole(input: z.infer<typeof bodySchema>["role"]): UserRole {
   if (input === "boss") return UserRole.ADMIN;
   if (input === "sales_manager") return UserRole.MANAGER;
   if (input === "technical") return UserRole.TECH_EXECUTIVE;
-  return UserRole.SALES_EXECUTIVE;
+  return UserRole.BDM;
 }
 
 export async function POST(request: NextRequest) {

@@ -12,12 +12,7 @@ datasource db {
 enum UserRole {
   ADMIN
   MANAGER
-  SALES_HEAD
-  SALES_EXECUTIVE
-  /**
-   * Field sales / dialling — same workspace capabilities as sales executive.
-   */
-  TELECALLER
+  BDM
   /**
    * BGOS Internal tech lead (delivery pipeline).
    */
@@ -26,20 +21,6 @@ enum UserRole {
    * BGOS Internal tech execution (delivery pipeline).
    */
   TECH_EXECUTIVE
-  CHANNEL_PARTNER
-  OPERATIONS_HEAD
-  SITE_ENGINEER
-  PRO
-  INSTALLATION_TEAM
-  SERVICE_TEAM
-  INVENTORY_MANAGER
-  ACCOUNTANT
-  LCO
-  HR_MANAGER
-  /**
-   * Online micro-franchise partner (ICECONNECT workspace, referral + wallet).
-   */
-  MICRO_FRANCHISE
 }
 
 /// Which product surface this user belongs to (ICECONNECT = field / solar workforce app).
@@ -379,15 +360,6 @@ model Company {
    */
   referralPhone           String?
   /**
-   * Sales-launch channel partner (cross-company referral tracking).
-   */
-  launchChannelPartnerId  String?
-  /**
-   * Micro-franchise partner linked by referral phone (takes precedence over channel partner when matched).
-   */
-  microFranchisePartnerId String?
-
-  /**
    * Acquisition channel for Nexa / CRM attribution: direct, sales, franchise.
    */
   sourceType String? @map("source_type")
@@ -418,49 +390,27 @@ model Company {
   attendances                  Attendance[]
   salaries                     Salary[]
   products                     Product[]
-  inventoryItems               InventoryItem[]
   stocks                       Stock[]
   stockLogs                    StockLog[]
-  channelPartners              ChannelPartner[]
-  commissions                  Commission[]
   siteVisits                   SiteVisit[]
   approvals                    Approval[]
   growthPlan                   CompanyGrowthPlan?
-  employeePips                 EmployeePip[]
-  lcoLoans                     LcoLoan[]
-  customerUsers                CustomerPortalUser[]
-  complaints                   CustomerComplaint[]
   razorpayPayments             RazorpayPayment[]
   onboardingTasks              OnboardingTask[]
   internalLeadActivities       InternalLeadActivity[]
   internalInAppNotifications   InternalInAppNotification[]
-  internalEmployeeDailyTargets InternalEmployeeDailyTarget[]
   internalNexaSupportTickets   InternalNexaSupportTicket[]
   userManuals                  UserManual[]
-  salesExecutiveMonthlyTargets SalesExecutiveMonthlyTarget[]
   onboardingFormTemplates      OnboardingFormTemplate[]
   onboardingSubmissions        OnboardingSubmission[]
   onboardingSessions           OnboardingSession[]
   onboardingRecords            Onboarding[]
   onboardingPipeline           OnboardingPipeline[]
   ownershipClaims             OwnershipClaim[]
-  launchChannelPartner         LaunchChannelPartner?             @relation("LaunchPartnerCompany", fields: [launchChannelPartnerId], references: [id], onDelete: SetNull)
-  microFranchisePartner        MicroFranchisePartner?            @relation(fields: [microFranchisePartnerId], references: [id], onDelete: SetNull)
-  microFranchiseCommissionTxs  CommissionTransaction[]
   techRequests                 TechRequest[]
-  salesBoosterMessages         SalesBoosterOmnichannelMessage[]
-  salesBoosterCampaigns        SalesBoosterOmnichannelCampaign[]
-  salesBoosterConnections      SalesBoosterChannelConnection[]
-  salesBoosterAutomationFlow   SalesBoosterAutomationFlow?
-  performanceMetrics           PerformanceMetric[]
-  salesNetworkTargets          SalesNetworkTarget[]
-  networkCommissions           NetworkCommission[]
-  promotionTrackers            PromotionTracker[]
   techQueueEntries             TechQueueEntry[]
   nexaTasks                    NexaTask[]
   techRoundRobinState          TechRoundRobinState?
-  salesHierarchySubscriptions  SalesHierarchySubscription[]
-  salesHierarchyEarnings       SalesHierarchyEarning[]
   nexaCoachingLogs             NexaCoachingLog[]
   nexaCompetitions             NexaCompetition[]
   nexaEmployeeWelfare          NexaEmployeeWelfare[]
@@ -475,8 +425,6 @@ model Company {
 
   @@index([name])
   @@index([ownerId])
-  @@index([launchChannelPartnerId])
-  @@index([microFranchisePartnerId])
 }
 
 /// Enforces max users, leads, and projects per company (upgrade path when exceeded).
@@ -609,69 +557,6 @@ enum SalesBoosterCampaignState {
 /**
  * In-app omnichannel thread messages (company-scoped). Mapped to `sales_booster_messages`.
  */
-model SalesBoosterOmnichannelMessage {
-  id        String                  @id @default(cuid())
-  companyId String
-  channel   SalesBoosterOmnichannel
-  sender    String
-  content   String                  @db.Text
-  leadId    String?
-  createdAt DateTime                @default(now())
-  readAt    DateTime?
-
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  @@index([companyId, createdAt(sort: Desc)])
-  @@map("sales_booster_messages")
-}
-
-model SalesBoosterOmnichannelCampaign {
-  id             String                    @id @default(cuid())
-  companyId      String
-  channel        SalesBoosterOmnichannel
-  status         SalesBoosterCampaignState @default(DRAFT)
-  name           String?
-  sentCount      Int                       @default(0)
-  deliveredCount Int                       @default(0)
-  responseCount  Int                       @default(0)
-  createdAt      DateTime                  @default(now())
-  updatedAt      DateTime                  @updatedAt
-
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  @@index([companyId])
-  @@map("sales_booster_campaigns")
-}
-
-model SalesBoosterChannelConnection {
-  id          String                      @id @default(cuid())
-  companyId   String
-  channel     SalesBoosterOmnichannel
-  status      SalesBoosterConnectionState @default(DISCONNECTED)
-  credentials Json?
-  createdAt   DateTime                    @default(now())
-  updatedAt   DateTime                    @updatedAt
-
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  @@unique([companyId, channel])
-  @@map("sales_booster_connections")
-}
-
-/**
- * Single automation flow JSON per company (chatbot builder).
- */
-model SalesBoosterAutomationFlow {
-  id               String   @id @default(cuid())
-  companyId        String   @unique
-  jsonFlow         Json
-  autoReplyEnabled Boolean  @default(false)
-  updatedAt        DateTime @updatedAt
-
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  @@map("sales_booster_automation_flows")
-}
 
 /**
  * Boss monthly targets on Home — drives projections (1Y / multi-year copy).
@@ -686,86 +571,6 @@ model CompanyGrowthPlan {
   company               Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 }
 
-/**
- * Performance improvement plan for an employee.
- */
-model EmployeePip {
-  id          String    @id @default(cuid())
-  companyId   String
-  userId      String
-  goal        String    @db.Text
-  progress    Int       @default(0)
-  isCompleted Boolean   @default(false)
-  dueDate     DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([companyId])
-  @@index([userId])
-  @@index([companyId, userId, isCompleted])
-}
-
-/**
- * Loan compliance tracker linked to customer lead.
- */
-model LcoLoan {
-  id         String   @id @default(cuid())
-  companyId  String
-  leadId     String
-  loanAmount Float
-  /// PENDING | APPROVED | REJECTED
-  status     String   @default("PENDING")
-  notes      String?  @db.Text
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-
-  @@index([companyId])
-  @@index([leadId])
-  @@index([status])
-}
-
-/**
- * Customer login account for ICECONNECT customer portal (one per customer lead).
- */
-model CustomerPortalUser {
-  id           String   @id @default(cuid())
-  companyId    String
-  leadId       String   @unique
-  mobile       String
-  passwordHash String
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  lead         Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-
-  @@unique([companyId, mobile])
-  @@index([companyId])
-  @@index([mobile])
-}
-
-/**
- * Customer complaints linked to a customer lead.
- */
-model CustomerComplaint {
-  id          String   @id @default(cuid())
-  companyId   String
-  leadId      String
-  description String   @db.Text
-  /// PENDING | RESOLVED
-  status      String   @default("PENDING")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-
-  @@index([companyId])
-  @@index([leadId])
-  @@index([status])
-}
 
 /// Processed billing webhook deliveries (e.g. Stripe `evt_*`) — prevents double-applying upgrades.
 model BillingWebhookEvent {
@@ -810,89 +615,19 @@ model UserCompany {
   /// READY | PENDING_BUILD | IN_PROGRESS | LIVE
   status            String   @default("READY")
   createdAt         DateTime @default(now())
-  /**
-   * Sales / HR network layer (BGOS Control v3) — optional; legacy rows stay null.
-   */
-  salesNetworkRole  SalesNetworkRole?
-  /** Manager in the same company workspace (RSM → BDM → BDE chain). */
-  parentUserId      String?
-  /** RSM region label (e.g. South India). */
-  region            String?
   archivedAt        DateTime?
-  /// Sales hierarchy V1 — active customer subs counted for this member (see sales_subscriptions).
-  activeSubscriptionsCount Int      @default(0)
-  totalPoints              Int      @default(0)
-  /// BDE: capped recurring; BDM+ false = full recurring (config-driven).
-  recurringCap             Boolean  @default(true)
-  /// BDM: max direct BDEs; raised by performance.
-  bdeSlotLimit             Int      @default(0)
   createdByUserId          String?
-  benefitLevel             SalesBenefitLevel @default(FULL)
 
   user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   company    Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  parentUser User?   @relation("SalesNetworkParent", fields: [parentUserId], references: [id], onDelete: SetNull)
   createdByUser User? @relation("MembershipCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
 
   @@unique([userId, companyId])
   @@index([companyId])
   @@index([userId])
-  @@index([parentUserId])
-  @@index([companyId, salesNetworkRole])
   @@index([createdByUserId])
   /// Compound index for paginated team roster queries ordered by join date.
   @@index([companyId, createdAt])
-}
-
-/** BGOS Control hybrid sales network role (orthogonal to {@link UserRole} jobRole). */
-enum SalesNetworkRole {
-  BOSS
-  RSM
-  BDM
-  BDE
-  TECH_EXEC
-}
-
-/// BDM benefit tier when active subscription count fluctuates (grace band).
-enum SalesBenefitLevel {
-  FULL
-  GRACE
-  REDUCED
-}
-
-/// Hierarchy subscription plan (sales engine — not company billing plan).
-enum SalesHierarchyPlan {
-  BASIC
-  PRO
-  CUSTOM
-}
-
-enum SalesHierarchySubscriptionStatus {
-  ACTIVE
-  CANCELLED
-  EXPIRED
-}
-
-enum NetworkCommissionType {
-  DIRECT
-  OVERRIDE
-  RECURRING
-}
-
-/**
- * Payout lifecycle for each SalesHierarchyEarning row.
- *
- * PENDING  — earning written; not yet in a payout cycle.
- * APPROVED — monthly cycle has approved this batch; wallet approval pending.
- * PAID     — wallet transaction moved to withdrawable; cycle complete.
- *
- * Transition: PENDING → APPROVED → PAID (only via runMonthlyPayoutCycle).
- * Direct wallet manipulation is not permitted by the rules.
- */
-enum EarningPayoutStatus {
-  PENDING
-  APPROVED
-  PAID
 }
 
 enum TechQueueStatus {
@@ -914,151 +649,6 @@ enum NexaTaskPriority {
   HIGH
 }
 
-/// Monthly rollup for sales network performance (company-scoped).
-model PerformanceMetric {
-  id                   String   @id @default(cuid())
-  companyId            String
-  userId               String
-  /// First day of month or yyyy-MM key — stored as yyyy-MM-01 for queries.
-  month                DateTime
-  totalSales           Float    @default(0)
-  totalRevenue         Float    @default(0)
-  newCustomers         Int      @default(0)
-  bdeCreated           Int      @default(0)
-  promotionsAchieved   Int      @default(0)
-  updatedAt            DateTime @updatedAt
-
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([companyId, userId, month])
-  @@index([companyId])
-  @@index([userId])
-  @@map("performance_metrics")
-}
-
-/// Configurable targets per network role within a company.
-model SalesNetworkTarget {
-  id                        String           @id @default(cuid())
-  companyId                 String
-  role                      SalesNetworkRole
-  monthlyRevenueTarget      Float            @default(0)
-  monthlyCustomerTarget     Int              @default(0)
-  bdeCreationTarget         Int              @default(0)
-  consecutiveMonthsRequired Int              @default(3)
-  createdAt                 DateTime         @default(now())
-  updatedAt                 DateTime         @updatedAt
-
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  @@unique([companyId, role])
-  @@index([companyId])
-  @@map("sales_network_targets")
-}
-
-model NetworkCommission {
-  id           String                @id @default(cuid())
-  companyId    String
-  userId       String
-  sourceUserId String?
-  amount       Float
-  type         NetworkCommissionType
-  createdAt    DateTime              @default(now())
-
-  company    Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user       User    @relation("NetworkCommissionPayee", fields: [userId], references: [id], onDelete: Cascade)
-  sourceUser User?   @relation("NetworkCommissionSource", fields: [sourceUserId], references: [id], onDelete: SetNull)
-
-  @@index([companyId, userId])
-  @@index([createdAt])
-  @@map("network_commissions")
-}
-
-model PromotionTracker {
-  id                     String   @id @default(cuid())
-  companyId              String
-  userId                 String
-  currentStreak          Int      @default(0)
-  targetMet              Boolean  @default(false)
-  eligibleForPromotion   Boolean  @default(false)
-  /// V1 engine: promotion path (BDM or RSM).
-  roleTarget             SalesNetworkRole?
-  activeCountSnapshot    Int?
-  lastPromotionCheckAt   DateTime?
-  updatedAt              DateTime @updatedAt
-
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([companyId, userId])
-  @@index([companyId])
-  /// Standalone user index — for per-user promotion checks without a companyId filter.
-  @@index([userId])
-  @@map("promotion_tracker")
-}
-
-/// Customer subscription sale attributed to a hierarchy member (sales engine).
-model SalesHierarchySubscription {
-  id          String                         @id @default(cuid())
-  companyId   String
-  ownerUserId String
-  planType    SalesHierarchyPlan
-  points      Int                            @default(0)
-  status      SalesHierarchySubscriptionStatus @default(ACTIVE)
-  startedAt   DateTime                       @default(now())
-  expiresAt   DateTime
-
-  /// Optional client-side identifiers supplied at sale time — used for duplicate detection.
-  clientEmail String?
-  clientPhone String?
-
-  /// Fraud guard (bgos_fraud_guard_v1): true when a duplicate-contact/email check fires.
-  fraudFlagged  Boolean @default(false)
-  /// Human-readable reason for the flag (e.g. "Duplicate email: a@b.com already sold by user X").
-  fraudReason   String?
-
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  owner     User     @relation("SalesHierarchySubscriptionOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
-  earnings  SalesHierarchyEarning[]
-  fraudLogs InternalFraudLog[]
-
-  @@index([companyId, ownerUserId])
-  /// Standalone owner index — used by per-BDE subscription lookups and batch counts.
-  @@index([ownerUserId])
-  @@index([status, expiresAt])
-  @@index([clientEmail])
-  @@index([clientPhone])
-  @@map("sales_subscriptions")
-}
-
-model SalesHierarchyEarning {
-  id             String                @id @default(cuid())
-  companyId      String
-  userId         String
-  sourceUserId   String?
-  subscriptionId String?
-  amount         Float
-  type           NetworkCommissionType
-  /// Payout lifecycle: PENDING → APPROVED → PAID via monthly payout cycle.
-  payoutStatus   EarningPayoutStatus   @default(PENDING)
-  /// When this earning was moved to APPROVED in the payout cycle.
-  approvedAt     DateTime?
-  /// When this earning was fully paid out (wallet moved to withdrawable).
-  paidAt         DateTime?
-  createdAt      DateTime              @default(now())
-
-  company      Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user         User                      @relation("SalesHierarchyEarningPayee", fields: [userId], references: [id], onDelete: Cascade)
-  sourceUser   User?                     @relation("SalesHierarchyEarningSource", fields: [sourceUserId], references: [id], onDelete: SetNull)
-  subscription SalesHierarchySubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
-
-  @@index([companyId, userId])
-  /// Standalone user index — used by wallet/payout per-user earnings queries.
-  @@index([userId])
-  @@index([payoutStatus, createdAt])
-  @@index([createdAt])
-  @@map("sales_hierarchy_earnings")
-}
 
 model TechQueueEntry {
   id                 String          @id @default(cuid())
@@ -1137,14 +727,6 @@ model User {
   companiesOwned                    Company[]                     @relation("OwnedCompany")
   memberships                       UserCompany[]
   membershipsCreated                UserCompany[]                 @relation("MembershipCreatedBy")
-  networkManagedMembers             UserCompany[]                 @relation("SalesNetworkParent")
-  salesHierarchySubscriptionsOwned  SalesHierarchySubscription[]  @relation("SalesHierarchySubscriptionOwner")
-  salesHierarchyEarningsReceived    SalesHierarchyEarning[]       @relation("SalesHierarchyEarningPayee")
-  salesHierarchyEarningsAsSource    SalesHierarchyEarning[]       @relation("SalesHierarchyEarningSource")
-  performanceMetrics                PerformanceMetric[]
-  networkCommissionsReceived        NetworkCommission[]           @relation("NetworkCommissionPayee")
-  networkCommissionsAsSource        NetworkCommission[]           @relation("NetworkCommissionSource")
-  promotionTrackers                 PromotionTracker[]
   techQueueAssignments              TechQueueEntry[]
   nexaTasks                         NexaTask[]
   assignedLeads                     Lead[]                        @relation("LeadAssignee")
@@ -1158,8 +740,6 @@ model User {
   leaveRequests                     LeaveRequest[]
   attendances                       Attendance[]
   salaries                          Salary[]
-  pips                              EmployeePip[]
-  createdChannelPartners            ChannelPartner[]              @relation("PartnerCreator")
   assignedSiteVisits                SiteVisit[]                   @relation("SiteVisitAssignee")
   documentsUploaded                 Document[]
   razorpayPayments                  RazorpayPayment[]
@@ -1167,16 +747,12 @@ model User {
   internalLeadActivities            InternalLeadActivity[]
   internalInAppNotifications        InternalInAppNotification[]
   internalNexaSupportTicketsCreated InternalNexaSupportTicket[]   @relation("NexaSupportCreator")
-  salesExecutiveMonthlyTargets      SalesExecutiveMonthlyTarget[]
   onboardingSubmissionsFilled       OnboardingSubmission[]        @relation("OnboardingFilledBy")
   onboardingSubmissionsTech         OnboardingSubmission[]        @relation("OnboardingTechAssignee")
   onboardingWorkflowMessages        OnboardingMessage[]
   onboardingSessionsCreated         OnboardingSession[]           @relation("OnboardingSessionCreator")
   onboardingRecordsCreated          Onboarding[]                  @relation("OnboardingCreator")
   nexaActions                       NexaAction[]                  @relation("NexaActionActor")
-  microFranchiseReferrals           MicroFranchiseApplication[]   @relation("MicroFranchiseReferrer")
-  microFranchiseAssignments         MicroFranchiseApplication[]   @relation("MicroFranchiseAssignee")
-  microFranchisePartner             MicroFranchisePartner?
   nexaCoachingLogs                  NexaCoachingLog[]
   nexaCompetitionParticipants       NexaCompetitionParticipant[]
   nexaCompetitionsCreated           NexaCompetition[]             @relation("NexaCompetitionCreator")
@@ -1218,17 +794,6 @@ model User {
   ownershipClaimsAsOwner    OwnershipClaim[]      @relation("OwnershipClaimCurrentOwner")
   usageFlagsHandled         UsageFlag[]           @relation("UsageFlagHandledBy")
   usageCapacityNotifications UsageCapacityNotification[]
-  bdeMissions                BdeMission[]
-  bdeTasks                   BdeTask[]
-  bdeProspects               BdeProspect[]
-  bdeStreak                  BdeStreak?
-  bdeRewards                 BdeReward[]
-  bdeWallet                  BdeWallet?
-  bdeWalletTransactions      BdeWalletTransaction[]
-  bdeWithdrawRequests        BdeWithdrawRequest[]
-  bdeOnboarding              BdeOnboarding?
-  userMissions               UserMission[]
-  userTasks                  UserTask[]
 
   @@index([email])
   @@index([parentId])
@@ -1241,234 +806,6 @@ enum BdeMissionStatus {
   COMPLETED
 }
 
-enum BdeTaskStatus {
-  PENDING
-  DONE
-}
-
-enum BdeProspectPipelineStage {
-  NEW
-  CONTACTED
-  TRIAL_STARTED
-  CONVERTED
-}
-
-enum BdeRewardStatus {
-  LOCKED
-  UNLOCKED
-  REVEALED
-}
-
-model BdeMission {
-  id               String           @id @default(cuid())
-  userId           String
-  /// Calendar date (UTC) for the mission day.
-  date             DateTime         @db.Date
-  targetProspects  Int              @default(5)
-  completedCount   Int              @default(0)
-  callsLogged      Int              @default(0)
-  status           BdeMissionStatus @default(PENDING)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-
-  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tasks     BdeTask[]
-  prospects BdeProspect[]
-
-  @@unique([userId, date])
-  @@index([userId, date])
-  @@map("bde_missions")
-}
-
-model BdeTask {
-  id        String        @id @default(cuid())
-  userId    String
-  missionId String
-  taskText  String
-  status    BdeTaskStatus @default(PENDING)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-
-  user    User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  mission BdeMission @relation(fields: [missionId], references: [id], onDelete: Cascade)
-
-  @@index([missionId, status])
-  @@map("bde_tasks")
-}
-
-/// Field prospect captured by BDE (Nexa mission progress).
-model BdeProspect {
-  id             String                     @id @default(cuid())
-  userId         String
-  missionId      String?
-  companyName    String
-  phone          String
-  location       String?
-  pipelineStage  BdeProspectPipelineStage   @default(NEW)
-  createdAt      DateTime                   @default(now())
-  updatedAt      DateTime                   @updatedAt
-
-  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  mission BdeMission? @relation(fields: [missionId], references: [id], onDelete: SetNull)
-  userMissionId String?
-  userMission   UserMission? @relation(fields: [userMissionId], references: [id], onDelete: SetNull)
-
-  @@index([userId, createdAt])
-  @@index([userMissionId])
-  @@map("bde_prospects")
-}
-
-model BdeStreak {
-  userId         String    @id
-  currentStreak  Int       @default(0)
-  lastActiveDate DateTime? @db.Date
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("bde_streaks")
-}
-
-model BdeReward {
-  id        String          @id @default(cuid())
-  userId    String
-  type      String
-  value     String
-  status    BdeRewardStatus @default(LOCKED)
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, type])
-  @@index([userId])
-  @@map("bde_rewards")
-}
-
-/// ICECONNECT BDE earnings wallet (not micro-franchise {@link Wallet}).
-model BdeWallet {
-  id                 String   @id @default(cuid())
-  userId             String   @unique
-  totalEarned        Float    @default(0)
-  withdrawableAmount Float    @default(0)
-  bonusAmount        Float    @default(0)
-  updatedAt          DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("bde_wallets")
-}
-
-enum BdeWalletTransactionType {
-  EARNING
-  BONUS
-  REWARD
-}
-
-model BdeWalletTransaction {
-  id          String                   @id @default(cuid())
-  userId      String
-  type        BdeWalletTransactionType
-  amount      Float
-  /// Idempotency key: e.g. `prospect:<id>`, `reward:<type>`.
-  referenceId String?
-  createdAt   DateTime                 @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
-  @@index([userId, referenceId])
-  @@map("bde_wallet_transactions")
-}
-
-enum BdeWithdrawRequestStatus {
-  PENDING
-  APPROVED
-  PAID
-}
-
-model BdeWithdrawRequest {
-  id        String                   @id @default(cuid())
-  userId    String
-  amount    Float
-  status    BdeWithdrawRequestStatus @default(PENDING)
-  createdAt DateTime                 @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, status])
-  @@map("bde_withdraw_requests")
-}
-
-/// 7-day Nexa BDE onboarding journey (checklist + day progression).
-model BdeOnboarding {
-  userId       String   @id
-  currentDay   Int      @default(1)
-  startedAt    DateTime @default(now())
-  completed    Boolean  @default(false)
-  /// Per-day completed task keys: `{ "1": ["d1_intro", ...], "2": [...] }`
-  progressJson Json     @default("{}")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("bde_onboarding")
-}
-
-/// Unified BDE mission (onboarding day or daily) — one row per user per calendar day.
-enum UserMissionType {
-  ONBOARDING
-  DAILY
-}
-
-enum UserMissionStatus {
-  PENDING
-  COMPLETED
-}
-
-enum UserTaskStatus {
-  PENDING
-  DONE
-}
-
-model UserMission {
-  id             String            @id @default(cuid())
-  userId         String
-  missionDate    DateTime          @db.Date
-  type           UserMissionType
-  /// Set when type = ONBOARDING (which journey day 1–7).
-  onboardingDay  Int?
-  targetCount    Int
-  completedCount Int             @default(0)
-  callsLogged    Int               @default(0)
-  status         UserMissionStatus @default(PENDING)
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-
-  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tasks      UserTask[]
-  prospects  BdeProspect[]
-
-  @@unique([userId, missionDate])
-  @@index([userId, missionDate])
-  @@map("user_missions")
-}
-
-model UserTask {
-  id            String        @id @default(cuid())
-  userId        String
-  userMissionId String
-  taskKey       String
-  label         String
-  status        UserTaskStatus @default(PENDING)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-
-  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  mission UserMission @relation(fields: [userMissionId], references: [id], onDelete: Cascade)
-
-  @@unique([userMissionId, taskKey])
-  @@index([userMissionId, status])
-  @@map("user_tasks")
-}
 
 /// BDE-initiated company onboarding pipeline (BDE → Sales → Tech → Boss account).
 enum OnboardingRequestDashboardType {
@@ -1577,15 +914,6 @@ model OnboardingPipeline {
 /**
  * Sales-launch referral partner registry (cross-company).
  */
-model LaunchChannelPartner {
-  id           String    @id @default(cuid())
-  phone        String    @unique
-  name         String?
-  totalRevenue Float     @default(0)
-  conversions  Int       @default(0)
-  createdAt    DateTime  @default(now())
-  companies    Company[] @relation("LaunchPartnerCompany")
-}
 
 /**
  * Sales launch session used by Nexa chat onboarding flow.
@@ -1639,150 +967,21 @@ model TechRequest {
 /**
  * Online micro-franchise applicant pipeline (APPLICATION → … → APPROVED).
  */
-model MicroFranchiseApplication {
-  id           String   @id @default(cuid())
-  name         String
-  phone        String
-  email        String?
-  location     String?
-  experience   String?
-  /// APPLICATION | REVIEW | TRAINING | MOU | APPROVED | REJECTED
-  status       String   @default("APPLICATION")
-  referredById String?
-  assignedToId String?
-  /// JSON array: { at: ISO string, body: string, authorEmail?: string }
-  notes        Json     @default("[]")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  referredBy User?                  @relation("MicroFranchiseReferrer", fields: [referredById], references: [id], onDelete: SetNull)
-  assignedTo User?                  @relation("MicroFranchiseAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
-  partner    MicroFranchisePartner?
-
-  @@index([status, createdAt])
-  @@index([referredById])
-  @@index([phone])
-}
 
 /**
  * Commission template for micro-franchise offers (boss-managed).
  */
-model CommissionPlan {
-  id           String   @id @default(cuid())
-  name         String
-  /// PERCENTAGE | FIXED
-  type         String
-  value        Float
-  recurring    Boolean  @default(false)
-  instantBonus Float?
-  createdAt    DateTime @default(now())
-
-  partners MicroFranchisePartner[]
-}
 
 /**
  * Activated micro-franchise partner (ICECONNECT login + referral phone as ID).
  */
-model MicroFranchisePartner {
-  id               String    @id @default(cuid())
-  applicationId    String?   @unique
-  name             String
-  phone            String    @unique
-  email            String?
-  userId           String    @unique
-  commissionPlanId String?
-  performanceScore Float     @default(0)
-  tier             String    @default("BRONZE")
-  lastScoredAt     DateTime?
-  createdAt        DateTime  @default(now())
 
-  application            MicroFranchiseApplication? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
-  user                   User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  commissionPlan         CommissionPlan?            @relation(fields: [commissionPlanId], references: [id], onDelete: SetNull)
-  wallet                 Wallet?
-  companies              Company[]
-  commissionTransactions CommissionTransaction[]
-  alerts                 MicroFranchiseAlert[]
 
-  @@index([commissionPlanId])
-}
 
-model MicroFranchiseAlert {
-  id        String   @id @default(cuid())
-  partnerId String
-  /// INACTIVE | GROWTH | RISK
-  type      String
-  /// LOW | MEDIUM | HIGH
-  severity  String   @default("LOW")
-  title     String
-  message   String
-  status    String   @default("OPEN")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  partner MicroFranchisePartner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-
-  @@index([partnerId, createdAt])
-  @@index([status, createdAt])
-}
-
-model Wallet {
-  id          String   @id @default(cuid())
-  partnerId   String   @unique
-  balance     Float    @default(0)
-  pending     Float    @default(0)
-  totalEarned Float    @default(0)
-  updatedAt   DateTime @updatedAt
-
-  partner MicroFranchisePartner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-}
-
-model CommissionTransaction {
-  id         String   @id @default(cuid())
-  partnerId  String
-  companyId  String
-  amount     Float
-  /// RECURRING | ONE_TIME
-  type       String
-  /// PENDING (awaiting boss release) | RELEASED (in partner balance) | PAID_OUT
-  status     String   @default("PENDING")
-  /// Idempotency: Razorpay payment id when commission sourced from subscription payment.
-  paymentRef String?  @unique
-  createdAt  DateTime @default(now())
-
-  partner MicroFranchisePartner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  company Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  @@index([partnerId, createdAt])
-  @@index([companyId])
-  @@index([status])
-}
 
 /**
  * Monthly sales target + salary for ICECONNECT executives (internal org).
  */
-model SalesExecutiveMonthlyTarget {
-  id           String                 @id @default(cuid())
-  companyId    String
-  userId       String
-  periodYear   Int
-  periodMonth  Int
-  targetCount  Int
-  targetPlan   IceconnectCustomerPlan
-  /**
-   * Monthly salary in INR (eligible portion scales with target progress).
-   */
-  salaryRupees Int                    @default(0)
-  createdAt    DateTime               @default(now())
-  updatedAt    DateTime               @updatedAt
-
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([companyId, userId, periodYear, periodMonth])
-  @@index([companyId])
-  @@index([userId])
-}
 
 model Lead {
   id              String     @id @default(cuid())
@@ -1802,7 +1001,6 @@ model Lead {
   ownerRole       LeadOwnershipRole? @map("owner_role")
   sourceType      LeadSourceType?    @map("source_type")
   sourceUserId    String?            @map("source_user_id")
-  partnerId       String?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
@@ -1811,18 +1009,13 @@ model Lead {
   creator        User?               @relation("LeadCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
   owner          User?               @relation("LeadOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   sourceUser     User?               @relation("LeadSourceUser", fields: [sourceUserId], references: [id], onDelete: SetNull)
-  partner        ChannelPartner?     @relation(fields: [partnerId], references: [id], onDelete: SetNull)
   deals          Deal[]
   tasks          Task[]
   quotations     Quotation[]
   invoices       Invoice[]
   documents      Document[]
-  commissions    Commission[]
   siteVisits     SiteVisit[]
   approvals      Approval[]
-  lcoLoans       LcoLoan[]
-  customerUser   CustomerPortalUser?
-  complaints     CustomerComplaint[]
   installations  Installation[]
   projects       Project[]
   serviceJobs    ServiceJob[]
@@ -1884,7 +1077,6 @@ model Lead {
   @@index([assignedTo])
   @@index([createdByUserId])
   @@index([ownerUserId, ownerRole])
-  @@index([partnerId])
   @@index([phone])
   @@index([companyId, email])
   @@index([companyId, phone])
@@ -2070,23 +1262,6 @@ model ServiceJob {
   @@map("services")
 }
 
-/// Inventory master for solar operations (stock ledger stays in ProductMovement).
-model InventoryItem {
-  id        String   @id @default(cuid())
-  companyId String
-  name      String
-  sku       String?
-  quantity  Int      @default(0)
-  unit      String   @default("unit")
-  updatedAt DateTime @updatedAt
-  createdAt DateTime @default(now())
-
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  @@index([companyId])
-  @@index([companyId, name])
-  @@map("inventory")
-}
 
 model Payment {
   id        String        @id @default(cuid())
@@ -2376,44 +1551,6 @@ model StockLog {
   @@index([companyId, type])
 }
 
-model ChannelPartner {
-  id              String   @id @default(cuid())
-  companyId       String
-  name            String
-  phone           String
-  createdByUserId String
-  createdAt       DateTime @default(now())
-
-  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  creator     User         @relation("PartnerCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  leads       Lead[]
-  commissions Commission[]
-
-  @@index([companyId])
-  @@index([createdByUserId])
-}
-
-model Commission {
-  id        String   @id @default(cuid())
-  companyId String
-  partnerId String
-  leadId    String
-  amount    Float
-  /// DIRECT | REFERRAL
-  type      String
-  /// PENDING | PAID
-  status    String
-  createdAt DateTime @default(now())
-
-  company Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  partner ChannelPartner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  lead    Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
-
-  @@unique([companyId, leadId])
-  @@index([companyId])
-  @@index([partnerId])
-  @@index([status])
-}
 
 model ActivityLog {
   id        String   @id @default(cuid())
@@ -2557,20 +1694,6 @@ model InternalInAppNotification {
   @@index([companyId, userId, readAt])
 }
 
-/// Manager-set daily targets per rep (internal company).
-model InternalEmployeeDailyTarget {
-  id          String @id @default(cuid())
-  companyId   String
-  userId      String
-  dayKey      String
-  targetCalls Int    @default(0)
-  targetLeads Int    @default(0)
-
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  @@unique([companyId, userId, dayKey])
-  @@index([companyId])
-}
 
 /// Dynamic sections JSON — rendered by form engine (category + plan tier).
 model OnboardingFormTemplate {
@@ -2712,87 +1835,6 @@ enum IncentiveCampaignLifecycle {
   COMPLETED
 }
 
-model TargetCampaign {
-  id              String               @id @default(cuid())
-  title           String
-  roleCategory    TargetRoleCategory
-  durationPreset  TargetDurationPreset
-  metricType      TargetMetricType
-  targetNumber    Float
-  startDate       DateTime
-  endDate         DateTime
-  assignScope     TargetAssignScope
-  assigneeUserId  String?
-  departmentLabel String?
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
-
-  @@index([startDate, endDate])
-  @@index([roleCategory])
-}
-
-model BonusCampaign {
-  id               String                     @id @default(cuid())
-  title            String
-  eligibleAudience IncentiveAudience
-  conditionType    BonusConditionType
-  bonusType        BonusValueType
-  bonusValue       Float?
-  notes            String?                    @db.Text
-  validMonth       String
-  poolAmount       Float?
-  lifecycle        IncentiveCampaignLifecycle @default(ACTIVE)
-  createdAt        DateTime                   @default(now())
-  updatedAt        DateTime                   @updatedAt
-
-  @@index([validMonth])
-  @@index([eligibleAudience])
-}
-
-model MegaPrizeCampaign {
-  id               String                     @id @default(cuid())
-  name             String
-  audience         IncentiveAudience
-  eligibilityRules String                     @db.Text
-  prizeDescription String                     @db.Text
-  winnerRule       String                     @db.Text
-  startDate        DateTime
-  endDate          DateTime
-  lifecycle        IncentiveCampaignLifecycle @default(ACTIVE)
-  createdAt        DateTime                   @default(now())
-  updatedAt        DateTime                   @updatedAt
-
-  @@index([startDate, endDate])
-}
-
-model CommissionRule {
-  id               String                      @id @default(cuid())
-  planName         String
-  planTier         IncentiveCommissionPlanTier
-  commissionType   String
-  value            Float
-  recurring        Boolean                     @default(true)
-  instantSaleBonus Float                       @default(0)
-  isActive         Boolean                     @default(true)
-  createdAt        DateTime                    @default(now())
-  updatedAt        DateTime                    @updatedAt
-
-  @@index([planTier, isActive])
-}
-
-model OfferAnnouncement {
-  id        String            @id @default(cuid())
-  title     String
-  body      String            @db.Text
-  audience  IncentiveAudience @default(BOTH)
-  startsAt  DateTime?
-  endsAt    DateTime?
-  isActive  Boolean           @default(true)
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-
-  @@index([audience, isActive])
-}
 
 /// Nexa CEO engine — coaching line items (audit + culture).
 enum NexaCoachingActionType {
@@ -3197,7 +2239,7 @@ model InternalLeaderboard {
   rank      Int              @default(0)
   /// Denormalised name — avoids a join on every leaderboard read.
   userName  String?
-  role      SalesNetworkRole?
+  role      String?
   updatedAt DateTime         @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -3220,8 +2262,6 @@ model InternalFraudLog {
   companyId         String
   /// User who triggered the suspicious event (usually the BDE who recorded the sale).
   triggeredByUserId String?
-  /// The subscription row that was flagged, if applicable.
-  subscriptionId    String?
   /// Short machine-readable reason key (DUPLICATE_EMAIL, DUPLICATE_PHONE, DUPLICATE_CONTACT).
   reason            String
   /// Full human-readable description for BOSS review.
@@ -3231,11 +2271,9 @@ model InternalFraudLog {
   createdAt         DateTime  @default(now())
 
   triggeredByUser User?                      @relation("FraudLogTrigger",       fields: [triggeredByUserId], references: [id], onDelete: SetNull)
-  subscription    SalesHierarchySubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
 
   @@index([companyId, createdAt])
   @@index([triggeredByUserId])
-  @@index([subscriptionId])
   @@map("internal_fraud_log")
 }
 

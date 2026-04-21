@@ -32,13 +32,9 @@ function roleForDepartment(department: TeamDept, roleLabel: string): UserRole {
     return UserRole.TECH_EXECUTIVE;
   }
   if (department === "SALES") {
-    if (r.includes("head")) return UserRole.SALES_HEAD;
-    if (r.includes("tele")) return UserRole.TELECALLER;
-    return UserRole.SALES_EXECUTIVE;
+    return UserRole.BDM;
   }
   if (department === "ADMIN") {
-    if (r.includes("account")) return UserRole.ACCOUNTANT;
-    if (r.includes("hr")) return UserRole.HR_MANAGER;
     return UserRole.MANAGER;
   }
   return UserRole.MANAGER;

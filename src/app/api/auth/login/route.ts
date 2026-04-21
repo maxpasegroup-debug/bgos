@@ -25,7 +25,7 @@ type MembershipWithCompany = {
 function rolePriority(role: UserRole): number {
   if (role === UserRole.ADMIN) return 100;
   if (role === UserRole.MANAGER) return 80;
-  if (role === UserRole.SALES_HEAD) return 70;
+  if (role === UserRole.BDM) return 70;
   return 10;
 }
 
@@ -105,7 +105,7 @@ export async function POST(req: Request) {
   );
   const companyId = primaryMembership?.companyId ?? null;
   const companyPlan = primaryMembership?.company.plan ?? CompanyPlan.BASIC;
-  const role = primaryMembership?.jobRole ?? UserRole.TELECALLER;
+  const role = primaryMembership?.jobRole ?? UserRole.BDM;
   const workspaceReady = primaryMembership ? Boolean(user.workspaceActivatedAt) : false;
 
   if (!primaryMembership) {
