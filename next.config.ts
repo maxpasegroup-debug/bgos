@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   /** Expose ICECONNECT_URL to the client bundle for same-origin login handoff (Railway often sets server-only `ICECONNECT_URL`). */
   env: {
     NEXT_PUBLIC_ICECONNECT_URL:
