@@ -1,228 +1,77 @@
 "use client";
 
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Suspense, useRef, useState } from "react";
-import { z } from "zod";
-import { resolveAfterLoginNavigation } from "@/lib/cross-domain-login";
-import { apiFetch, formatFetchFailure } from "@/lib/api-fetch";
-import { SUPER_BOSS_HOME_PATH, TECH_EXEC_HOME_PATH } from "@/lib/role-routing";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-const clientLoginSchema = z.object({
-  email: z.string().trim().min(1, "Email is required").email("Enter a valid email"),
-  password: z.string().min(1, "Password is required"),
-});
-const DEBUG_ENDPOINT = "http://127.0.0.1:7510/ingest/9e2a10db-dc92-4291-bfe3-11a810004664";
+function isBossRole(role: unknown): boolean {
+  return role === "BOSS" || role === "ADMIN";
+}
 
-function LoginForm() {
-  const searchParams = useSearchParams();
+export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const submitInFlightRef = useRef(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (submitInFlightRef.current || pending) return;
     setError(null);
-    const fields = clientLoginSchema.safeParse({ email, password });
-    if (!fields.success) {
-      const first = fields.error.flatten().fieldErrors;
-      const msg =
-        first.email?.[0] ?? first.password?.[0] ?? "Check the form and try again.";
-      setError(msg);
-      return;
-    }
-    submitInFlightRef.current = true;
     setPending(true);
+
     try {
-      const from = searchParams.get("from");
-      // #region agent log
-      fetch(DEBUG_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "29b790" },
-        body: JSON.stringify({
-          sessionId: "29b790",
-          runId: "initial",
-          hypothesisId: "H3",
-          location: "src/app/login/page.tsx:45",
-          message: "login_client_submit",
-          data: { hasFrom: Boolean(from), emailDomain: fields.data.email.split("@")[1] ?? "invalid" },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
-      const res = await apiFetch("/api/auth/login", {
+      const loginRes = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        redirect: "manual",
-        body: JSON.stringify({
-          email: fields.data.email,
-          password: fields.data.password,
-          ...(from ? { from } : {}),
-        }),
+        body: JSON.stringify({ email, password }),
+        credentials: "include",
       });
 
-      if ([301, 302, 303, 307, 308].includes(res.status)) {
-        const loc = res.headers.get("Location");
-        if (!loc) {
-          setError("Sign-in failed");
-          return;
-        }
-        window.location.assign(loc);
+      if (!loginRes.ok) {
+        setError("Invalid email or password.");
         return;
       }
 
-      const data = (await res.json()) as {
-        ok?: boolean;
-        error?: string;
-        message?: string;
-        code?: string;
-        nextPath?: string;
-        needsCompanySelection?: boolean;
-        companies?: unknown[];
-        isSuperBoss?: boolean;
-        user?: {
-          role: string;
-          companyId?: string | null;
-          needsOnboarding?: boolean;
-          needsWorkspaceActivation?: boolean;
-        };
-      };
-      if (process.env.NODE_ENV !== "production") {
-        console.info("[login/page] LOGIN RESPONSE", { status: res.status, ok: res.ok, data });
-      }
-      // #region agent log
-      fetch(DEBUG_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "29b790" },
-        body: JSON.stringify({
-          sessionId: "29b790",
-          runId: "initial",
-          hypothesisId: "H3",
-          location: "src/app/login/page.tsx:83",
-          message: "login_client_response",
-          data: { status: res.status, ok: res.ok, code: data.code ?? null, hasNextPath: typeof data.nextPath === "string" },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
-      if (!res.ok) {
-        if (data.code === "CONTACT_ADMIN" && typeof data.error === "string") {
-          setError(data.error);
-          return;
-        }
-        if (typeof data.error === "string" && data.error.trim()) {
-          setError(data.error);
-        } else if (typeof data.message === "string" && data.message.trim()) {
-          setError(data.message);
-        } else if (data.code === "VALIDATION_ERROR") {
-          setError("Please check your email and password.");
-        } else {
-          setError("Sign-in failed");
-        }
-        return;
-      }
-      // Fail-loud guard: login must establish a readable session immediately.
-      const meCheck = await apiFetch("/api/auth/me", { credentials: "include" });
-      const meData = (await meCheck.json()) as { authenticated?: boolean };
-      // #region agent log
-      fetch(DEBUG_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "29b790" },
-        body: JSON.stringify({
-          sessionId: "29b790",
-          runId: "initial",
-          hypothesisId: "H4",
-          location: "src/app/login/page.tsx:108",
-          message: "login_client_me_check",
-          data: { meStatus: meCheck.status, authenticated: meData.authenticated === true },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
-      if (!meCheck.ok || meData.authenticated !== true) {
-        setError("Session cookie was not established. Please disable strict tracking protection and try again.");
-        return;
-      }
-      if (data.isSuperBoss === true) {
-        window.location.assign(SUPER_BOSS_HOME_PATH);
-        return;
-      }
-
-      const role = data.user?.role;
-      if (!role) {
-        setError("Invalid sign-in response");
-        return;
-      }
-
-      const u = data.user;
-      if (role === "ADMIN") {
-        const ready =
-          typeof u?.companyId === "string" &&
-          u.companyId.length > 0 &&
-          u.needsOnboarding !== true &&
-          u.needsWorkspaceActivation !== true &&
-          (u as { workspaceReady?: boolean }).workspaceReady === true;
-        if (!ready) {
-          window.location.assign("/onboarding/nexa");
-          return;
-        }
-      } else if (
-        u?.needsOnboarding === true ||
-        u?.companyId == null ||
-        u?.needsWorkspaceActivation === true
-      ) {
-        window.location.assign("/onboarding/nexa");
-        return;
-      }
-
+      const meRes = await fetch("/api/auth/me", { credentials: "include" });
+      let meJson: { user?: { role?: string; companyType?: string } | null };
       try {
-        const listRes = await apiFetch("/api/company/list");
-        const listJson = (await listRes.json()) as { ok?: boolean; companies?: unknown[] };
-        const multiCompany =
-          data.needsCompanySelection === true ||
-          (listJson.ok && Array.isArray(listJson.companies) && listJson.companies.length > 1) ||
-          (Array.isArray(data.companies) && data.companies.length > 1);
-        if (multiCompany) {
-          window.location.assign("/iceconnect/select-company");
-          return;
+        meJson = (await meRes.json()) as { user?: { role?: string; companyType?: string } | null };
+      } catch {
+        setError("Unable to verify session. Please try again.");
+        return;
+      }
+
+      if (!meRes.ok || !meJson?.user) {
+        setError("Session could not be established. Please sign in again.");
+        return;
+      }
+
+      const { user } = meJson;
+      const role = user.role;
+      const companyType = user.companyType;
+
+      if (role === "BOSS") {
+        if (companyType === "SOLAR") {
+          router.replace("/solar/dashboard");
+        } else {
+          router.replace("/dashboard");
         }
-      } catch (e) {
-        console.error("API ERROR:", e);
-      }
-
-      if (role === "ADMIN") {
-        const dest =
-          typeof data.nextPath === "string" && data.nextPath.startsWith("/")
-            ? data.nextPath
-            : "/onboarding/nexa";
-        window.location.assign(dest);
-        return;
-      }
-      if (role === "TECH_EXECUTIVE") {
-        window.location.assign(TECH_EXEC_HOME_PATH);
         return;
       }
 
-      const nav = resolveAfterLoginNavigation({
-        role,
-        from,
-        hostname: typeof window !== "undefined" ? window.location.hostname : "",
-      });
-      if (nav.kind === "external") {
-        window.location.replace(nav.url);
+      if (isBossRole(role)) {
+        if (companyType === "SOLAR") {
+          router.replace("/solar/dashboard");
+        } else {
+          router.replace("/dashboard");
+        }
         return;
       }
-      const serverPath =
-        typeof data.nextPath === "string" && data.nextPath.startsWith("/") ? data.nextPath : null;
-      window.location.assign(serverPath ?? nav.path);
-    } catch (e) {
-      console.error("API ERROR:", e);
-      setError(formatFetchFailure(e, "Sign-in request failed"));
+
+      router.replace("/dashboard");
+    } catch {
+      setError("Login failed. Please try again.");
     } finally {
-      submitInFlightRef.current = false;
       setPending(false);
     }
   }
@@ -230,23 +79,19 @@ function LoginForm() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#0B0F19] px-4 text-white">
       <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-8 shadow-xl backdrop-blur">
-        <h1 className="text-center text-xl font-semibold tracking-tight">BGOS Sign in</h1>
-        <p className="mt-1 text-center text-sm text-white/60">Email and password</p>
-        <form className="mt-8 space-y-4" onSubmit={onSubmit} noValidate>
+        <h1 className="text-center text-xl font-semibold tracking-tight">Login</h1>
+        <form className="mt-8 space-y-4" onSubmit={onSubmit}>
           <div>
             <label htmlFor="email" className="block text-xs font-medium text-white/70">
               Email
             </label>
             <input
               id="email"
-              name="email"
               type="email"
-              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              aria-invalid={error !== null}
-              aria-busy={pending}
               className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none ring-cyan-500/40 focus:ring-2"
+              required
             />
           </div>
           <div>
@@ -255,54 +100,23 @@ function LoginForm() {
             </label>
             <input
               id="password"
-              name="password"
               type="password"
-              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              aria-invalid={error !== null}
               className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none ring-cyan-500/40 focus:ring-2"
+              required
             />
           </div>
-          {error ? (
-            <p className="text-center text-sm text-red-400" role="alert">
-              {error}
-            </p>
-          ) : null}
+          {error ? <p className="text-center text-sm text-red-400">{error}</p> : null}
           <button
             type="submit"
             disabled={pending}
-            aria-busy={pending}
             className="w-full rounded-lg bg-cyan-500 py-2.5 text-sm font-medium text-black transition hover:bg-cyan-400 disabled:pointer-events-none disabled:opacity-50"
           >
-            {pending ? "Signing in…" : "Sign in"}
+            {pending ? "Signing in..." : "Sign in"}
           </button>
         </form>
-        <p className="mt-6 text-center text-sm text-white/50">
-          New to BGOS?{" "}
-          <Link href="/onboarding/nexa" className="font-medium text-cyan-400 hover:text-cyan-300">
-            Create an account
-          </Link>
-        </p>
       </div>
     </div>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#0B0F19] px-4 text-white/60">
-          <div
-            className="h-9 w-9 animate-spin rounded-full border-2 border-white/20 border-t-cyan-400"
-            aria-hidden
-          />
-          <p className="text-sm">Loading…</p>
-        </div>
-      }
-    >
-      <LoginForm />
-    </Suspense>
   );
 }

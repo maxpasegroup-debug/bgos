@@ -1,5 +1,6 @@
 import "server-only";
 
+import jwt from "jsonwebtoken";
 import { CompanyPlan, UserRole } from "@prisma/client";
 import { cookies, headers } from "next/headers";
 import type { NextRequest } from "next/server";
@@ -20,6 +21,28 @@ import {
 import { verifyAccessTokenResult } from "./jwt";
 import { isPlanLockedToBasic } from "./plan-production-lock";
 import { prisma } from "./prisma";
+
+const SECRET = process.env.JWT_SECRET;
+
+if (!SECRET) {
+  throw new Error("JWT_SECRET missing in environment");
+}
+
+/** Cookie-session JWT (login route + `/api/auth/me`). Kept separate from access-token claims used elsewhere. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- contract matches auth hardening spec
+export function signToken(payload: any) {
+  return jwt.sign(payload, SECRET, {
+    expiresIn: "7d",
+  });
+}
+
+export function verifyToken(token: string) {
+  try {
+    return jwt.verify(token, SECRET);
+  } catch {
+    return null;
+  }
+}
 
 export type AuthUser = AccessTokenPayload;
 
