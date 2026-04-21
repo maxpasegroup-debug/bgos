@@ -22,7 +22,8 @@
     "e2e:multibusiness": "node scripts/e2e-multibusiness-onboarding.mjs",
     "e2e:mf": "node scripts/e2e-mf-flow.mjs",
     "e2e:razorpay": "node scripts/e2e-razorpay-test.mjs",
-    "e2e:smoke": "node scripts/api-smoke-test.mjs"
+    "e2e:smoke": "node scripts/api-smoke-test.mjs",
+    "e2e:smoke-auth": "node scripts/smoke-auth.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

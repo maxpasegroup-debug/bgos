@@ -86,43 +86,57 @@ export function BgosHeader() {
       try {
         const res = await apiFetch("/api/auth/me", { credentials: "include" });
         const j = (await res.json()) as {
-          billing?: {
-            planLabel?: string;
-            subscriptionStatus?: string;
-            trialDaysRemaining?: number | null;
-            renewalDateIso?: string | null;
-          };
-          user?: { name?: string; email?: string; role?: string; companyName?: string | null };
+          user?: { email?: string; role?: string; companyId?: string | null };
         };
         if (!cancelled && j.user) {
-          const b = j.billing;
+          const email = (j.user.email ?? "").trim();
+          const guessedName = email.includes("@") ? email.split("@")[0] ?? "" : "";
           setSessionUser({
-            name: (j.user.name || "Solar Owner").trim() || "Solar Owner",
-            email: j.user.email || "—",
+            name: guessedName || "Solar Owner",
+            email: email || "—",
             role: j.user.role || "ADMIN",
             companyName:
-              typeof j.user.companyName === "string" && j.user.companyName.trim()
-                ? j.user.companyName.trim()
+              typeof j.user.companyId === "string" && j.user.companyId.trim()
+                ? j.user.companyId.trim()
                 : null,
-            billing:
-              b &&
-              typeof b.planLabel === "string" &&
-              typeof b.subscriptionStatus === "string"
-                ? {
-                    planLabel: b.planLabel,
-                    subscriptionStatus: b.subscriptionStatus,
-                    trialDaysRemaining:
-                      typeof b.trialDaysRemaining === "number" ? b.trialDaysRemaining : null,
-                    renewalDateIso:
-                      typeof b.renewalDateIso === "string" && b.renewalDateIso.trim()
-                        ? b.renewalDateIso
-                        : null,
-                  }
-                : null,
+            billing: null,
           });
         }
       } catch {
         /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch("/api/user/profile", { credentials: "include" });
+        if (!res.ok) return;
+        const p = (await res.json()) as {
+          displayName?: string;
+          email?: string;
+          companyName?: string | null;
+          companyId?: string | null;
+        };
+        if (cancelled) return;
+        setSessionUser((prev) => ({
+          ...prev,
+          name: typeof p.displayName === "string" && p.displayName.trim() ? p.displayName.trim() : prev.name,
+          email: typeof p.email === "string" && p.email.trim() ? p.email.trim() : prev.email,
+          companyName:
+            typeof p.companyName === "string" && p.companyName.trim()
+              ? p.companyName.trim()
+              : typeof p.companyId === "string" && p.companyId.trim()
+                ? p.companyId.trim()
+                : prev.companyName,
+        }));
+      } catch {
+        /* keep existing fallback silently */
       }
     })();
     return () => {

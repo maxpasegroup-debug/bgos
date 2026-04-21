@@ -7,6 +7,8 @@ import { getCompanyUsage } from "@/lib/company-limits";
 import { prisma } from "@/lib/prisma";
 import { getSolarBossNexaInsights } from "@/lib/solar-boss-nexa";
 
+const TOMORROW_CUTOFF = new Date(Date.now() + 864e5);
+
 export default async function SolarBossDashboardPage() {
   const user = await getAuthUserFromCookies();
   if (!user?.companyId) {
@@ -26,7 +28,7 @@ export default async function SolarBossDashboardPage() {
         where: {
           companyId,
           status: TaskStatus.PENDING,
-          dueDate: { lte: new Date(Date.now() + 864e5) },
+          dueDate: { lte: TOMORROW_CUTOFF },
         },
       }).catch(() => 0),
       prisma.invoicePayment

@@ -16,6 +16,30 @@ export function apiFetch(input: RequestInfo | URL, init?: ApiFetchInit): Promise
     ...rest,
     credentials: rest.credentials ?? "include",
   }).then((res) => {
+    const isAuthMeRequest =
+      typeof input === "string"
+        ? input.startsWith("/api/auth/me")
+        : input instanceof URL
+          ? input.pathname.startsWith("/api/auth/me")
+          : false;
+    if (isAuthMeRequest && typeof window !== "undefined") {
+      void res
+        .clone()
+        .json()
+        .then((j: unknown) => {
+          const requiresRelogin =
+            typeof j === "object" &&
+            j !== null &&
+            (j as { requiresRelogin?: unknown }).requiresRelogin === true;
+          if (requiresRelogin) {
+            const here = `${window.location.pathname}${window.location.search}`;
+            window.location.assign(`/login?from=${encodeURIComponent(here)}`);
+          }
+        })
+        .catch(() => {
+          /* non-JSON body; ignore */
+        });
+    }
     if (res.status === 401 && typeof window !== "undefined") {
       const urlStr =
         typeof input === "string"

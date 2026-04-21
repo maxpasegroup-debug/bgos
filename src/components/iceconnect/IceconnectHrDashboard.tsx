@@ -83,9 +83,9 @@ export function IceconnectHrDashboard() {
         apiFetch("/api/hr/users/list", { credentials: "include" }),
       ]);
 
-      const me = (await meRes.json()) as { user?: { role?: string; id?: string } };
+      const me = (await meRes.json()) as { user?: { role?: string; sub?: string } };
       setRole(me.user?.role ?? "");
-      setMeUserId(me.user?.id ?? "");
+      setMeUserId(me.user?.sub ?? "");
 
       const leavesJson = (await leavesRes.json()) as { ok?: boolean; leaves?: LeaveRow[] };
       const attendanceJson = (await attendanceRes.json()) as { ok?: boolean; attendance?: AttendanceRow[] };

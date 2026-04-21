@@ -13,10 +13,9 @@ export default function SetupRetryPage() {
   const probe = useCallback(async () => {
     const res = await apiFetch("/api/auth/me", { credentials: "include" });
     const data = (await readApiJson(res, "setup-retry-me")) as {
-      authenticated?: boolean;
-      user?: { companyId?: string | null; role?: string; needsOnboarding?: boolean };
+      user?: { companyId?: string | null; role?: string; workspaceReady?: boolean };
     };
-    if (!res.ok || !data.authenticated || !data.user) {
+    if (!res.ok || !data.user) {
       router.replace("/login?from=/setup-retry");
       return;
     }
@@ -24,8 +23,8 @@ export default function SetupRetryPage() {
     const u = data.user;
     const companyOk = typeof u.companyId === "string" && u.companyId.length > 0;
     const roleOk = u.role === "ADMIN";
-    const workspaceReady = (u as { workspaceReady?: boolean }).workspaceReady === true;
-    if (companyOk && roleOk && u.needsOnboarding === false && workspaceReady) {
+    const workspaceReady = u.workspaceReady === true;
+    if (companyOk && roleOk && workspaceReady) {
       router.replace("/bgos/control/v4");
       return;
     }
@@ -33,7 +32,10 @@ export default function SetupRetryPage() {
   }, [router]);
 
   useEffect(() => {
-    void probe();
+    const id = window.setTimeout(() => {
+      void probe();
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [probe]);
 
   async function startFresh() {

@@ -18,7 +18,6 @@ export function IceconnectTechPageClient() {
       try {
         const res = await apiFetch("/api/auth/me", { credentials: "include" });
         const j = (await readApiJson(res, "iceconnect/tech-router")) as {
-          authenticated?: boolean;
           user?: {
             employeeSystem?: string | null;
             iceconnectEmployeeRole?: string | null;

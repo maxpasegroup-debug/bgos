@@ -33,16 +33,18 @@ function loadRazorpayScript(): Promise<void> {
 export function SalesBoosterUpgradeClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const upgraded = searchParams.get("upgraded") === "1";
   const { planLockedToBasic } = useBgosDashboardContext();
   const [upgrading, setUpgrading] = useState(false);
-  const [banner, setBanner] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [banner, setBanner] = useState<{ kind: "ok" | "err"; text: string } | null>(
+    () => (upgraded ? { kind: "ok", text: "Plan activated — Sales Booster Pro is ready." } : null),
+  );
 
   useEffect(() => {
-    if (searchParams.get("upgraded") === "1") {
-      setBanner({ kind: "ok", text: "Plan activated — Sales Booster Pro is ready." });
+    if (upgraded) {
       router.replace("/sales-booster", { scroll: false });
     }
-  }, [searchParams, router]);
+  }, [upgraded, router]);
 
   const runProUpgrade = useCallback(async () => {
     if (planLockedToBasic) {
@@ -97,8 +99,9 @@ export function SalesBoosterUpgradeClient() {
       }
 
       const meRes = await apiFetch("/api/auth/me", { credentials: "include" });
-      const meJson = (await meRes.json()) as { user?: { name?: string; email?: string } };
-      const prefillName = (meJson.user?.name ?? "").trim() || "Customer";
+      const meJson = (await meRes.json()) as { user?: { email?: string } };
+      const email = (meJson.user?.email ?? "").trim();
+      const prefillName = (email.split("@")[0] ?? "").trim() || "Customer";
       const prefillEmail = (meJson.user?.email ?? "").trim() || "customer@example.com";
 
       const RazorpayCtor = window.Razorpay;

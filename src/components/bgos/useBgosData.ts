@@ -207,25 +207,17 @@ export function useBgosData(
       .then((r) => (r.ok ? r.json() : null))
       .then(
         (j: {
-          authenticated?: boolean;
-          planLockedToBasic?: boolean;
-          basicTrialExpired?: boolean;
-          bossBillingBypass?: boolean;
           user?: {
             companyPlan?: CompanyPlan;
             role?: UserRole;
-            isSuperBoss?: boolean;
+            superBoss?: boolean;
           };
         } | null) => {
-          if (j?.authenticated === true) {
-            setPlanLockedToBasic(j.planLockedToBasic === true);
-            setBasicTrialExpired(j.basicTrialExpired === true);
-            setBossBillingBypass(j.bossBillingBypass === true);
-          } else {
+          if (!j?.user) {
             setBasicTrialExpired(false);
             setBossBillingBypass(false);
           }
-          setIsSuperBoss(j?.user?.isSuperBoss === true);
+          setIsSuperBoss(j?.user?.superBoss === true);
           const p = j?.user?.companyPlan;
           if (
             p === CompanyPlan.BASIC ||
@@ -293,13 +285,13 @@ export function useBgosData(
           if (meRes.ok) {
             const mj = (await meRes.json()) as {
               user?: {
-                isSuperBoss?: boolean;
+                superBoss?: boolean;
                 companyId?: string | null;
                 role?: UserRole;
               };
             };
             if (
-              mj.user?.isSuperBoss === true &&
+              mj.user?.superBoss === true &&
               (mj.user.companyId == null || mj.user.companyId === "")
             ) {
               superBossNoCompanyRef.current = true;

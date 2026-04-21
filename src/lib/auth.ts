@@ -22,23 +22,32 @@ import { verifyAccessTokenResult } from "./jwt";
 import { isPlanLockedToBasic } from "./plan-production-lock";
 import { prisma } from "./prisma";
 
-const SECRET = process.env.JWT_SECRET;
-
-if (!SECRET) {
-  throw new Error("JWT_SECRET missing in environment");
+/** Cookie-session JWT (login route + `/api/auth/me`). Kept separate from access-token claims used elsewhere. */
+function requireCookieSessionSecret(): string {
+  const s = process.env.JWT_SECRET?.trim();
+  if (!s) {
+    throw new Error("JWT_SECRET missing in environment");
+  }
+  return s;
 }
 
-/** Cookie-session JWT (login route + `/api/auth/me`). Kept separate from access-token claims used elsewhere. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- contract matches auth hardening spec
-export function signToken(payload: any) {
-  return jwt.sign(payload, SECRET, {
+export function signToken(payload: any): string {
+  /** Explicit `string` so `jsonwebtoken` overloads resolve (never `string | undefined`). */
+  const signingKey: string = requireCookieSessionSecret();
+  return jwt.sign(payload, signingKey, {
     expiresIn: "7d",
   });
 }
 
+/** Verify cookie JWT; missing `JWT_SECRET` yields null (logged out), not an import-time crash — needed for `next build` without secrets. */
 export function verifyToken(token: string) {
   try {
-    return jwt.verify(token, SECRET);
+    const signingKey = process.env.JWT_SECRET?.trim();
+    if (signingKey === undefined || signingKey.length === 0) {
+      return null;
+    }
+    return jwt.verify(token, signingKey);
   } catch {
     return null;
   }
@@ -123,13 +132,46 @@ function payloadToUser(decoded: Record<string, unknown>): AuthUser | null {
   };
 }
 
+/** Cookie login JWT may use `userId` instead of `sub` — normalize before {@link payloadToUser}. */
+function normalizeCookieJwtPayload(p: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...p };
+  if (typeof out.sub !== "string" || !out.sub) {
+    if (typeof out.userId === "string" && out.userId.length > 0) {
+      out.sub = out.userId;
+    }
+  }
+  return out;
+}
+
+/**
+ * Raw JWT claims for routes that need `superBoss` etc. Tries access token (iss `bgos`) then cookie JWT.
+ */
+export function getSessionPayloadFromToken(token: string): Record<string, unknown> | null {
+  const access = verifyAccessTokenResult(token);
+  if (access.ok) return access.payload as Record<string, unknown>;
+  const raw = verifyToken(token);
+  if (!raw || typeof raw !== "object") return null;
+  const normalized = normalizeCookieJwtPayload(raw as Record<string, unknown>);
+  const v = normalized.jwtVersion;
+  if (typeof v !== "number" || v < 2) return null;
+  return normalized;
+}
+
 /**
  * Verify JWT and return the signed-in user (Route Handlers, Server Actions).
+ * Access tokens use {@link verifyAccessTokenResult}; cookie sessions use {@link verifyToken} (no issuer).
  */
 export function getAuthUserFromToken(token: string): AuthUser | null {
-  const r = verifyAccessTokenResult(token);
-  if (!r.ok) return null;
-  return payloadToUser(r.payload as Record<string, unknown>);
+  const access = verifyAccessTokenResult(token);
+  if (access.ok) {
+    return payloadToUser(access.payload as Record<string, unknown>);
+  }
+  const raw = verifyToken(token);
+  if (!raw || typeof raw !== "object") return null;
+  const normalized = normalizeCookieJwtPayload(raw as Record<string, unknown>);
+  const v = normalized.jwtVersion;
+  if (typeof v !== "number" || v < 2) return null;
+  return payloadToUser(normalized);
 }
 
 /** Session probe for `/api/auth/me` (distinguishes absent vs expired vs invalid). */
@@ -141,11 +183,23 @@ export type MeSession =
 
 export function getMeSessionFromToken(token: string | undefined): MeSession {
   if (!token?.trim()) return { status: "none" };
-  const r = verifyAccessTokenResult(token);
-  if (!r.ok) {
-    return r.code === "TOKEN_EXPIRED" ? { status: "expired" } : { status: "invalid" };
+  const access = verifyAccessTokenResult(token);
+  if (access.ok) {
+    const user = payloadToUser(access.payload as Record<string, unknown>);
+    if (!user) return { status: "invalid" };
+    return { status: "valid", user };
   }
-  const user = payloadToUser(r.payload as Record<string, unknown>);
+  if (access.code === "TOKEN_EXPIRED") {
+    return { status: "expired" };
+  }
+  const raw = verifyToken(token);
+  if (!raw || typeof raw !== "object") {
+    return { status: "invalid" };
+  }
+  const normalized = normalizeCookieJwtPayload(raw as Record<string, unknown>);
+  const v = normalized.jwtVersion;
+  if (typeof v !== "number" || v < 2) return { status: "invalid" };
+  const user = payloadToUser(normalized);
   if (!user) return { status: "invalid" };
   return { status: "valid", user };
 }

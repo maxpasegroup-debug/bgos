@@ -13,12 +13,8 @@ type CompanyRow = {
 };
 
 type MeJson = {
-  ok?: boolean;
-  authenticated?: boolean;
   user?: {
     companyId?: string | null;
-    activeCompanyIdCookie?: string | null;
-    workspaceReady?: boolean;
   };
 };
 
@@ -59,12 +55,9 @@ export function BgosCompanySwitcher({ light = false }: { light?: boolean }) {
       );
     }
 
-    if (meJson.authenticated && meJson.user) {
+    if (meJson.user) {
       const u = meJson.user;
-      const id =
-        (typeof u.activeCompanyIdCookie === "string" && u.activeCompanyIdCookie) ||
-        (typeof u.companyId === "string" && u.companyId) ||
-        null;
+      const id = (typeof u.companyId === "string" && u.companyId) || null;
       setActiveCompanyId(id);
     }
     setLoading(false);

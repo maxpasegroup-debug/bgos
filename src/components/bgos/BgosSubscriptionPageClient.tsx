@@ -169,8 +169,9 @@ export function BgosSubscriptionPageClient() {
         }
 
         const meRes = await apiFetch("/api/auth/me", { credentials: "include" });
-        const meJson = (await meRes.json()) as { user?: { name?: string; email?: string } };
-        const prefillName = (meJson.user?.name ?? "").trim() || "Customer";
+        const meJson = (await meRes.json()) as { user?: { email?: string } };
+        const email = (meJson.user?.email ?? "").trim();
+        const prefillName = (email.split("@")[0] ?? "").trim() || "Customer";
         const prefillEmail = (meJson.user?.email ?? "").trim() || "customer@example.com";
 
         const RazorpayCtor = window.Razorpay;

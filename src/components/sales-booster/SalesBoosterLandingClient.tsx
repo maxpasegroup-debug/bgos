@@ -75,12 +75,10 @@ export function SalesBoosterLandingClient() {
     try {
       const res = await apiFetch("/api/auth/me", { credentials: "include" });
       const j = (await res.json()) as {
-        authenticated?: boolean;
         user?: { companyPlan?: string };
-        billing?: { plan?: string };
       };
-      if (res.ok && j.authenticated) {
-        const p = j.billing?.plan ?? j.user?.companyPlan ?? null;
+      if (res.ok && j.user) {
+        const p = j.user?.companyPlan ?? null;
         setCompanyPlan(p ?? null);
       }
     } catch {
@@ -155,8 +153,9 @@ export function SalesBoosterLandingClient() {
       }
 
       const meRes = await apiFetch("/api/auth/me", { credentials: "include" });
-      const meJson = (await meRes.json()) as { user?: { name?: string; email?: string } };
-      const prefillName = (meJson.user?.name ?? "").trim() || "Customer";
+      const meJson = (await meRes.json()) as { user?: { email?: string } };
+      const email = (meJson.user?.email ?? "").trim();
+      const prefillName = (email.split("@")[0] ?? "").trim() || "Customer";
       const prefillEmail = (meJson.user?.email ?? "").trim() || "customer@example.com";
 
       const RazorpayCtor = window.Razorpay;

@@ -177,14 +177,15 @@ function ApprovePanel() {
   const [result, setResult] = useState<CycleResult | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  if (salesNetworkRole !== SalesNetworkRole.BOSS) return null;
-
   useEffect(() => {
+    if (salesNetworkRole !== SalesNetworkRole.BOSS) return;
     apiFetch("/api/internal/wallet/approve")
       .then((r) => r.json() as Promise<{ ok?: boolean } & PayoutStats>)
       .then((j) => { if (j.ok !== false) setStats(j); })
       .catch(() => undefined);
-  }, []);
+  }, [salesNetworkRole]);
+
+  if (salesNetworkRole !== SalesNetworkRole.BOSS) return null;
 
   async function runCycle() {
     setBusy(true);

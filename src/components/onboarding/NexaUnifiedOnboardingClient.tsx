@@ -94,9 +94,9 @@ function TypewriterText({
   const [shown, setShown] = useState("");
   useEffect(() => {
     if (!active) return;
-    setShown("");
     let i = 0;
     const start = window.setTimeout(() => {
+      setShown("");
       const timer = window.setInterval(() => {
         i += 1;
         setShown(text.slice(0, i));
@@ -640,13 +640,13 @@ export function NexaUnifiedOnboardingClient({
         }
         const meRes = await apiFetch("/api/auth/me", { credentials: "include" });
         const meJson = ((await readApiJson(meRes, "launch-me-guard")) ?? {}) as {
-          user?: { id?: string; companyId?: string | null; role?: string };
+          user?: { sub?: string; companyId?: string | null; role?: string };
         };
         const u = meJson.user;
         if (DEV_ONBOARD) console.log("Role assigned (me):", u);
         if (
           !meRes.ok ||
-          typeof u?.id !== "string" ||
+          typeof u?.sub !== "string" ||
           typeof u?.companyId !== "string" ||
           u.companyId.length === 0 ||
           u.role !== "ADMIN"

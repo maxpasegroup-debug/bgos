@@ -84,8 +84,9 @@ export function SalesBoosterInboxClient() {
     void (async () => {
       try {
         const res = await apiFetch("/api/auth/me", { credentials: "include" });
-        const j = (await res.json()) as { user?: { name?: string } };
-        const n = j.user?.name?.trim();
+        const j = (await res.json()) as { user?: { email?: string } };
+        const email = j.user?.email?.trim() ?? "";
+        const n = email.includes("@") ? email.split("@")[0]?.trim() : "";
         if (n) setUserLabel(n.split(" ")[0] ?? "You");
       } catch {
         /* ignore */

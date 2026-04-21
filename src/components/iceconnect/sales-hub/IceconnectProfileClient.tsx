@@ -27,11 +27,12 @@ export function IceconnectProfileClient() {
     void (async () => {
       try {
         const res = await apiFetch("/api/auth/me", { credentials: "include" });
-        const j = (await res.json()) as { user?: { name?: string; email?: string; role?: string } };
+        const j = (await res.json()) as { user?: { email?: string; role?: string } };
         if (c) return;
         if (j.user) {
-          setName(j.user.name?.trim() || "");
-          setEmail(j.user.email ?? "");
+          const nextEmail = j.user.email ?? "";
+          setEmail(nextEmail);
+          setName((nextEmail.split("@")[0] ?? "").trim());
           setRole(j.user.role ?? "");
         }
       } catch {

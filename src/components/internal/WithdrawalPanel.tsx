@@ -428,7 +428,7 @@ export function WithdrawalPanel({ withdrawableBalance, agreementAccepted, onRefr
           </span>
           <div>
             <p className="text-sm font-semibold text-white">Withdrawal pending</p>
-            <p className="text-xs text-white/40">Your request is awaiting boss approval. You'll be notified once processed.</p>
+            <p className="text-xs text-white/40">Your request is awaiting boss approval. You&apos;ll be notified once processed.</p>
           </div>
         </motion.div>
       )}

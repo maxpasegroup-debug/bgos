@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getTokenFromRequest, requireAuth } from "@/lib/auth";
-import { verifyAccessTokenResult } from "@/lib/jwt";
+import { getSessionPayloadFromToken, getTokenFromRequest, requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isSuperBossEmail } from "@/lib/super-boss";
 
@@ -13,8 +12,7 @@ export async function GET(request: NextRequest) {
   if (session instanceof NextResponse) return session;
 
   const token = getTokenFromRequest(request);
-  const vr = token ? verifyAccessTokenResult(token) : { ok: false as const };
-  const payload = vr.ok ? (vr.payload as Record<string, unknown>) : null;
+  const payload = token ? getSessionPayloadFromToken(token) : null;
   const superBossList =
     payload?.superBoss === true && isSuperBossEmail(session.email) === true;
 

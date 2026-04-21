@@ -24,14 +24,12 @@ interface MobileWrapperProps {
 }
 
 export function MobileWrapper({ children }: MobileWrapperProps) {
-  const [mounted, setMounted]   = useState(false);
-  const [mobile,  setMobile]    = useState(false);
+  const [mounted]               = useState(() => typeof window !== "undefined");
+  const [mobile,  setMobile]    = useState(() =>
+    typeof window !== "undefined" ? isMobile() : false,
+  );
 
   useEffect(() => {
-    // Detect on mount
-    setMobile(isMobile());
-    setMounted(true);
-
     // Keep in sync on resize (orientation change, devtools responsive mode, etc.)
     function handleResize() {
       setMobile(isMobile());

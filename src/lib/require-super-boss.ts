@@ -2,8 +2,13 @@ import "server-only";
 
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { type AuthUser, getAuthUser, getAuthUserFromToken, getTokenFromRequest } from "@/lib/auth";
-import { verifyAccessTokenResult } from "@/lib/jwt";
+import {
+  type AuthUser,
+  getAuthUser,
+  getAuthUserFromToken,
+  getSessionPayloadFromToken,
+  getTokenFromRequest,
+} from "@/lib/auth";
 import { isSuperBossEmail } from "@/lib/super-boss";
 
 /**
@@ -24,14 +29,13 @@ export function requireSuperBossApi(
       { status: 401 },
     );
   }
-  const vr = verifyAccessTokenResult(token);
-  if (!vr.ok) {
+  const payload = getSessionPayloadFromToken(token);
+  if (!payload) {
     return NextResponse.json(
       { ok: false as const, error: "Invalid or expired session", code: "TOKEN_INVALID" as const },
       { status: 401 },
     );
   }
-  const payload = vr.payload as Record<string, unknown>;
   if (!isSuperBossEmail(user.email)) {
     return NextResponse.json(
       {

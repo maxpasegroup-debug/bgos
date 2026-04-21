@@ -20,13 +20,12 @@ import { MobileBdeDashboard } from "@/components/mobile/MobileBdeDashboard";
 
 export function SalesPageRouter() {
   const { salesNetworkRole }    = useInternalSession();
-  const [mounted, setMounted]   = useState(false);
-  const [mobile,  setMobile]    = useState(false);
+  const [mounted]               = useState(() => typeof window !== "undefined");
+  const [mobile,  setMobile]    = useState(() =>
+    typeof window !== "undefined" ? isMobile() : false,
+  );
 
   useEffect(() => {
-    setMobile(isMobile());
-    setMounted(true);
-
     function onResize() { setMobile(isMobile()); }
     window.addEventListener("resize", onResize, { passive: true });
     return () => window.removeEventListener("resize", onResize);

@@ -86,12 +86,11 @@ export function BgosAddLeadModal({
       let meRole: string | null = null;
       try {
         const meJson = (await meRes.json()) as {
-          authenticated?: boolean;
-          user?: { id: string; role: string };
+          user?: { sub?: string; role?: string };
         };
-        if (meRes.ok && meJson.authenticated && meJson.user) {
-          meId = meJson.user.id;
-          meRole = meJson.user.role;
+        if (meRes.ok && meJson.user) {
+          meId = typeof meJson.user.sub === "string" ? meJson.user.sub : null;
+          meRole = typeof meJson.user.role === "string" ? meJson.user.role : null;
         }
       } catch (e) {
         console.error("API ERROR:", e);

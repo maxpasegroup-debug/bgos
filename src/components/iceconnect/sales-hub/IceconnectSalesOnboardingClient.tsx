@@ -158,13 +158,11 @@ export function IceconnectSalesOnboardingClient() {
       );
 
       const mej = ((await readApiJson(meRes, "auth/me-onb")) ?? {}) as {
-        ok?: boolean;
-        user?: { name?: string | null; email?: string; role?: string };
+        user?: { email?: string; role?: string };
       };
-      if (meRes.ok && mej.ok === true) {
-        const n = mej.user?.name?.trim();
+      if (meRes.ok && mej.user) {
         const e = mej.user?.email?.split("@")[0]?.trim();
-        setEmployeeName(n || e || "there");
+        setEmployeeName(e || "there");
         setEmployeeRole(mej.user?.role || "SALES_EXECUTIVE");
       }
       const cj = ((await readApiJson(coRes, "company/current-onb")) ?? {}) as {

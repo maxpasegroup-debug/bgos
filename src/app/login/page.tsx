@@ -33,11 +33,22 @@ export default function LoginPage() {
       }
 
       const meRes = await fetch("/api/auth/me", { credentials: "include" });
-      let meJson: { user?: { role?: string; companyType?: string } | null };
+      let meJson: {
+        user?: { role?: string; employeeDomain?: "BGOS" | "SOLAR" } | null;
+        requiresRelogin?: boolean;
+      };
       try {
-        meJson = (await meRes.json()) as { user?: { role?: string; companyType?: string } | null };
+        meJson = (await meRes.json()) as {
+          user?: { role?: string; employeeDomain?: "BGOS" | "SOLAR" } | null;
+          requiresRelogin?: boolean;
+        };
       } catch {
         setError("Unable to verify session. Please try again.");
+        return;
+      }
+
+      if (meJson?.requiresRelogin === true) {
+        router.replace("/login");
         return;
       }
 
@@ -48,10 +59,10 @@ export default function LoginPage() {
 
       const { user } = meJson;
       const role = user.role;
-      const companyType = user.companyType;
+      const employeeDomain = user.employeeDomain;
 
       if (role === "BOSS") {
-        if (companyType === "SOLAR") {
+        if (employeeDomain === "SOLAR") {
           router.replace("/solar/dashboard");
         } else {
           router.replace("/dashboard");
@@ -60,7 +71,7 @@ export default function LoginPage() {
       }
 
       if (isBossRole(role)) {
-        if (companyType === "SOLAR") {
+        if (employeeDomain === "SOLAR") {
           router.replace("/solar/dashboard");
         } else {
           router.replace("/dashboard");

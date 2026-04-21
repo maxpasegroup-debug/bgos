@@ -40,7 +40,6 @@ export default function SelectCompanyPage() {
       };
       const meJson = (await meRes.json()) as {
         ok?: boolean;
-        authenticated?: boolean;
         user?: { role?: string };
       };
       if (!listRes.ok || !listJson.ok || !Array.isArray(listJson.companies)) {

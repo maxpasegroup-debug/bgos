@@ -11,6 +11,13 @@ export async function POST() {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
   });
+  res.cookies.set("bgos_onboarding_sid", "", {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 0,
+  });
 
   await clearSessionCookie(res);
   await clearActiveCompanyCookie(res);

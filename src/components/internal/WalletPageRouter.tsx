@@ -10,13 +10,13 @@ import { MobileWalletPage } from "@/components/mobile/MobileWalletPage";
  * SSR defaults to WalletDashboard to avoid hydration mismatches.
  */
 export function WalletPageRouter() {
-  const [mounted, setMounted] = useState(false);
-  const [mobile, setMobile]   = useState(false);
+  const [mounted] = useState(() => typeof window !== "undefined");
+  const [mobile, setMobile] = useState(() =>
+    typeof window !== "undefined" ? isMobile() : false,
+  );
 
   useEffect(() => {
     const check = () => setMobile(isMobile());
-    check();
-    setMounted(true);
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);

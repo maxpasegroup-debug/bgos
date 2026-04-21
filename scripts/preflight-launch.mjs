@@ -27,19 +27,19 @@ function ok(msg) {
 
 const required = ["DATABASE_URL", "JWT_SECRET"];
 for (const k of required) {
-  const v = process.env[k];
-  if (!v || !v.trim()) fail(`${k} is missing`);
+  const v = (process.env[k] ?? "").trim();
+  if (!v) fail(`${k} is missing`);
   else ok(`${k} is set`);
 }
 
-const jwt = process.env.JWT_SECRET ?? "";
+const jwt = (process.env.JWT_SECRET ?? "").trim();
 if (jwt && jwt.length < 32) {
   fail("JWT_SECRET must be at least 32 characters");
 } else if (jwt) {
   ok("JWT_SECRET length is strong enough");
 }
 
-const db = process.env.DATABASE_URL ?? "";
+const db = (process.env.DATABASE_URL ?? "").trim();
 if (db && !/^postgres(ql)?:\/\//i.test(db)) {
   fail("DATABASE_URL must be a PostgreSQL URL");
 } else if (db) {
@@ -47,7 +47,7 @@ if (db && !/^postgres(ql)?:\/\//i.test(db)) {
 }
 
 if (process.exitCode && process.exitCode !== 0) {
-  console.error("Preflight failed.");
+  console.error("Preflight failed. Fix env vars and restart.");
 } else {
   console.log("Preflight passed.");
 }

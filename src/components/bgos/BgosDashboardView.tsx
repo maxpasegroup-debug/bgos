@@ -39,16 +39,23 @@ export function BgosDashboardView({ section }: { section?: string }) {
   const scrollKey = section ? routeToSection[section] ?? section : undefined;
   const [userName, setUserName] = useState("Boss");
   const [companyName, setCompanyName] = useState<string | null>(null);
-  const [showBuildingPanel, setShowBuildingPanel] = useState(false);
+  const [showBuildingPanel, setShowBuildingPanel] = useState(
+    () => searchParams.get("building") === "1",
+  );
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await apiFetch("/api/auth/me");
-        const j = (await res.json()) as { user?: { name?: string; companyName?: string | null } };
-        const name = j.user?.name?.trim();
-        const co = j.user?.companyName?.trim();
+        const res = await apiFetch("/api/user/profile", { credentials: "include" });
+        if (!res.ok) return;
+        const j = (await res.json()) as {
+          displayName?: string;
+          companyName?: string | null;
+          companyId?: string | null;
+        };
+        const name = j.displayName?.trim() ?? "";
+        const co = (j.companyName ?? j.companyId ?? "").trim();
         if (!cancelled && name) setUserName(name);
         if (!cancelled && co) setCompanyName(co);
       } catch {
@@ -71,10 +78,7 @@ export function BgosDashboardView({ section }: { section?: string }) {
   }, [scrollKey, isLoading]);
 
   useEffect(() => {
-    if (searchParams.get("building") === "1") {
-      setShowBuildingPanel(true);
-      return;
-    }
+    if (searchParams.get("building") === "1") return;
     let cancelled = false;
     (async () => {
       try {

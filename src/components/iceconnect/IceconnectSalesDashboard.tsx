@@ -246,13 +246,14 @@ export function IceconnectSalesDashboard() {
     (async () => {
       try {
         const res = await apiFetch("/api/auth/me", { credentials: "include" });
-        const j = (await res.json()) as { user?: { id?: string; name?: string; role?: string } };
+        const j = (await res.json()) as { user?: { sub?: string; email?: string; role?: string } };
         if (!c) return;
-        if (typeof j.user?.id === "string" && j.user.id.trim()) {
-          setSessionUserId(j.user.id.trim());
+        if (typeof j.user?.sub === "string" && j.user.sub.trim()) {
+          setSessionUserId(j.user.sub.trim());
         }
-        if (typeof j.user?.name === "string" && j.user.name.trim()) {
-          setEmployeeName(j.user.name.trim());
+        if (typeof j.user?.email === "string" && j.user.email.trim()) {
+          const local = j.user.email.split("@")[0]?.trim();
+          if (local) setEmployeeName(local);
         }
         if (typeof j.user?.role === "string" && j.user.role.trim()) {
           setEmployeeRole(j.user.role.trim());

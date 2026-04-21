@@ -10,13 +10,13 @@ import { MobileLanding } from "@/components/mobile/MobileLanding";
  * on everything else. SSR defaults to Landing to avoid hydration mismatches.
  */
 export function LandingRouter() {
-  const [mounted, setMounted] = useState(false);
-  const [mobile, setMobile]   = useState(false);
+  const [mounted] = useState(() => typeof window !== "undefined");
+  const [mobile, setMobile] = useState(() =>
+    typeof window !== "undefined" ? isMobile() : false,
+  );
 
   useEffect(() => {
     const check = () => setMobile(isMobile());
-    check();
-    setMounted(true);
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
