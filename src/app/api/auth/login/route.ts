@@ -118,10 +118,6 @@ export async function POST(req: Request) {
   const role = primaryMembership?.jobRole ?? UserRole.ADMIN;
   const workspaceReady = primaryMembership ? Boolean(user.workspaceActivatedAt) : false;
 
-  if (!primaryMembership) {
-    console.warn(`[bgos] login: user ${user.id} has no memberships`);
-  }
-
   const memberships =
     user.memberships.length > 0
       ? user.memberships.map((m) => ({
