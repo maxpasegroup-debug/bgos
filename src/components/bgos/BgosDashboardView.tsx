@@ -7,6 +7,7 @@ import { apiFetch, readApiJson } from "@/lib/api-fetch";
 import { useEffect, useState } from "react";
 import { BgosDashboardSkeletons, BgosIntelligenceHomeSkeleton } from "./BgosDashboardSkeletons";
 import { BgosIntelligenceHome } from "./BgosIntelligenceHome";
+import { BossPipelineView } from "./BossPipelineView";
 import { SolarBossDashboard } from "./solar/SolarBossDashboard";
 import { useBgosDashboardContext } from "./BgosDataProvider";
 import { BGOS_MAIN_PAD } from "./layoutTokens";
@@ -29,7 +30,6 @@ export function BgosDashboardView({ section }: { section?: string }) {
     error,
     refetch,
     isLoading,
-    analyticsRangePreset,
     sessionRole,
     isSuperBoss,
   } = useBgosDashboardContext();
@@ -150,6 +150,7 @@ export function BgosDashboardView({ section }: { section?: string }) {
           </div>
         </section>
       ) : null}
+      {useBossCommandCenterHome ? <BossPipelineView /> : null}
       <SolarBossDashboard
         dashboard={dashboard}
         userName={userName}
