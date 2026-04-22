@@ -33,7 +33,8 @@ export async function GET(request: NextRequest) {
       select: {
         userId: true,
         jobRole: true,
-        user: { select: { id: true, name: true, mobile: true, createdAt: true } },
+        dashboardAssigned: true,
+        user: { select: { id: true, name: true, email: true, mobile: true, createdAt: true } },
       },
       orderBy: { user: { name: "asc" } },
     }),
@@ -112,8 +113,10 @@ export async function GET(request: NextRequest) {
     return {
       id: m.user.id,
       name: m.user.name,
+      email: m.user.email,
       phone: m.user.mobile ?? "",
       role: m.jobRole,
+      dashboardAssigned: m.dashboardAssigned ?? "",
       roleLabel: roleLabel(m.jobRole),
       joiningDate: m.user.createdAt.toISOString(),
       status: isOnLeave ? "ON_LEAVE" : "ACTIVE",

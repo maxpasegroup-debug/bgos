@@ -150,9 +150,11 @@ export default async function SolarBossDashboardPage() {
         <p style={sectionLabel}>Quick actions</p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
           {[
-            { href: "/solar-boss/sales", label: "Add lead" },
-            { href: "/solar-boss/sales", label: "Follow-up" },
-            { href: "/solar-boss/operations", label: "New project" },
+            { href: "/bgos/sales", label: "Add lead" },
+            { href: "/bgos/sales", label: "Follow-up" },
+            { href: "/bgos/operations", label: "New project" },
+            { href: "/bgos/hr", label: "HR dashboard" },
+            { href: "/bgos/inventory", label: "Inventory" },
           ].map((a) => (
             <Link
               key={a.label}

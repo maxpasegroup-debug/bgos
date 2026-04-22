@@ -8,6 +8,7 @@ import { BdmLeads } from "./bdm/BdmLeads";
 import { BdmOnboarding } from "./bdm/BdmOnboarding";
 import { BdmOverview } from "./bdm/BdmOverview";
 import { BdmTechRequests } from "./bdm/BdmTechRequests";
+import { ChangePasswordModal } from "./ChangePasswordModal";
 
 type TabKey = "overview" | "leads" | "onboarding" | "clients" | "tech";
 
@@ -32,6 +33,7 @@ export function BdmDashboard({ user }: { user: AuthUser }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
+  const [changePwOpen, setChangePwOpen] = useState(false);
 
   async function loadNotifications() {
     try {
@@ -78,6 +80,7 @@ export function BdmDashboard({ user }: { user: AuthUser }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {changePwOpen && <ChangePasswordModal onClose={() => setChangePwOpen(false)} />}
       <div
         style={{
           display: "flex",
@@ -97,6 +100,26 @@ export function BdmDashboard({ user }: { user: AuthUser }) {
           </p>
         </div>
 
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            type="button"
+            onClick={() => setChangePwOpen(true)}
+            aria-label="Change password"
+            title="Change password"
+            style={{
+              borderRadius: 10,
+              border: "1px solid rgba(255,255,255,0.15)",
+              background: "rgba(255,255,255,0.05)",
+              color: "rgba(255,255,255,0.65)",
+              padding: "8px 10px",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              fontSize: 16,
+              lineHeight: 1,
+            }}
+          >
+            ⚙
+          </button>
         <div style={{ position: "relative" }}>
           <button
             type="button"
@@ -200,6 +223,7 @@ export function BdmDashboard({ user }: { user: AuthUser }) {
               )}
             </div>
           ) : null}
+        </div>
         </div>
       </div>
 

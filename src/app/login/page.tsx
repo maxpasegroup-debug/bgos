@@ -26,7 +26,14 @@ export default function LoginPage() {
       });
 
       if (!loginRes.ok) {
-        setError("Invalid email or password.");
+        let message = "Invalid email or password.";
+        try {
+          const body = (await loginRes.clone().json()) as { error?: string };
+          if (body?.error) message = body.error;
+        } catch {
+          // ignore non-json body
+        }
+        setError(message);
         return;
       }
 

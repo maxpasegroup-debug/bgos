@@ -103,9 +103,19 @@ export async function POST(req: Request) {
     user.memberships as MembershipWithCompany[],
     activeCompanyIdCookie,
   );
+  const superBoss = isSuperBossEmail(user.email);
+  if (!primaryMembership && !superBoss) {
+    return NextResponse.json(
+      {
+        error: "Your account has no active workspace. Contact your admin.",
+      },
+      { status: 403 },
+    );
+  }
+
   const companyId = primaryMembership?.companyId ?? null;
   const companyPlan = primaryMembership?.company.plan ?? CompanyPlan.BASIC;
-  const role = primaryMembership?.jobRole ?? UserRole.BDM;
+  const role = primaryMembership?.jobRole ?? UserRole.ADMIN;
   const workspaceReady = primaryMembership ? Boolean(user.workspaceActivatedAt) : false;
 
   if (!primaryMembership) {
@@ -143,7 +153,7 @@ export async function POST(req: Request) {
     jwtVersion: 2,
     ...(memberships ? { memberships } : {}),
     employeeDomain,
-    ...(isSuperBossEmail(user.email) ? { superBoss: true } : {}),
+    ...(superBoss ? { superBoss: true } : {}),
   });
 
   const res = NextResponse.json({ success: true });

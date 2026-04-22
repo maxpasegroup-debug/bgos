@@ -41,7 +41,7 @@ export function SolarBossDashboard({
   companyName: string | null;
   metricsUnavailable: boolean;
 }) {
-  const { hasProPlan, planLockedToBasic, trialReadOnly } = useBgosDashboardContext();
+  const { trialReadOnly } = useBgosDashboardContext();
 
   const empty = useMemo(() => {
     if (metricsUnavailable || !dashboard) return true;
@@ -159,9 +159,6 @@ export function SolarBossDashboard({
     return [...t].sort((a, b) => (b.wonLeads ?? 0) - (a.wonLeads ?? 0))[0] ?? null;
   }, [dashboard]);
 
-  const salesBoosterHref =
-    hasProPlan && !planLockedToBasic ? "/sales-booster" : "/bgos/pricing";
-
   if (empty && !metricsUnavailable) {
     return (
       <div className="relative pb-28">
@@ -200,6 +197,12 @@ export function SolarBossDashboard({
               >
                 Invite team
               </Link>
+              <span
+                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-5 text-sm font-medium text-white/45"
+                aria-disabled="true"
+              >
+                Sales Booster (disabled)
+              </span>
             </div>
           </div>
         </motion.section>
@@ -262,12 +265,12 @@ export function SolarBossDashboard({
               >
                 Check Inventory
               </Link>
-              <Link
-                href={salesBoosterHref}
-                className="inline-flex min-h-10 items-center justify-center rounded-xl border border-amber-400/25 bg-amber-500/10 px-4 text-sm font-semibold text-amber-100/95 transition hover:bg-amber-500/15"
+              <span
+                className="inline-flex min-h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white/45"
+                aria-disabled="true"
               >
-                {hasProPlan && !planLockedToBasic ? "Sales Booster" : "Sales Booster — Upgrade"}
-              </Link>
+                Sales Booster (disabled)
+              </span>
             </div>
 
             <div className="mt-8 rounded-2xl border border-white/10 bg-black/20 p-4 sm:p-5">

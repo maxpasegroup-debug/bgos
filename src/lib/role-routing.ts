@@ -12,6 +12,7 @@ export const ROLE_HOME: Record<string, string> = {
   // Boss roles -> BGOS dashboard
   ADMIN: "/bgos/dashboard",
   MANAGER: "/bgos/dashboard",
+  BDM: "/iceconnect/bdm",
 
   // BGOS Employee roles -> ICECONNECT dashboards
   SALES_HEAD: "/iceconnect/rsm",

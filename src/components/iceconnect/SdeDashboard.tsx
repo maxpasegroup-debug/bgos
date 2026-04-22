@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AuthUser } from "@/lib/auth";
 import { apiFetch } from "@/lib/api-fetch";
 import type { SdeTechRequestDescription } from "@/lib/sde-tech-request-payload";
+import { ChangePasswordModal } from "./ChangePasswordModal";
 
 type SdeTask = {
   id: string;
@@ -146,6 +147,8 @@ export function SdeDashboard({ user }: SdeDashboardProps) {
     modalNotes: string;
   }>({ open: false, request: null, focusNotes: false, modalNotes: "" });
 
+  const [changePwOpen, setChangePwOpen] = useState(false);
+
   const loadTasks = useCallback(async () => {
     setTasksLoading(true);
     setTasksError(null);
@@ -258,6 +261,7 @@ export function SdeDashboard({ user }: SdeDashboardProps) {
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4 text-white">
+      {changePwOpen && <ChangePasswordModal onClose={() => setChangePwOpen(false)} />}
       <section style={GLASS}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -265,9 +269,30 @@ export function SdeDashboard({ user }: SdeDashboardProps) {
             <h1 className="mt-2 text-2xl font-semibold">Hey {name}, ready to build?</h1>
             <p className="mt-1 text-sm text-white/65">SDE queue for BDM tech requests and your assigned tasks.</p>
           </div>
-          <div className="flex items-center gap-2 rounded-full border border-cyan-300/35 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-200">
-            <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />
-            Nexa Online
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 rounded-full border border-cyan-300/35 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-200">
+              <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />
+              Nexa Online
+            </div>
+            <button
+              type="button"
+              onClick={() => setChangePwOpen(true)}
+              aria-label="Change password"
+              title="Change password"
+              style={{
+                borderRadius: 8,
+                border: "1px solid rgba(255,255,255,0.15)",
+                background: "rgba(255,255,255,0.05)",
+                color: "rgba(255,255,255,0.65)",
+                padding: "6px 8px",
+                cursor: "pointer",
+                fontFamily: "inherit",
+                fontSize: 14,
+                lineHeight: 1,
+              }}
+            >
+              ⚙
+            </button>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
