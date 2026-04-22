@@ -1,4 +1,4 @@
-import { CompanyPlan, UserRole } from "@prisma/client";
+import { UserRole } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { requireActiveCompanyMembership } from "@/lib/auth";
@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { setActiveCompanyCookie, setSessionCookie } from "@/lib/session-cookie";
 import { signAccessToken } from "@/lib/jwt";
 import { isSuperBossEmail } from "@/lib/super-boss";
+import { getNextBdmId } from "@/lib/bdm-round-robin";
 
 /**
  * Completes onboarding step 2 (NEXA activation). Sets `workspaceActivatedAt` and re-issues JWT with `workspaceReady: true`.
@@ -63,6 +64,59 @@ export async function POST(request: NextRequest) {
       where: { id: session.sub },
       data: { workspaceActivatedAt: new Date() },
     });
+
+    // Non-fatal website-signup lead auto-creation for BDM queue.
+    try {
+      const company = await prisma.company.findUnique({
+        where: { id: companyId },
+        select: { id: true, name: true, industry: true },
+      });
+      const user = await prisma.user.findUnique({
+        where: { id: session.sub },
+        select: { id: true, name: true, email: true, mobile: true },
+      });
+
+      if (company && user) {
+        const existingWebsiteLead = await prisma.lead.findFirst({
+          where: { companyId: company.id, source: "WEBSITE" },
+          select: { id: true },
+        });
+
+        if (!existingWebsiteLead) {
+          const assignedBdmId = await getNextBdmId(company.id);
+          await prisma.lead.create({
+            data: {
+              name: user.name || "Website Signup",
+              email: user.email,
+              phone: user.mobile || "",
+              source: "WEBSITE",
+              status: "NEW",
+              leadCompanyName: company.name,
+              businessType: String(company.industry),
+              companyId: company.id,
+              assignedTo: assignedBdmId,
+              createdByUserId: user.id,
+              internalSalesNotes: "Self signup via bgos.online",
+              lastActivityAt: new Date(),
+            },
+          });
+
+          if (assignedBdmId) {
+            await prisma.internalInAppNotification.create({
+              data: {
+                companyId: company.id,
+                userId: assignedBdmId,
+                title: "New Lead Assigned",
+                body: `New website signup: ${company.name}`,
+                type: "LEAD_ASSIGNED",
+              },
+            });
+          }
+        }
+      }
+    } catch (leadCreateError) {
+      console.error("[bgos] lead auto-create failed", leadCreateError);
+    }
   } catch (e) {
     return handleApiError("POST /api/onboarding/activate", e);
   }

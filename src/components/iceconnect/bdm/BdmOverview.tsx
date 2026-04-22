@@ -35,7 +35,7 @@ export function BdmOverview() {
           NEXA BRIEFING
         </p>
         <p style={{ margin: "8px 0 0", fontSize: 14, color: "rgba(255,255,255,0.88)" }}>
-          Today's priorities from Nexa
+          Today&apos;s priorities from Nexa
         </p>
         <p style={{ margin: "6px 0 0", fontSize: 13, color: "rgba(255,255,255,0.72)", lineHeight: 1.45 }}>
           Focus on your 3 pending leads. 2 onboardings need follow-up. 1 tech request is ready for delivery.

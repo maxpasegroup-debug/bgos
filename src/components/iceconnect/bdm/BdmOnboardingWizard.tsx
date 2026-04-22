@@ -240,7 +240,7 @@ export function BdmOnboardingWizard({ lead, onClose, onSubmitted }: Props) {
                 Yes, pre-fill
               </button>
               <button type="button" style={buttonStyle} onClick={() => setEmployees([])}>
-                No, I'll add manually
+                No, I&apos;ll add manually
               </button>
             </div>
           </div>

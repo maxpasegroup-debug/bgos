@@ -19,6 +19,7 @@ type LeadRow = {
   lastActivityDate: string | null;
   nextAction: string;
   notes: string | null;
+  source?: string | null;
 };
 
 const FILTERS: LeadFilter[] = ["ALL", "NEW", "CONTACTED", "QUALIFIED", "ONBOARDING", "DELIVERED", "LOST"];
@@ -101,6 +102,11 @@ export function BdmLeads({ user }: { user: { companyId?: string | null } }) {
     return leads.filter((lead) => lead.statusKey === activeFilter);
   }, [leads, activeFilter]);
 
+  const websiteSignupLeads = useMemo(
+    () => leads.filter((lead) => lead.source === "WEBSITE" && lead.statusKey === "NEW"),
+    [leads],
+  );
+
   async function submitNewLead() {
     if (!form.companyName.trim() || !form.contactName.trim() || !form.phone.trim() || !form.industry.trim()) {
       setError("Company name, contact person, phone, and industry are required.");
@@ -161,6 +167,52 @@ export function BdmLeads({ user }: { user: { companyId?: string | null } }) {
         </div>
 
         <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {websiteSignupLeads.length > 0 ? (
+            <div
+              style={{
+                width: "100%",
+                borderRadius: 12,
+                border: "1px solid rgba(34,211,238,0.45)",
+                background: "rgba(34,211,238,0.1)",
+                padding: "10px 12px",
+                display: "grid",
+                gap: 8,
+              }}
+            >
+              <div>
+                <p style={{ margin: 0, fontWeight: 700, color: "#67E8F9" }}>🔔 New Website Signups ({websiteSignupLeads.length})</p>
+                <p style={{ margin: "4px 0 0", fontSize: 12, color: "rgba(255,255,255,0.86)" }}>
+                  These leads signed up directly and are waiting for your contact.
+                </p>
+              </div>
+              {websiteSignupLeads.map((lead) => (
+                <div
+                  key={`website-${lead.id}`}
+                  style={{
+                    borderRadius: 10,
+                    border: "1px solid rgba(34,211,238,0.35)",
+                    background: "rgba(34,211,238,0.08)",
+                    padding: "8px 10px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 8,
+                  }}
+                >
+                  <div>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: 700 }}>{lead.companyName}</p>
+                    <p style={{ margin: "2px 0 0", fontSize: 12, color: "rgba(255,255,255,0.82)" }}>
+                      {lead.contactName} • {lead.phone}
+                    </p>
+                  </div>
+                  <a href={`tel:${lead.phone}`} style={{ color: "#9CE7FF", fontSize: 12, fontWeight: 700, textDecoration: "none" }}>
+                    Call now
+                  </a>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          <div style={{ width: "100%", display: "flex", flexWrap: "wrap", gap: 8 }}>
           {FILTERS.map((filter) => {
             const active = filter === activeFilter;
             return (
@@ -184,6 +236,7 @@ export function BdmLeads({ user }: { user: { companyId?: string | null } }) {
               </button>
             );
           })}
+          </div>
         </div>
       </div>
 
