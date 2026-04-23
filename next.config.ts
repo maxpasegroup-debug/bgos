@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  generateBuildId: async () => {
+    return `bgos-${Date.now()}`;
+  },
   experimental: {
     optimizePackageImports: ["@next/font"],
   },
