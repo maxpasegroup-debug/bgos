@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AuthUser } from "@/lib/auth";
 import { apiFetch } from "@/lib/api-fetch";
+import { RoleBadge } from "@/components/ui/RoleBadge";
 import type { SdeTechRequestDescription } from "@/lib/sde-tech-request-payload";
 import { ChangePasswordModal } from "./ChangePasswordModal";
 
@@ -60,12 +61,6 @@ function priorityTone(priority: SdeTask["priority"]): React.CSSProperties {
   if (priority === "HIGH") return { color: "#fca5a5", borderColor: "rgba(248,113,113,0.35)" };
   if (priority === "LOW") return { color: "#86efac", borderColor: "rgba(74,222,128,0.35)" };
   return { color: "#fcd34d", borderColor: "rgba(251,191,36,0.35)" };
-}
-
-function roleLabel(role: string): string {
-  if (role === "TECH_EXECUTIVE") return "SDE";
-  if (role === "TECH_HEAD") return "SDE Lead";
-  return role;
 }
 
 function timeAgo(iso: string): string {
@@ -267,7 +262,7 @@ export function SdeDashboard({ user }: SdeDashboardProps) {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300/80">Iceconnect Engineering</p>
             <h1 className="mt-2 text-2xl font-semibold">Hey {name}, ready to build?</h1>
-            <p className="mt-1 text-sm text-white/65">SDE queue for BDM tech requests and your assigned tasks.</p>
+            <p className="mt-1 text-sm text-white/65">SDE queue for franchise partner tech requests and your assigned tasks.</p>
           </div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 rounded-full border border-cyan-300/35 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-200">
@@ -296,9 +291,7 @@ export function SdeDashboard({ user }: SdeDashboardProps) {
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
-          <div className="inline-flex rounded-full border border-violet-300/35 bg-violet-500/10 px-3 py-1 text-xs font-semibold text-violet-200">
-            {roleLabel(user.role)} - Software Dev Executive
-          </div>
+          <RoleBadge role={user.role} />
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -354,7 +347,7 @@ export function SdeDashboard({ user }: SdeDashboardProps) {
       {tab === "build" && (
         <section style={GLASS}>
           <h2 className="text-lg font-semibold">Build queue</h2>
-          <p className="mt-1 text-sm text-white/60">Incoming tech requests from BDM (excludes completed).</p>
+          <p className="mt-1 text-sm text-white/60">Incoming tech requests from franchise partners (excludes completed).</p>
           {techLoading ? (
             <p className="mt-3 text-sm text-white/65">Loading…</p>
           ) : techError ? (
@@ -366,7 +359,7 @@ export function SdeDashboard({ user }: SdeDashboardProps) {
               {buildQueue.map((r) => {
                 const typeMeta = requestTypeMeta(r.roleName);
                 const urgent = r.priority === "URGENT";
-                const bdm = r.requestedByUser?.name ?? "BDM";
+                const bdm = r.requestedByUser?.name ?? "Franchise Partner";
                 const tpl = hasIndustryTemplate(r.industry, doneList, r.id);
                 return (
                   <article
@@ -378,7 +371,7 @@ export function SdeDashboard({ user }: SdeDashboardProps) {
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
                         <h3 className="font-semibold">{r.companyName}</h3>
-                        <p className="text-xs text-white/55">Submitted by {bdm} · {timeAgo(r.createdAt)}</p>
+                        <p className="text-xs text-white/55">Submitted by {bdm} (Franchise Partner) · {timeAgo(r.createdAt)}</p>
                       </div>
                       <div className="flex flex-wrap gap-1">
                         <span
@@ -617,7 +610,7 @@ export function SdeDashboard({ user }: SdeDashboardProps) {
               <p className="font-semibold text-amber-100">Overdue items</p>
               <p className="mt-1 text-white/70">
                 {stats.overdue > 0
-                  ? `${stats.overdue} open request(s) are past the estimated delivery date. Re-scope or update the BDM.`
+                  ? `${stats.overdue} open request(s) are past the estimated delivery date. Re-scope or update the franchise partner.`
                   : "No open requests are past their estimated delivery date."}
               </p>
             </div>
@@ -702,7 +695,7 @@ export function SdeDashboard({ user }: SdeDashboardProps) {
                 </div>
               </div>
               <div>
-                <p className="text-[11px] font-semibold uppercase text-white/45">BDM notes</p>
+                <p className="text-[11px] font-semibold uppercase text-white/45">Franchise Partner Notes</p>
                 <p className="mt-1 rounded border border-white/10 bg-black/20 p-2 text-white/80">{modal.request.notes || "—"}</p>
               </div>
               <div>

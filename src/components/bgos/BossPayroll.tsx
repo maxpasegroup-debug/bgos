@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api-fetch";
+import { RoleBadge } from "@/components/ui/RoleBadge";
 
 type PayrollResponse = {
   currentMonth: string;
@@ -170,7 +171,7 @@ export function BossPayroll() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold text-white">BDM Payroll</h3>
+          <h3 className="text-lg font-semibold text-white">Franchise Payroll</h3>
           <p className="text-sm text-white/60">Pure performance pay. Direct wins plus recurring retention income.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -228,11 +229,11 @@ export function BossPayroll() {
         {loading ? (
           <p className="text-sm text-white/65">Loading payroll...</p>
         ) : !data || data.bdms.length === 0 ? (
-          <p className="text-sm text-white/65">No BDM earnings recorded for this month yet.</p>
+          <p className="text-sm text-white/65">No franchise earnings recorded for this month yet.</p>
         ) : (
           <div className="space-y-2">
             <div className="grid grid-cols-[1.3fr_repeat(4,0.8fr)_1fr] gap-3 px-3 text-[11px] uppercase tracking-[0.14em] text-white/45">
-              <span>BDM</span>
+              <span>Partner Name</span>
               <span>Direct</span>
               <span>Recurring</span>
               <span>Enterprise</span>
@@ -242,7 +243,10 @@ export function BossPayroll() {
             {data.bdms.map((row) => (
               <div key={row.bdmUserId} className="grid grid-cols-[1.3fr_repeat(4,0.8fr)_1fr] items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-3 text-sm">
                 <div>
-                  <p className="font-semibold text-white">{row.bdmName}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-semibold text-white">{row.bdmName}</p>
+                    <RoleBadge role="BDM" />
+                  </div>
                   <p className="text-xs text-white/55">{row.bdmEmail}</p>
                   <span
                     className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${
@@ -311,7 +315,7 @@ export function BossPayroll() {
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <label className="grid gap-1 text-sm text-white/70">
-                BDM
+                Franchise Partner
                 <select
                   value={bonusForm.bdmUserId}
                   onChange={(e) => setBonusForm((current) => ({ ...current, bdmUserId: e.target.value }))}

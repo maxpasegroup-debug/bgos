@@ -255,7 +255,7 @@ function CampaignsPanel() {
 function ModuleGrid() {
   const modules = [
     { href: "/internal/sales", label: "Sales Network", desc: "Hierarchy, targets, promotions", icon: "◎", color: "from-cyan-500/20 to-cyan-500/5" },
-    { href: "/internal/team", label: "People", desc: "RSM, BDM, BDE management", icon: "◆", color: "from-violet-500/20 to-violet-500/5" },
+    { href: "/internal/team", label: "People", desc: "RSM, franchise partner, BDE management", icon: "◆", color: "from-violet-500/20 to-violet-500/5" },
     { href: "/internal/wallet", label: "Accounts", desc: "Revenue, payouts, compliance", icon: "◇", color: "from-emerald-500/20 to-emerald-500/5" },
     { href: "/internal/tech", label: "Tech Queue", desc: "Requests, queue, completions", icon: "⎔", color: "from-sky-500/20 to-sky-500/5" },
   ];
@@ -323,7 +323,7 @@ export function BossDashboard() {
           <StatCard label="Network Revenue" value={earnings ? fmt(earnings.totalAmount) : "—"} accent="text-emerald-400" />
           <StatCard label="Active Subs" value={subs ? String(subs.activeCount) : "—"} accent="text-[#4FD1FF]" />
           <StatCard label="Team Size" value={team ? String(team.total) : "—"} />
-          <StatCard label="BDM Count" value={String(team?.roleCount?.BDM ?? 0)} sub="active BDMs" />
+          <StatCard label="Franchise Partners" value={String(team?.roleCount?.BDM ?? 0)} sub="active partners" />
         </motion.div>
 
         {/* Module navigation */}

@@ -416,6 +416,7 @@ model Company {
   onboardingFormTemplates      OnboardingFormTemplate[]
   onboardingSubmissions        OnboardingSubmission[]
   onboardingSessions           OnboardingSession[]
+  onboardingConversation       OnboardingConversation?
   onboardingRecords            Onboarding[]
   onboardingPipeline           OnboardingPipeline[]
   ownershipClaims             OwnershipClaim[]
@@ -984,6 +985,27 @@ model OnboardingSession {
   @@index([status])
   @@index([leadId])
   @@index([companyId])
+}
+
+model OnboardingConversation {
+  id                 String   @id @default(cuid())
+  companyId          String   @unique
+  bossUserId         String
+  stage              Int      @default(1)
+  companyProfile     Json?
+  departments        Json?
+  roles              Json?
+  employees          Json?
+  bossDashboardNeeds Json?
+  completed          Boolean  @default(false)
+  submittedAt        DateTime?
+  techRequestId      String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([bossUserId])
 }
 
 /**

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api-fetch";
+import { getTeamLabel } from "@/lib/role-display";
 import { BossPayroll } from "./BossPayroll";
 
 type NewSignup = {
@@ -294,9 +295,9 @@ export function BossPipelineView() {
             </div>
 
             <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-              <p className="text-sm font-semibold text-white">Team Performance</p>
+              <p className="text-sm font-semibold text-white">Franchise Network Performance</p>
               <div className="mt-3">
-                <p className="text-xs uppercase tracking-wider text-white/50">BDM Team</p>
+                <p className="text-xs uppercase tracking-wider text-white/50">{getTeamLabel("BDM")}</p>
                 <div className="mt-2 space-y-2">
                   {data.teamStats.bdm.map((m) => {
                     const progress = pct(m.deliveredThisMonth, 5);

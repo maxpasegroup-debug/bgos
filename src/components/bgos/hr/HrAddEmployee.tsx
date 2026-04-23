@@ -4,8 +4,8 @@ import { useState } from "react";
 import { apiFetch } from "@/lib/api-fetch";
 
 const ROLE_OPTIONS: { label: string; role: "BDM" | "TECH_EXECUTIVE" | "MANAGER" }[] = [
-  { label: "Sales Executive", role: "BDM" },
-  { label: "Channel Partner", role: "BDM" },
+  { label: "Micro Franchise Partner", role: "BDM" },
+  { label: "Micro Franchise Partner", role: "BDM" },
   { label: "Operations Manager", role: "MANAGER" },
   { label: "Site Engineer", role: "TECH_EXECUTIVE" },
   { label: "Installation Team", role: "TECH_EXECUTIVE" },
@@ -46,7 +46,9 @@ function SuccessModal({
       <div className="w-full max-w-sm rounded-2xl border border-emerald-400/30 bg-[#0f1f17] p-6 shadow-xl">
         <div className="mb-4 flex items-center gap-2 text-emerald-300">
           <span className="text-xl">✅</span>
-          <h2 className="text-lg font-semibold">Employee Added Successfully</h2>
+          <h2 className="text-lg font-semibold">
+            {payload.employee.role === "BDM" ? "Franchise Partner Added" : "Employee Added Successfully"}
+          </h2>
         </div>
 
         <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm">
@@ -62,6 +64,7 @@ function SuccessModal({
         <p className="mt-3 text-xs text-white/50">
           Share these credentials with the employee. They can login at{" "}
           <span className="text-cyan-300">iceconnect.in</span>
+          {payload.employee.role === "BDM" ? " as a Micro Franchise Partner." : "."}
         </p>
 
         <div className="mt-4 flex gap-2">
@@ -171,7 +174,9 @@ export function HrAddEmployee({ onCreated }: { onCreated: () => void }) {
       )}
 
       <div className="mx-auto max-w-lg rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-        <h2 className="mb-1 text-lg font-semibold">Add Employee</h2>
+        <h2 className="mb-1 text-lg font-semibold">
+          {ROLE_OPTIONS[selectedOption]?.role === "BDM" ? "Add Franchise Partner" : "Add Employee"}
+        </h2>
         <p className="mb-5 text-sm text-white/50">
           A welcome notification with login credentials will be sent automatically.
         </p>
@@ -217,7 +222,7 @@ export function HrAddEmployee({ onCreated }: { onCreated: () => void }) {
             >
               {ROLE_OPTIONS.map((opt, i) => (
                 <option key={opt.label} value={i}>
-                  {opt.label} → {opt.role === "BDM" ? "Sales" : opt.role === "TECH_EXECUTIVE" ? "Technical" : "Management"}
+                  {opt.label} → {opt.role === "BDM" ? "Franchise" : opt.role === "TECH_EXECUTIVE" ? "Technical" : "Management"}
                 </option>
               ))}
             </select>
@@ -269,7 +274,7 @@ export function HrAddEmployee({ onCreated }: { onCreated: () => void }) {
             disabled={submitting}
             className="w-full rounded-xl bg-cyan-600 py-2.5 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-50"
           >
-            {submitting ? "Adding employee…" : "Add Employee"}
+            {submitting ? "Adding employee…" : `${ROLE_OPTIONS[selectedOption]?.role === "BDM" ? "Add Franchise Partner" : "Add Employee"}`}
           </button>
         </form>
       </div>

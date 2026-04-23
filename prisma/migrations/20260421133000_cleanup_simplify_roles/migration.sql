@@ -1,26 +1,26 @@
--- PART 1: Remap roles BEFORE enum conversion
-CREATE TEMP TABLE "_uc_bdm_ids" AS
-SELECT "id"
-FROM "UserCompany"
+-- Remap roles before enum change
+UPDATE "UserCompany"
+SET "jobRole" = 'BDM'
 WHERE "jobRole" IN (
-  'SALES_HEAD','SALES_EXECUTIVE','TELECALLER',
-  'CHANNEL_PARTNER','MICRO_FRANCHISE'
+  'SALES_HEAD','SALES_EXECUTIVE',
+  'TELECALLER','CHANNEL_PARTNER',
+  'MICRO_FRANCHISE'
 );
 
-UPDATE "UserCompany" SET "jobRole" = 'MANAGER'
-  WHERE "id" IN (SELECT "id" FROM "_uc_bdm_ids");
+UPDATE "UserCompany"
+SET "jobRole" = 'TECH_EXECUTIVE'
+WHERE "jobRole" IN (
+  'SITE_ENGINEER','INSTALLATION_TEAM',
+  'SERVICE_TEAM','PRO'
+);
 
-UPDATE "UserCompany" SET "jobRole" = 'TECH_EXECUTIVE'
-  WHERE "jobRole" IN (
-    'SITE_ENGINEER','INSTALLATION_TEAM',
-    'SERVICE_TEAM','PRO'
-  );
-
-UPDATE "UserCompany" SET "jobRole" = 'MANAGER'
-  WHERE "jobRole" IN (
-    'ACCOUNTANT','HR_MANAGER','OPERATIONS_HEAD',
-    'INVENTORY_MANAGER','LCO'
-  );
+UPDATE "UserCompany"
+SET "jobRole" = 'MANAGER'
+WHERE "jobRole" IN (
+  'ACCOUNTANT','HR_MANAGER',
+  'OPERATIONS_HEAD','INVENTORY_MANAGER',
+  'LCO'
+);
 
 -- PART 2: Prisma diff SQL
 
@@ -34,10 +34,6 @@ ALTER TYPE "UserRole" RENAME TO "UserRole_old";
 ALTER TYPE "UserRole_new" RENAME TO "UserRole";
 DROP TYPE "public"."UserRole_old";
 COMMIT;
-
-UPDATE "UserCompany" SET "jobRole" = 'BDM'
-WHERE "id" IN (SELECT "id" FROM "_uc_bdm_ids");
-DROP TABLE "_uc_bdm_ids";
 
 -- DropForeignKey
 ALTER TABLE "ChannelPartner" DROP CONSTRAINT "ChannelPartner_companyId_fkey";

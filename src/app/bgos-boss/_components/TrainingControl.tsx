@@ -123,7 +123,7 @@ export function TrainingControl() {
 
       {saved && (
         <p style={{ fontSize: 12, color: "#34D399", margin: 0 }}>
-          Material saved — visible to BDE/BDM on /internal/training
+          Material saved — visible to BDE and Micro Franchise Partner roles on /internal/training
         </p>
       )}
     </div>

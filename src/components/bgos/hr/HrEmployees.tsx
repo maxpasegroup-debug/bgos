@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { apiFetch } from "@/lib/api-fetch";
+import { RoleBadge } from "@/components/ui/RoleBadge";
 import type { HrPayload } from "./HrDashboard";
 
 type Employee = HrPayload["employees"][number];
@@ -109,7 +110,9 @@ export function HrEmployees({ data, onRefresh }: { data: HrPayload; onRefresh: (
                   <p className="text-xs text-white/50">{emp.email}</p>
                   {emp.phone ? <p className="text-xs text-white/40">{emp.phone}</p> : null}
                 </td>
-                <td className="px-4 py-3 hidden sm:table-cell text-white/70">{emp.roleLabel}</td>
+                <td className="px-4 py-3 hidden sm:table-cell text-white/70">
+                  <RoleBadge role={emp.role} />
+                </td>
                 <td className="px-4 py-3 hidden md:table-cell text-xs text-white/50">
                   {emp.dashboardAssigned || <span className="text-white/25">—</span>}
                 </td>

@@ -371,7 +371,7 @@ export function BdmOnboardingWizard({ lead, onClose, onSubmitted }: Props) {
     <div style={overlayStyle}>
       <div style={wizardShellStyle}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h3 style={{ margin: 0, fontSize: 19 }}>BDM Onboarding Wizard</h3>
+          <h3 style={{ margin: 0, fontSize: 19 }}>Franchise Onboarding Wizard</h3>
           <button type="button" style={buttonStyle} onClick={onClose}>Close</button>
         </div>
         <p style={{ margin: "4px 0 0", color: "rgba(255,255,255,0.7)", fontSize: 13 }}>Step {step} of 5</p>

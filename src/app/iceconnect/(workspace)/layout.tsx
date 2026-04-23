@@ -45,7 +45,7 @@ const SALES_HUB_LABEL: Record<string, string> = {
 const SEGMENT_LABEL: Record<string, string> = {
   sales: "Sales",
   "sales-head": "Sales Head",
-  partner: "Channel Partner",
+  partner: "Micro Franchise Partner",
   operations: "Operations Head",
   site: "Site Engineer",
   pro: "PRO",

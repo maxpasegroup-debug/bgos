@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { AuthUser } from "@/lib/auth";
 import { apiFetch } from "@/lib/api-fetch";
+import { RoleBadge } from "@/components/ui/RoleBadge";
+import { getDashboardTitle } from "@/lib/role-display";
 import { BdmClients } from "./bdm/BdmClients";
 import { BdmEarnings } from "./bdm/BdmEarnings";
 import { BdmLeads } from "./bdm/BdmLeads";
@@ -19,7 +21,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "onboarding", label: "Onboarding" },
   { key: "clients", label: "Clients" },
   { key: "tech", label: "Tech Requests" },
-  { key: "earnings", label: "Earnings" },
+  { key: "earnings", label: "My Franchise Earnings" },
 ];
 
 type NotificationRow = {
@@ -75,7 +77,7 @@ export function BdmDashboard({ user }: { user: AuthUser }) {
   const tabContent = useMemo(() => {
     if (activeTab === "overview") return <BdmOverview />;
     if (activeTab === "leads") return <BdmLeads user={user} />;
-    if (activeTab === "onboarding") return <BdmOnboarding />;
+    if (activeTab === "onboarding") return <BdmOnboarding user={user} />;
     if (activeTab === "clients") return <BdmClients />;
     if (activeTab === "earnings") return <BdmEarnings />;
     return <BdmTechRequests />;
@@ -97,13 +99,14 @@ export function BdmDashboard({ user }: { user: AuthUser }) {
         }}
       >
         <div>
-          <p style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>BDM Command Center</p>
+          <p style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{getDashboardTitle(user.role)}</p>
           <p style={{ margin: "2px 0 0", fontSize: 12, color: "rgba(255,255,255,0.7)" }}>
             Welcome, {user.email}
           </p>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <RoleBadge role={user.role} />
           <button
             type="button"
             onClick={() => setChangePwOpen(true)}

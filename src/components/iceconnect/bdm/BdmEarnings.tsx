@@ -131,7 +131,7 @@ export function BdmEarnings() {
       <div style={panelStyle}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <div>
-            <p style={eyebrowStyle}>Current Month Breakdown</p>
+            <p style={eyebrowStyle}>My Franchise Earnings</p>
             <p style={{ margin: "6px 0 0", fontSize: 18, fontWeight: 700 }}>
               {formatMonth(data.currentMonth.month)} - {formatCurrency(data.currentMonth.total)} earned
             </p>
@@ -206,10 +206,10 @@ export function BdmEarnings() {
       <div style={{ ...panelStyle, background: "linear-gradient(135deg, rgba(14,165,233,0.16), rgba(34,197,94,0.12))" }}>
         <p style={eyebrowStyle}>Momentum</p>
         <p style={{ margin: "6px 0 0", fontSize: 16, fontWeight: 700 }}>
-          Build 30 active clients to unlock {formatCurrency(30_000)}/month just from renewals.
+          Build 30 active clients to unlock {formatCurrency(30_000)}/month in passive franchise renewals.
         </p>
         <p style={{ margin: "8px 0 0", fontSize: 13, color: "rgba(255,255,255,0.78)" }}>
-          You currently have {data.stats.activeClients} active recurring clients.
+          You currently have {data.stats.activeClients} active recurring clients in your franchise network.
         </p>
       </div>
     </div>

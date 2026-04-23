@@ -2,11 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api-fetch";
-import { BdmOnboardingWizard } from "./BdmOnboardingWizard";
+import type { AuthUser } from "@/lib/auth";
+import { BdmNexaOnboarding } from "./BdmNexaOnboarding";
 
 type LeadRow = {
   id: string;
   companyName: string;
+  contactName: string;
+  phone: string;
+  email: string | null;
   industry: string | null;
   statusKey: "NEW" | "CONTACTED" | "QUALIFIED" | "ONBOARDING" | "DELIVERED" | "LOST";
   assignedDate: string;
@@ -22,12 +26,12 @@ type TechRequestRow = {
   nextActionNeeded: string | null;
 };
 
-export function BdmOnboarding() {
+export function BdmOnboarding({ user }: { user: AuthUser }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [techRequests, setTechRequests] = useState<TechRequestRow[]>([]);
-  const [wizardLead, setWizardLead] = useState<{ id: string; companyName: string; industry: string | null } | null>(null);
+  const [wizardLead, setWizardLead] = useState<LeadRow | null>(null);
 
   async function loadData() {
     setLoading(true);
@@ -79,12 +83,7 @@ export function BdmOnboarding() {
   }
 
   return (
-    <div
-      style={{
-        display: "grid",
-        gap: 12,
-      }}
-    >
+    <div style={{ display: "grid", gap: 12 }}>
       <div style={sectionStyle}>
         <h3 style={{ margin: 0, fontSize: 17 }}>ACTIVE ONBOARDINGS</h3>
         {loading ? (
@@ -95,12 +94,16 @@ export function BdmOnboarding() {
           <p style={mutedText}>No active onboardings.</p>
         ) : (
           activeOnboardings.map((lead) => {
-            const days = Math.max(1, Math.floor((Date.now() - new Date(lead.assignedDate).getTime()) / (1000 * 60 * 60 * 24)));
+            const days = Math.max(
+              1,
+              Math.floor((Date.now() - new Date(lead.assignedDate).getTime()) / (1000 * 60 * 60 * 24)),
+            );
             const tech = techRequests.find((row) => row.companyName === lead.companyName);
             const stages = stageArray(lead.id);
             return (
               <div key={lead.id} style={cardStyle}>
                 <p style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{lead.companyName}</p>
+                <p style={mutedText}>Boss contact: {lead.contactName || "Not added yet"}</p>
                 <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {stages.map((stage) => (
                     <span
@@ -120,13 +123,11 @@ export function BdmOnboarding() {
                 </div>
                 <p style={mutedText}>Days since started: {days}</p>
                 <p style={mutedText}>SDE assigned: {tech?.sdeAssigned ?? "Not assigned"}</p>
-                <p style={mutedText}>Next action needed: {tech?.nextActionNeeded ?? "Complete onboarding wizard and submit tech request."}</p>
-                <button
-                  type="button"
-                  style={buttonStyle}
-                  onClick={() => setWizardLead({ id: lead.id, companyName: lead.companyName, industry: lead.industry })}
-                >
-                  Continue
+                <p style={mutedText}>
+                  Next action needed: {tech?.nextActionNeeded ?? "Complete onboarding and submit the build brief."}
+                </p>
+                <button type="button" style={buttonStyle} onClick={() => setWizardLead(lead)}>
+                  Start Onboarding
                 </button>
               </div>
             );
@@ -153,10 +154,10 @@ export function BdmOnboarding() {
       </div>
 
       {wizardLead ? (
-        <BdmOnboardingWizard
+        <BdmNexaOnboarding
           lead={wizardLead}
-          onClose={() => setWizardLead(null)}
-          onSubmitted={() => {
+          user={user}
+          onClose={() => {
             setWizardLead(null);
             void loadData();
           }}

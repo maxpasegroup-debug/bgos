@@ -17,7 +17,7 @@ const ROLE_LABEL: Record<string, string> = {
   SALES_HEAD: "Sales Head",
   SALES_EXECUTIVE: "Sales Executive",
   TELECALLER: "Telecaller",
-  CHANNEL_PARTNER: "Channel Partner",
+  CHANNEL_PARTNER: "Micro Franchise Partner",
   OPERATIONS_HEAD: "Operations Head",
   SITE_ENGINEER: "Site Engineer",
   PRO: "PRO",

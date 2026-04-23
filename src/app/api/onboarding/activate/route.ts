@@ -84,7 +84,31 @@ export async function POST(request: NextRequest) {
         });
 
         if (!existingWebsiteLead) {
-          const assignedBdmId = await getNextBdmId(company.id);
+          const latestOnboardingSession = await prisma.onboardingSession.findFirst({
+            where: {
+              createdByUserId: session.sub,
+              companyId: company.id,
+            },
+            orderBy: { createdAt: "desc" },
+            select: {
+              partnerId: true,
+              data: true,
+            },
+          });
+          const sessionData =
+            latestOnboardingSession?.data &&
+            typeof latestOnboardingSession.data === "object" &&
+            !Array.isArray(latestOnboardingSession.data)
+              ? (latestOnboardingSession.data as Record<string, unknown>)
+              : null;
+          const partnerFromSessionData =
+            typeof sessionData?.franchisePartnerId === "string" && sessionData.franchisePartnerId.trim()
+              ? sessionData.franchisePartnerId.trim()
+              : null;
+          const assignedBdmId =
+            latestOnboardingSession?.partnerId?.trim() ||
+            partnerFromSessionData ||
+            (await getNextBdmId(company.id));
           await prisma.lead.create({
             data: {
               name: user.name || "Website Signup",
