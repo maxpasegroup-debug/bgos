@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { getRoleHome } from "@/lib/role-routing";
+import { SUPER_BOSS_HOME_PATH, getRoleHome } from "@/lib/role-routing";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -66,7 +66,7 @@ export default function LoginPage() {
       const superBoss = meJson?.user?.superBoss === true;
 
       if (superBoss) {
-        router.replace("/bgos/control");
+        router.replace(SUPER_BOSS_HOME_PATH);
         return;
       }
 
