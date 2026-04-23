@@ -421,19 +421,61 @@ export function NexaOnboardBossClient({
     }));
   }
 
+  async function activateWorkspaceAndRedirect(fallbackPath: string) {
+    const activateRes = await apiFetch("/api/onboarding/activate", {
+      method: "POST",
+      credentials: "include",
+    });
+    const activateJson = ((await readApiJson(activateRes, "onboarding-activate")) ?? {}) as {
+      ok?: boolean;
+      error?: string;
+    };
+    if (!activateRes.ok || activateJson.ok !== true) {
+      setBanner({
+        text: activateJson.error || "Your company was created, but workspace activation did not finish.",
+        showRetry: true,
+      });
+      return;
+    }
+
+    let redirectPath = fallbackPath;
+    try {
+      const meRes = await apiFetch("/api/auth/me", { credentials: "include" });
+      const meJson = ((await readApiJson(meRes, "onboarding-activate-me")) ?? {}) as {
+        user?: { employeeDomain?: "BGOS" | "SOLAR"; superBoss?: boolean } | null;
+      };
+      if (meJson.user?.superBoss === true) {
+        redirectPath = "/bgos/control";
+      } else if (meJson.user?.employeeDomain === "SOLAR") {
+        redirectPath = "/solar-boss";
+      } else {
+        redirectPath = "/bgos/dashboard";
+      }
+    } catch {
+      redirectPath = fallbackPath;
+    }
+
+    window.localStorage.removeItem(STORAGE_KEY);
+    window.setTimeout(() => {
+      window.location.assign(redirectPath);
+    }, 400);
+  }
+
   async function runReadymade() {
     setBusy(true);
     setBanner(null);
     try {
       const uid = state.user.id?.trim();
+      const requestedIndustry = category.trim() || "SOLAR";
       const body = {
         source: "NEXA_ENGINE" as const,
         name: companyName.trim(),
-        industry: "SOLAR",
-        businessType: "SOLAR",
+        industry: requestedIndustry,
+        businessType: requestedIndustry,
         ...(uid ? { user_id: uid } : {}),
       };
       let companyId: string | undefined;
+      let redirectPath = requestedIndustry === "SOLAR" ? "/solar-boss" : "/bgos/dashboard";
       for (let attempt = 0; attempt < 3; attempt++) {
         const createRes = await apiFetch("/api/company/create", {
           method: "POST",
@@ -447,10 +489,14 @@ export function NexaOnboardBossClient({
         const created = ((await readApiJson(createRes, "company-create")) ?? {}) as {
           ok?: boolean;
           companyId?: string;
+          redirectPath?: string;
           error?: string;
           code?: string;
         };
         companyId = created.companyId;
+        if (typeof created.redirectPath === "string" && created.redirectPath.trim()) {
+          redirectPath = created.redirectPath;
+        }
         if (createRes.ok && created.ok === true && companyId) break;
         console.error("[NexaOnboardBoss] company/create attempt failed", {
           attempt,
@@ -478,10 +524,9 @@ export function NexaOnboardBossClient({
         return;
       }
       setState((s) => ({ ...s, step: 7, company: { ...s.company, id: companyId } }));
-      window.localStorage.removeItem(STORAGE_KEY);
       window.setTimeout(() => {
         /** Readymade (solar) bosses land on the tenant BGOS dashboard — not the internal control plane. */
-        window.location.assign("/bgos/control/v4");
+        void activateWorkspaceAndRedirect(redirectPath);
       }, 800);
     } finally {
       setBusy(false);
@@ -502,6 +547,7 @@ export function NexaOnboardBossClient({
         ...(uidCustom ? { user_id: uidCustom } : {}),
       };
       let newCompanyId: string | undefined;
+      let redirectPath = "/bgos/dashboard";
       for (let attempt = 0; attempt < 3; attempt++) {
         const createRes = await apiFetch("/api/company/create", {
           method: "POST",
@@ -515,11 +561,15 @@ export function NexaOnboardBossClient({
         const created = ((await readApiJson(createRes, "company-create-custom")) ?? {}) as {
           ok?: boolean;
           companyId?: string;
+          redirectPath?: string;
           error?: string;
           code?: string;
         };
         if (createRes.ok && created.ok === true && created.companyId) {
           newCompanyId = created.companyId;
+          if (typeof created.redirectPath === "string" && created.redirectPath.trim()) {
+            redirectPath = created.redirectPath;
+          }
           break;
         }
         if (attempt < 2) await new Promise((r) => setTimeout(r, 2000));
@@ -532,6 +582,7 @@ export function NexaOnboardBossClient({
         });
         return;
       }
+      let initialized = false;
       for (let attempt = 0; attempt < 3; attempt++) {
         const initSys = await apiFetch("/api/system/init", {
           method: "POST",
@@ -550,13 +601,27 @@ export function NexaOnboardBossClient({
             },
           }),
         });
-        if (initSys.ok) break;
+        const initJson = ((await readApiJson(initSys, "system-init")) ?? {}) as {
+          ok?: boolean;
+          success?: boolean;
+        };
+        if (initSys.ok && initJson.ok === true && initJson.success === true) {
+          initialized = true;
+          break;
+        }
         if (attempt < 2) await new Promise((r) => setTimeout(r, 2000));
       }
+      if (!initialized) {
+        setBanner({
+          text: "I'm fixing a system issue. Let's retry together.",
+          showRetry: true,
+          onRetry: () => void submitCustom(),
+        });
+        return;
+      }
       setState((s) => ({ ...s, step: 7, company: { ...s.company, id: newCompanyId } }));
-      window.localStorage.removeItem(STORAGE_KEY);
       window.setTimeout(() => {
-        window.location.assign("/bgos/control/v4?building=1");
+        void activateWorkspaceAndRedirect(redirectPath);
       }, 800);
     } finally {
       setBusy(false);

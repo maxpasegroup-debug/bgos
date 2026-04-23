@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { signToken } from "@/lib/auth";
 import { ACTIVE_COMPANY_COOKIE_NAME } from "@/lib/auth-config";
 import { prisma } from "@/lib/prisma";
+import { setActiveCompanyCookie, setSessionCookie } from "@/lib/session-cookie";
 import { isSuperBossEmail } from "@/lib/super-boss";
 
 type MembershipWithCompany = {
@@ -61,25 +62,35 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid" }, { status: 400 });
   }
 
-  const user = await prisma.user.findFirst({
-    where: { email: { equals: email.trim(), mode: "insensitive" } },
-    include: {
-      memberships: {
-        include: {
-          company: {
-            select: {
-              workspaceDomain: true,
-              plan: true,
-              trialEndDate: true,
-              subscriptionPeriodEnd: true,
-              subscriptionStatus: true,
+  let user:
+    | (Awaited<ReturnType<typeof prisma.user.findFirst>> & {
+        memberships: MembershipWithCompany[];
+      })
+    | null = null;
+  try {
+    user = await prisma.user.findFirst({
+      where: { email: { equals: email.trim(), mode: "insensitive" } },
+      include: {
+        memberships: {
+          include: {
+            company: {
+              select: {
+                workspaceDomain: true,
+                plan: true,
+                trialEndDate: true,
+                subscriptionPeriodEnd: true,
+                subscriptionStatus: true,
+              },
             },
           },
+          orderBy: { createdAt: "desc" },
         },
-        orderBy: { createdAt: "desc" },
       },
-    },
-  });
+    });
+  } catch (err) {
+    console.error("[LOGIN] DB error:", err);
+    return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
+  }
 
   if (!user) {
     return NextResponse.json({ error: "Invalid" }, { status: 401 });
@@ -149,18 +160,18 @@ export async function POST(req: Request) {
     jwtVersion: 2,
     ...(memberships ? { memberships } : {}),
     employeeDomain,
+    ...(user.employeeSystem ? { employeeSystem: user.employeeSystem } : {}),
+    ...(user.iceconnectEmployeeRole
+      ? { iceconnectEmployeeRole: user.iceconnectEmployeeRole }
+      : {}),
     ...(superBoss ? { superBoss: true } : {}),
   });
 
   const res = NextResponse.json({ success: true });
-
-  res.cookies.set("token", token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 7,
-  });
+  await setSessionCookie(res, token);
+  if (companyId) {
+    await setActiveCompanyCookie(res, companyId);
+  }
 
   return res;
 }

@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { isIceconnectInHost } from "@/lib/host-routing";
 import { getRoleHome } from "@/lib/role-routing";
 
 export default function LoginPage() {
@@ -65,18 +64,9 @@ export default function LoginPage() {
       const role = meJson?.user?.role ?? "";
       const employeeDomain = meJson?.user?.employeeDomain ?? "";
       const superBoss = meJson?.user?.superBoss === true;
-      const isIceDomain =
-        typeof window !== "undefined" && isIceconnectInHost(window.location.host ?? "");
 
-      // Super boss always goes to control
       if (superBoss) {
         router.replace("/bgos/control");
-        return;
-      }
-
-      if (isIceDomain) {
-        const home = getRoleHome(role);
-        router.replace(home || "/login");
         return;
       }
 

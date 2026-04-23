@@ -31,16 +31,7 @@ const nextConfig: NextConfig = {
        * `/_next/static` chunks causes “Failed to find Server Action” until a hard refresh.
        */
       {
-        source: "/onboarding/nexa",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "private, no-cache, no-store, must-revalidate",
-          },
-        ],
-      },
-      {
-        source: "/login",
+        source: "/((?!_next/static|_next/image|favicon).*)",
         headers: [
           {
             key: "Cache-Control",
