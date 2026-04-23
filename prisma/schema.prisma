@@ -49,6 +49,18 @@ enum CompanyPlan {
   ENTERPRISE
 }
 
+enum BdmEarningType {
+  DIRECT
+  RECURRING
+  ENTERPRISE
+}
+
+enum BdmEarningStatus {
+  PENDING
+  APPROVED
+  PAID
+}
+
 /**
  * Derived billing/trial state; kept in sync on writes and subscription reads.
  */
@@ -409,6 +421,7 @@ model Company {
   ownershipClaims             OwnershipClaim[]
   techRequests                 TechRequest[]
   techQueueEntries             TechQueueEntry[]
+  bdmEarnings                  BdmEarning[]
   nexaTasks                    NexaTask[]
   techRoundRobinState          TechRoundRobinState?
   nexaCoachingLogs             NexaCoachingLog[]
@@ -604,6 +617,33 @@ model RazorpayPayment {
   @@index([userId])
 }
 
+model BdmEarning {
+  id              String           @id @default(cuid())
+  bdmUserId       String
+  clientCompanyId String
+  type            BdmEarningType
+  plan            String
+  amount          Int
+  month           String
+  periodStart     DateTime
+  periodEnd       DateTime
+  status          BdmEarningStatus @default(PENDING)
+  approvedBy      String?
+  approvedAt      DateTime?
+  paidAt          DateTime?
+  notes           String?
+  paymentRef      String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  bdmUser       User    @relation(fields: [bdmUserId], references: [id])
+  clientCompany Company @relation(fields: [clientCompanyId], references: [id], onDelete: Cascade)
+
+  @@index([bdmUserId, month])
+  @@index([status])
+  @@index([clientCompanyId])
+}
+
 /// Membership: `role` is company-level (ADMIN vs EMPLOYEE); `jobRole` is operational RBAC (solar CRM role enum).
 model UserCompany {
   id                String   @id @default(cuid())
@@ -772,6 +812,7 @@ model User {
   internalTechTasksAssigned         InternalTechTask[]            @relation("TechTaskAssignee")
   internalTechTasksCreated          InternalTechTask[]            @relation("TechTaskCreator")
   internalFraudLogsTriggered        InternalFraudLog[]            @relation("FraudLogTrigger")
+  bdmEarnings                       BdmEarning[]
 
   /**
    * ICECONNECT workforce identity — when set to ICECONNECT, user may use /iceconnect/{rsm,bdm,bde,tech}.

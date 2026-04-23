@@ -10,6 +10,7 @@ import { setActiveCompanyCookie, setSessionCookie } from "@/lib/session-cookie";
 import { signAccessToken } from "@/lib/jwt";
 import { isSuperBossEmail } from "@/lib/super-boss";
 import { getNextBdmId } from "@/lib/bdm-round-robin";
+import { processDirectCommission } from "@/lib/bdm-commission-engine";
 
 /**
  * Completes onboarding step 2 (NEXA activation). Sets `workspaceActivatedAt` and re-issues JWT with `workspaceReady: true`.
@@ -116,6 +117,23 @@ export async function POST(request: NextRequest) {
       }
     } catch (leadCreateError) {
       console.error("[bgos] lead auto-create failed", leadCreateError);
+    }
+
+    try {
+      const company = await prisma.company.findUnique({
+        where: { id: companyId },
+        select: { id: true, plan: true },
+      });
+      if (company) {
+        await processDirectCommission({
+          clientCompanyId: company.id,
+          plan: company.plan,
+          paymentRef: `activation:${company.id}`,
+          notes: "Workspace activation commission",
+        });
+      }
+    } catch (commissionError) {
+      console.error("[commission] onboarding activation commission failed", commissionError);
     }
   } catch (e) {
     return handleApiError("POST /api/onboarding/activate", e);

@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import { CompanySubscriptionStatus, type CompanyPlan, Prisma } from "@prisma/client";
 import Razorpay from "razorpay";
 import { PRICING_VERSION, priceForPlanPaise, validatePaymentAmountOrThrow } from "@/config/pricing";
+import { processDirectCommission, processRecurringCommission } from "@/lib/bdm-commission-engine";
 import { prisma } from "@/lib/prisma";
 import { touchCompanyUsageAfterLimitsOrPlanChange } from "@/lib/usage-metrics-engine";
 
@@ -117,6 +118,8 @@ export async function applySuccessfulRazorpayPayment(input: {
   currency: string;
 }): Promise<{ applied: boolean }> {
   let applied = false;
+  let subscriptionStartDate: Date | null = null;
+  let recurringPayment = false;
   await prisma.$transaction(async (tx) => {
     // Idempotency: same Razorpay payment id must never activate twice (webhook + verify retries).
     const dup = await tx.razorpayPayment.findUnique({
@@ -126,13 +129,18 @@ export async function applySuccessfulRazorpayPayment(input: {
 
     const company = await tx.company.findUnique({
       where: { id: input.companyId },
-      select: { subscriptionPeriodEnd: true },
+      select: { createdAt: true, subscriptionPeriodStart: true, subscriptionPeriodEnd: true, subscriptionStatus: true },
     });
     if (!company) {
       throw new Error("Company not found");
     }
 
     const now = new Date();
+    subscriptionStartDate = company.subscriptionPeriodStart ?? company.createdAt;
+    recurringPayment =
+      company.subscriptionStatus === CompanySubscriptionStatus.ACTIVE &&
+      company.subscriptionPeriodEnd !== null &&
+      company.subscriptionPeriodEnd.getTime() > now.getTime();
     if (typeof input.expectedAmountPaise === "number") {
       if (input.amountPaise !== input.expectedAmountPaise) {
         throw new Error(
@@ -185,6 +193,30 @@ export async function applySuccessfulRazorpayPayment(input: {
     void touchCompanyUsageAfterLimitsOrPlanChange(input.companyId).catch((e) =>
       console.error("[razorpay-billing] usage metrics touch failed", e),
     );
+    if (subscriptionStartDate) {
+      const commissionInput = {
+        clientCompanyId: input.companyId,
+        plan: input.targetPlan,
+        paymentRef: input.razorpayPaymentId,
+      };
+      void (async () => {
+        try {
+          if (recurringPayment) {
+            await processRecurringCommission({
+              ...commissionInput,
+              subscriptionStartDate: subscriptionStartDate as Date,
+            });
+          } else {
+            await processDirectCommission({
+              ...commissionInput,
+              notes: "Razorpay payment captured",
+            });
+          }
+        } catch (e) {
+          console.error("[commission] razorpay payment commission failed", e);
+        }
+      })();
+    }
   }
   return { applied };
 }

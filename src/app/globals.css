@@ -14,6 +14,7 @@
   --bgos-primary-to: #8b5cf6;
   --bgos-success: #22c55e;
   --bgos-danger: #ef4444;
+  --font-inter: ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Light shell — applied via [data-bgos-theme="light"] on app root */

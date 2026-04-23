@@ -4,13 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import type { AuthUser } from "@/lib/auth";
 import { apiFetch } from "@/lib/api-fetch";
 import { BdmClients } from "./bdm/BdmClients";
+import { BdmEarnings } from "./bdm/BdmEarnings";
 import { BdmLeads } from "./bdm/BdmLeads";
 import { BdmOnboarding } from "./bdm/BdmOnboarding";
 import { BdmOverview } from "./bdm/BdmOverview";
 import { BdmTechRequests } from "./bdm/BdmTechRequests";
 import { ChangePasswordModal } from "./ChangePasswordModal";
 
-type TabKey = "overview" | "leads" | "onboarding" | "clients" | "tech";
+type TabKey = "overview" | "leads" | "onboarding" | "clients" | "tech" | "earnings";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "overview", label: "Overview" },
@@ -18,6 +19,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "onboarding", label: "Onboarding" },
   { key: "clients", label: "Clients" },
   { key: "tech", label: "Tech Requests" },
+  { key: "earnings", label: "Earnings" },
 ];
 
 type NotificationRow = {
@@ -75,6 +77,7 @@ export function BdmDashboard({ user }: { user: AuthUser }) {
     if (activeTab === "leads") return <BdmLeads user={user} />;
     if (activeTab === "onboarding") return <BdmOnboarding />;
     if (activeTab === "clients") return <BdmClients />;
+    if (activeTab === "earnings") return <BdmEarnings />;
     return <BdmTechRequests />;
   }, [activeTab, user]);
 

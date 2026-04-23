@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api-fetch";
+import { BossPayroll } from "./BossPayroll";
 
 type NewSignup = {
   id: string;
@@ -66,7 +67,7 @@ type PipelinePayload = {
   activityFeed: Array<{ id: string; text: string; createdAt: string }>;
 };
 
-type PipelineTab = "signups" | "onboarding" | "builds" | "delivered";
+type PipelineTab = "signups" | "onboarding" | "builds" | "delivered" | "payroll";
 
 function timeAgo(iso: string): string {
   const t = new Date(iso).getTime();
@@ -147,6 +148,7 @@ export function BossPipelineView() {
         { id: "onboarding", label: "Onboarding" },
         { id: "builds", label: "Builds" },
         { id: "delivered", label: "Delivered" },
+        { id: "payroll", label: "Payroll" },
       ] as const,
     [],
   );
@@ -271,6 +273,8 @@ export function BossPipelineView() {
                   )}
                 </div>
               ) : null}
+
+              {tab === "payroll" ? <BossPayroll /> : null}
 
               {tab === "delivered" ? (
                 <div className="space-y-2">

@@ -1,17 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
 import { headers } from "next/headers";
 import { BGOSLayout } from "@/components/layout-shells/BGOSLayout";
 import { IceconnectLayout } from "@/components/layout-shells/IceconnectLayout";
 import { isIceconnectInHost } from "@/lib/host-routing";
 import "./globals.css";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-  preload: false,
-});
 
 /**
  * Viewport — controls theme-color, full-screen viewport fit, and prevents
@@ -58,7 +50,7 @@ export default async function RootLayout({
   const DomainShell = isIceconnectInHost(host) ? IceconnectLayout : BGOSLayout;
 
   return (
-    <html lang="en" className={`${inter.variable} h-full antialiased`}>
+    <html lang="en" className="h-full antialiased">
       <body className="flex min-h-screen flex-col overflow-x-hidden">
         <DomainShell>{children}</DomainShell>
         <div id="modal-root" />

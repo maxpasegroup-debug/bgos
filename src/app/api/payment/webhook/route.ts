@@ -8,6 +8,7 @@ import {
   stripeClient,
   targetPlanFromMetadata,
 } from "@/lib/billing-stripe";
+import { processDirectCommission, processRecurringCommission } from "@/lib/bdm-commission-engine";
 import { planRank } from "@/lib/company-plan-values";
 import { jsonError, logCaughtError } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
@@ -91,7 +92,14 @@ export async function POST(request: NextRequest) {
 
     const company = await prisma.company.findUnique({
       where: { id: companyId },
-      select: { id: true, plan: true },
+      select: {
+        id: true,
+        plan: true,
+        createdAt: true,
+        subscriptionStatus: true,
+        subscriptionPeriodStart: true,
+        subscriptionPeriodEnd: true,
+      },
     });
     if (!company) {
       return NextResponse.json({ received: true, skipped: "unknown_company" });
@@ -100,6 +108,11 @@ export async function POST(request: NextRequest) {
     if (planRank(targetPlan) <= planRank(company.plan as CompanyPlan)) {
       return NextResponse.json({ received: true, skipped: "already_at_tier" });
     }
+
+    const hadActiveSubscriptionBeforePayment =
+      company.subscriptionStatus === CompanySubscriptionStatus.ACTIVE &&
+      company.subscriptionPeriodEnd !== null &&
+      company.subscriptionPeriodEnd.getTime() > Date.now();
 
     try {
       const now = new Date();
@@ -130,6 +143,26 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ received: true, duplicate: true });
       }
       throw e;
+    }
+
+    try {
+      if (hadActiveSubscriptionBeforePayment) {
+        await processRecurringCommission({
+          clientCompanyId: companyId,
+          plan: targetPlan,
+          paymentRef: full.payment_intent?.toString() ?? full.id,
+          subscriptionStartDate: company.subscriptionPeriodStart ?? company.createdAt,
+        });
+      } else {
+        await processDirectCommission({
+          clientCompanyId: companyId,
+          plan: targetPlan,
+          paymentRef: full.payment_intent?.toString() ?? full.id,
+          notes: "Stripe checkout completed",
+        });
+      }
+    } catch (commissionError) {
+      console.error("[commission] stripe webhook commission failed", commissionError);
     }
 
     return NextResponse.json({ received: true, upgraded: true });

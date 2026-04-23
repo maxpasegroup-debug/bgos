@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuth } from "@/lib/auth";
+import { processDirectCommission } from "@/lib/bdm-commission-engine";
 import { prisma } from "@/lib/prisma";
 import {
   companyNameFromDescription,
@@ -96,6 +97,23 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
       });
     } catch (e) {
       console.error("[sde] BDM completion notification failed", e);
+    }
+
+    try {
+      const company = await prisma.company.findUnique({
+        where: { id: updated.companyId },
+        select: { id: true, plan: true },
+      });
+      if (company) {
+        await processDirectCommission({
+          clientCompanyId: company.id,
+          plan: company.plan,
+          paymentRef: `tech-request:${updated.id}`,
+          notes: "Tech request completed and delivered",
+        });
+      }
+    } catch (commissionError) {
+      console.error("[commission] tech request completion commission failed", commissionError);
     }
   }
 
